@@ -156,13 +156,21 @@ body{
 #form-control{display:none;flex-direction:column;gap:9px}
 #form-screen{display:none}
 #inspection-section,#photos-section{display:none}
-.photos-grid{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:7px}
+.photos-grid{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin-top:9px}
 .photo-slot{
-  height:65px;border:1px dashed #9ab9d5;border-radius:7px;
+  height:105px;border:2px dashed #9ab9d5;border-radius:10px;
   background:#f7fbff;display:flex;flex-direction:column;align-items:center;
-  justify-content:center;gap:2px;cursor:pointer;position:relative;overflow:hidden
+  justify-content:center;gap:5px;cursor:pointer;position:relative;overflow:hidden
 }
-.photo-slot i{font-size:1rem;color:#3774ac}.photo-slot span{font-size:.58rem;font-weight:700;color:#678097}
+.photo-slot i{font-size:1.6rem;color:#3774ac}.photo-slot span{font-size:.68rem;font-weight:800;color:#678097}
+.photo-slot:active{transform:scale(.98);background:#edf7ff}
+.inspection-screen-title{
+  text-align:center;color:#315e94;font-size:.82rem;font-weight:800;
+  text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px
+}
+.estado-placeholder{
+  background:#fff!important;color:#7b8ea2!important;border-color:#cfdfeb!important
+}
 .modal-backdrop-exito{position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(20,42,68,.6);display:none;align-items:center;justify-content:center;z-index:2000;padding:20px}
 .modal-card-exito{background:#fff;border-radius:16px;padding:30px 22px 24px;max-width:320px;width:100%;text-align:center;box-shadow:0 16px 46px rgba(0,0,0,.3)}
 .modal-icon-exito{font-size:2.6rem;color:var(--green);margin-bottom:12px}
@@ -238,7 +246,7 @@ button,.type-card,.photo-slot,.dd-item{-webkit-tap-highlight-color:transparent;t
 
     <form id="form-control" novalidate onsubmit="event.preventDefault(); return false;">
       <input type="hidden" id="tipo-movil">
-      <div class="section-card">
+      <div id="datos-section" class="section-card">
         <div class="two-col">
           <div class="field"><label>Fecha</label><input type="date" id="ctrl-fecha" required></div>
           <div class="field"><label>Hora</label><input type="time" id="ctrl-hora" required></div>
@@ -640,6 +648,7 @@ function seleccionarTipo(tipo) {
   $('form-control').style.display = 'flex';
   mostrar('home-screen', false);
   mostrar('form-screen', true);
+  mostrar('datos-section', true);
   mostrar('inspection-section', false);
   mostrar('photos-section', false);
   var b = $('btn-submit');
@@ -666,7 +675,6 @@ function validarDatos() {
 }
 
 function continuarInspeccion(event) {
-  // Este botón nunca debe enviar el formulario.
   if (event) {
     event.preventDefault();
     event.stopPropagation();
@@ -675,8 +683,13 @@ function continuarInspeccion(event) {
   var err = validarDatos();
   if (err) { mostrarAviso(err); return false; }
 
+  // Segunda pantalla: reemplaza visualmente a la primera, no queda debajo.
+  mostrar('datos-section', false);
   mostrar('inspection-section', true);
   mostrar('photos-section', true);
+
+  var titulo = document.querySelector('.form-head');
+  if (titulo) titulo.innerHTML = 'MÓDULO OPERATIVO<br><strong>INSPECCIÓN Y FOTOGRAFÍAS</strong>';
 
   var b = $('btn-submit');
   b.type = 'button';
@@ -690,8 +703,7 @@ function continuarInspeccion(event) {
   };
   b.innerHTML = '<i class="fas fa-cloud-arrow-up"></i> GUARDAR CONTROL <span>→</span>';
 
-  var s = $('inspection-section');
-  if (s && s.scrollIntoView) s.scrollIntoView({behavior:'smooth', block:'start'});
+  window.scrollTo(0, 0);
   return false;
 }
 
@@ -699,6 +711,9 @@ function volverInicio() {
   resetForm();
   mostrar('home-screen', true);
   mostrar('form-screen', false);
+  mostrar('datos-section', true);
+  var titulo = document.querySelector('.form-head');
+  if (titulo) titulo.innerHTML = 'MÓDULO OPERATIVO<br><strong>CONTROL DE MÓVILES - <span id="form-tipo-label">COMBUSTIBLE</span></strong>';
   window.scrollTo(0, 0);
 }
 
@@ -713,7 +728,7 @@ function resetForm() {
   mostrar('photos-section', false);
   var b = $('btn-submit');
   b.type = 'button';
-  b.onclick = continuarInspeccion;
+  b.onclick = function(ev){ return continuarInspeccion(ev); };
   b.disabled = false;
   b.innerHTML = 'CONTINUAR A INSPECCIÓN / GUARDAR <span>→</span>';
   var now = new Date();
@@ -727,15 +742,19 @@ function renderControles() {
   function bloque(lista, clase) {
     return lista.map(function (item, idx) {
       return '<div class="ctrl-item"><label>' + (idx + 1) + '. ' + esc(item) + '</label>' +
-        '<select class="' + clase + ' status-sin-novedad" data-item="' + esc(item) + '" onchange="styleSelect(this)">' +
-        '<option value="Sin Novedad">Sin Novedad</option><option value="Con Novedad">Con Novedad</option></select></div>';
+        '<select class="' + clase + ' estado-placeholder" data-item="' + esc(item) + '" onchange="styleSelect(this)">' +
+        '<option value="" selected>Seleccione estado...</option><option value="Sin Novedad">Sin Novedad</option><option value="Con Novedad">Con Novedad</option></select></div>';
     }).join('');
   }
   var bv = $('block-ctrl-vehiculo'); if (bv) bv.innerHTML = bloque(ITEMS_VEHICULO, 'select-ctrl');
   var bb = $('block-ctrl-bicicleta'); if (bb) bb.innerHTML = bloque(ITEMS_BICICLETA, 'select-ctrl-bici');
 }
 function styleSelect(el) {
-  var base = el.className.replace(/status-[\w-]+/g, '').trim();
+  var base = el.className.replace(/status-[\w-]+/g, '').replace(/estado-placeholder/g, '').trim();
+  if (!el.value) {
+    el.className = base + ' estado-placeholder';
+    return;
+  }
   el.className = base + (el.value === 'Con Novedad' ? ' status-con-novedad' : ' status-sin-novedad');
 }
 
@@ -793,8 +812,22 @@ function removePhoto(idx) {
 }
 
 /* ---------- Guardado ---------- */
+function validarInspeccion() {
+  var selector = $('tipo-movil').value === 'Bicicleta' ? '.select-ctrl-bici' : '.select-ctrl';
+  var controles = document.querySelectorAll(selector);
+  for (var i = 0; i < controles.length; i++) {
+    if (!controles[i].value) {
+      var n = controles[i].getAttribute('data-item') || ('ítem ' + (i + 1));
+      return 'Debe indicar "Sin Novedad" o "Con Novedad" en: ' + n + '.';
+    }
+  }
+  return '';
+}
 function guardarControl() {
   var err = validarDatos();
+  if (err) { mostrarAviso(err); return; }
+  err = validarInspeccion();
+  if (err) { mostrarAviso(err); return; }
   if (err) { mostrarAviso(err); return; }
   var tipo = $('tipo-movil').value;
   var fecha = $('ctrl-fecha').value, hora = $('ctrl-hora').value, dia = $('ctrl-dia').value;
