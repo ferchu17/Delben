@@ -241,7 +241,7 @@ button,.type-card,.photo-slot,.dd-item{-webkit-tap-highlight-color:transparent;t
   </div>
 
   <div id="form-screen">
-    <button type="button" class="back-btn" onclick="volverInicio()">‹ Volver</button>
+    <button type="button" class="back-btn" onclick="volverDatos()">‹ Volver a datos</button>
     <div class="form-head">MÓDULO OPERATIVO<br><strong>CONTROL DE MÓVILES - <span id="form-tipo-label">COMBUSTIBLE</span></strong></div>
 
     <form id="form-control" novalidate onsubmit="event.preventDefault(); return false;">
@@ -707,6 +707,19 @@ function continuarInspeccion(event) {
   return false;
 }
 
+function volverDatos() {
+  mostrar('datos-section', true);
+  mostrar('inspection-section', false);
+  mostrar('photos-section', false);
+  var titulo = document.querySelector('.form-head');
+  if (titulo) titulo.innerHTML = 'MÓDULO OPERATIVO<br><strong>CONTROL DE MÓVILES - <span id="form-tipo-label">' + (($('tipo-movil') && $('tipo-movil').value) || 'COMBUSTIBLE').toUpperCase() + '</span></strong>';
+  var b = $('btn-submit');
+  b.type = 'button';
+  b.disabled = false;
+  b.onclick = function(ev){ return continuarInspeccion(ev); };
+  b.innerHTML = 'CONTINUAR A INSPECCIÓN / GUARDAR <span>→</span>';
+  window.scrollTo(0, 0);
+}
 function volverInicio() {
   resetForm();
   mostrar('home-screen', true);
