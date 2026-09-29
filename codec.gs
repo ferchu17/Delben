@@ -318,21 +318,22 @@ function enviarControlPorCorreo_(data) {
     var html = '<div style="font-family:Arial,sans-serif;color:#23466f"><h2 style="color:#1f5f99">Control de móvil registrado</h2><p>Se adjunta el informe PDF del control <b>#' + data.id + '</b>.</p><p><b>Movilero:</b> ' + escHtml_(fila[4]) + '<br><b>Vehículo:</b> ' + escHtml_(fila[10] || '') + '<br><b>Fecha:</b> ' + escHtml_(fila[1] || '') + ' · <b>Hora:</b> ' + escHtml_(fila[3] || '') + '</p><p>Este correo fue generado automáticamente por DELBEN SGI.</p></div>';
     var cuentaEjecutora = String(Session.getEffectiveUser().getEmail() || '').trim().toLowerCase();
     if (cuentaEjecutora !== 'fjacyno@gmail.com') {
-      throw new Error('El envío de correo está configurado para salir de fjacyno@gmail.com, pero esta implementación se está ejecutando como ' + (cuentaEjecutora || 'cuenta no identificada') + '. En Administrar implementaciones debe quedar "Ejecutar como: yo" usando la cuenta fjacyno@gmail.com.');
+      throw new Error('La implementación NO está ejecutándose como fjacyno@gmail.com. Cuenta efectiva detectada: ' + (cuentaEjecutora || 'no identificada') + '. En Administrar implementaciones debe figurar "Ejecutar como: Yo" y ese Yo debe ser fjacyno@gmail.com.');
     }
-    GmailApp.sendEmail(
-      data.supervisor.correo,
-      subject,
-      'Se adjunta el informe PDF del control #' + data.id + '.',
-      {
-        cc: CC_CONTROL_MOVILES,
-        htmlBody: html,
-        attachments: [pdf],
-        name: 'DELBEN SGI',
-        replyTo: 'fjacyno@gmail.com',
-        from: 'fjacyno@gmail.com'
-      }
-    );
+
+    // MailApp envía desde la cuenta con la que se ejecuta la implementación.
+    // No se fuerza "from", porque Gmail solo permite "from" cuando es un alias
+    // configurado/verificado en la cuenta.
+    MailApp.sendEmail({
+      to: data.supervisor.correo,
+      cc: CC_CONTROL_MOVILES,
+      subject: subject,
+      body: 'Se adjunta el informe PDF del control #' + data.id + '.',
+      htmlBody: html,
+      attachments: [pdf],
+      name: 'DELBEN SGI',
+      replyTo: 'fjacyno@gmail.com'
+    });
     DriveApp.getFileById(doc.getId()).setTrashed(true);
     return {ok:true, cuentaEjecutora:cuentaEjecutora};
   } catch (e) {
@@ -340,6 +341,22 @@ function enviarControlPorCorreo_(data) {
     return {ok:false,error:String(e && e.message ? e.message : e)};
   }
 }
+function probarCorreo() {
+  var cuenta = String(Session.getEffectiveUser().getEmail() || '').trim();
+  if (cuenta.toLowerCase() !== 'fjacyno@gmail.com') {
+    throw new Error('Esta prueba debe ejecutarse como fjacyno@gmail.com. Cuenta detectada: ' + (cuenta || 'no identificada'));
+  }
+  MailApp.sendEmail({
+    to: 'fjacyno@gmail.com',
+    subject: 'DELBEN - PRUEBA DE CORREO',
+    body: 'Prueba de envío desde Apps Script.',
+    htmlBody: '<p><b>DELBEN</b></p><p>Prueba de envío correcta desde <b>fjacyno@gmail.com</b>.</p>',
+    name: 'DELBEN SGI',
+    replyTo: 'fjacyno@gmail.com'
+  });
+  return 'OK: correo enviado desde ' + cuenta;
+}
+
 function escHtml_(s) {
   return String(s == null ? '' : s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
