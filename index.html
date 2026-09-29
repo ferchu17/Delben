@@ -300,7 +300,7 @@ button,.type-card,.photo-slot,.dd-item{-webkit-tap-highlight-color:transparent;t
       </div>
 
       <div>
-        <button type="button" class="btn-submit" id="btn-submit" onclick="continuarInspeccion()">CONTINUAR A INSPECCIÓN / GUARDAR <span>→</span></button>
+        <button type="button" class="btn-submit" id="btn-submit" onclick="return continuarInspeccion(event)">CONTINUAR A INSPECCIÓN / GUARDAR <span>→</span></button>
         <button type="button" class="btn-reset" onclick="volverInicio()">Limpiar formulario</button>
       </div>
     </form>
@@ -645,7 +645,7 @@ function seleccionarTipo(tipo) {
   var b = $('btn-submit');
   b.type = 'button';
   b.innerHTML = 'CONTINUAR A INSPECCIÓN / GUARDAR <span>→</span>';
-  b.onclick = continuarInspeccion;
+  b.onclick = function(ev){ return continuarInspeccion(ev); };
   window.scrollTo(0, 0);
 }
 
