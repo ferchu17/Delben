@@ -1,5 +1,6 @@
 // ID de la carpeta en Google Drive para guardar las fotos de inspección
 var FOLDER_ID_FOTOS_MOVILES = '1m81-m3AAiZXGarP9xoq3ZSh-7qJQ5i6I';
+var CC_CONTROL_MOVILES = 'fjacyno@ktl-seguridad.com,gsanmartin@ktl-seguridad.com';
 
 // -----------------------------------------------------------------------------
 // 1. SERVIDOR WEB (doGet - Entrega directamente la app móvil interactiva)
@@ -39,7 +40,7 @@ function doPost(e) {
     if (!p || !p.tipo || !p.filaDatos) {
       return jsonOut_({ ok: false, error: 'Faltan datos en la solicitud.' });
     }
-    return jsonOut_(guardarControlCompleto(p.tipo, p.filaDatos, p.fotosArray || []));
+    return jsonOut_(guardarControlCompleto(p.tipo, p.filaDatos, p.fotosArray || [], p.supervisor || {}, p.empresa || ''));
   } catch (err) {
     return jsonOut_({ ok: false, error: String(err && err.message ? err.message : err) });
   }
@@ -123,21 +124,38 @@ function getDatosControlMoviles() {
     }
   }
 
-  return { personal: personalActivo, objetivos: listaObjetivos, flota: flotaActiva };
+  // Supervisores / destinatarios (pestaña "quienRetira")
+  var shSup = ss.getSheetByName('quienRetira');
+  var supervisores = [];
+  if (shSup) {
+    var dataSup = shSup.getDataRange().getValues();
+    if (dataSup.length > 1) {
+      var hSup = dataSup[0].map(function(h){ return String(h || '').toLowerCase().trim(); });
+      var iSupNom = hSup.indexOf('nombre') >= 0 ? hSup.indexOf('nombre') : 1;
+      var iSupMail = hSup.indexOf('correo') >= 0 ? hSup.indexOf('correo') : (hSup.indexOf('email') >= 0 ? hSup.indexOf('email') : 2);
+      for (var sr = 1; sr < dataSup.length; sr++) {
+        var nomSup = String(dataSup[sr][iSupNom] || '').trim();
+        var mailSup = String(dataSup[sr][iSupMail] || '').trim();
+        if (nomSup && mailSup) supervisores.push({ nombre: nomSup, correo: mailSup });
+      }
+    }
+  }
+
+  return { personal: personalActivo, objetivos: listaObjetivos, flota: flotaActiva, supervisores: supervisores };
 }
 
 // -----------------------------------------------------------------------------
 // 3. SUBIDA DE FOTOS A GOOGLE DRIVE
 // -----------------------------------------------------------------------------
 function subirFotosControlDrive(fotosArray) {
-  if (!fotosArray || !fotosArray.length) return [];
+  if (!fotosArray || !fotosArray.length) return { urls: [], ids: [] };
   var folder;
   try {
     folder = DriveApp.getFolderById(FOLDER_ID_FOTOS_MOVILES);
   } catch(e) {
     throw new Error('No se pudo acceder a la carpeta de fotos de Drive: ' + e.message);
   }
-  var urls = [];
+  var urls = [], ids = [];
   for (var i = 0; i < fotosArray.length; i++) {
     var f = fotosArray[i];
     if (f && f.base64) {
@@ -146,40 +164,35 @@ function subirFotosControlDrive(fotosArray) {
       var file = folder.createFile(blob);
       file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
       urls.push(file.getUrl());
+      ids.push(file.getId());
     }
   }
-  return urls;
+  return { urls: urls, ids: ids };
 }
 
 // -----------------------------------------------------------------------------
 // 4. GUARDADO DEFINITIVO EN GOOGLE SHEETS ("combustible", "carroelectrico", "bicicleta")
 // -----------------------------------------------------------------------------
-function guardarControlCompleto(tipo, filaDatos, fotosArray) {
+function guardarControlCompleto(tipo, filaDatos, fotosArray, supervisor, empresa) {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var sheetName = '';
   var t = String(tipo || '').toLowerCase();
-  if (t.indexOf('bici') >= 0) {
-    sheetName = 'bicicleta';
-  } else if (t.indexOf('el') >= 0) {
-    sheetName = 'carroelectrico';
-  } else {
-    sheetName = 'combustible';
-  }
+  if (t.indexOf('bici') >= 0) sheetName = 'bicicleta';
+  else if (t.indexOf('el') >= 0) sheetName = 'carroelectrico';
+  else sheetName = 'combustible';
 
   var sh = ss.getSheetByName(sheetName);
   if (!sh) throw new Error('No se encontró la pestaña destino: "' + sheetName + '"');
 
-  // 1. Subir fotos a Google Drive si las hay
-  var linksFotos = '';
-  if (fotosArray && fotosArray.length > 0) {
-    var urls = subirFotosControlDrive(fotosArray);
-    linksFotos = urls.join(', ');
-  }
+  supervisor = supervisor || {};
+  empresa = String(empresa || '').trim();
+  var supNombre = String(supervisor.nombre || '').trim();
+  var supCorreo = String(supervisor.correo || '').trim();
+  if (!supNombre || !supCorreo) throw new Error('Debe seleccionar un supervisor con correo electrónico.');
 
-  // 2. Colocar los links de fotos en la última posición
-  filaDatos[filaDatos.length - 1] = linksFotos;
+  var fotoInfo = subirFotosControlDrive(fotosArray || []);
+  var linksFotos = fotoInfo.urls.join(', ');
 
-  // 3. Generar ID correlativo
   var lastRow = sh.getLastRow();
   var nextId = 1;
   if (lastRow > 1) {
@@ -188,10 +201,128 @@ function guardarControlCompleto(tipo, filaDatos, fotosArray) {
   }
   filaDatos[0] = nextId;
 
-  // 4. Agregar la fila en la hoja
-  sh.appendRow(filaDatos);
+  // La columna de fotos ya existe en la estructura actual. Supervisor se agrega al final.
+  var header = sh.getRange(1, 1, 1, Math.max(sh.getLastColumn(), 1)).getValues()[0];
+  var idxSup = -1, idxFotos = -1;
+  for (var hc = 0; hc < header.length; hc++) {
+    var hh = String(header[hc] || '').trim().toLowerCase();
+    if (hh === 'supervisor') idxSup = hc;
+    if (hh === 'fotos' || hh.indexOf('foto') >= 0) idxFotos = hc;
+  }
+  if (idxFotos < 0) {
+    idxFotos = sh.getLastColumn();
+    sh.getRange(1, idxFotos + 1).setValue('Fotos');
+  }
+  if (idxSup < 0) {
+    idxSup = sh.getLastColumn();
+    sh.getRange(1, idxSup + 1).setValue('Supervisor');
+  }
 
-  return { ok: true, id: nextId, hoja: sheetName, fotos: linksFotos, persona: String(filaDatos[4] || '') };
+  var rowOut = filaDatos.slice();
+  if (rowOut.length > 0) rowOut[rowOut.length - 1] = linksFotos;
+  rowOut.push(supNombre);
+  sh.appendRow(rowOut);
+
+  var pdfResult = enviarControlPorCorreo_( {
+    id: nextId,
+    hoja: sheetName,
+    tipo: String(tipo || ''),
+    fila: filaDatos,
+    supervisor: { nombre: supNombre, correo: supCorreo },
+    empresa: empresa,
+    fotosIds: fotoInfo.ids,
+    fotosUrls: fotoInfo.urls,
+    linksFotos: linksFotos
+  });
+
+  return {
+    ok: true, id: nextId, hoja: sheetName, fotos: linksFotos,
+    persona: String(filaDatos[4] || ''), supervisor: supNombre,
+    correoEnviado: pdfResult.ok, correo: supCorreo,
+    errorCorreo: pdfResult.ok ? '' : pdfResult.error
+  };
+}
+
+function enviarControlPorCorreo_(data) {
+  var fila = data.fila || [];
+  var doc = null;
+  try {
+    var docName = 'Control Movil #' + data.id + ' - ' + (fila[10] || data.tipo || 'Vehiculo');
+    doc = DocumentApp.create(docName);
+    var body = doc.getBody();
+    body.setMarginTop(28).setMarginBottom(28).setMarginLeft(30).setMarginRight(30);
+
+    var title = body.appendParagraph('DELBEN');
+    title.setHeading(DocumentApp.ParagraphHeading.TITLE).setAlignment(DocumentApp.HorizontalAlignment.CENTER);
+    title.setForegroundColor('#1f5f99');
+    body.appendParagraph('CONTROL DE MÓVIL · INFORME DE INSPECCIÓN').setAlignment(DocumentApp.HorizontalAlignment.CENTER).setBold(true).setForegroundColor('#4b6f8f');
+    body.appendHorizontalRule();
+
+    var meta = body.appendTable([
+      ['N° CONTROL', String(data.id), 'TIPO', String(data.tipo || '')],
+      ['FECHA', String(fila[1] || ''), 'HORA', String(fila[3] || '')],
+      ['MOVILERO', String(fila[4] || ''), 'SUPERVISOR', String(data.supervisor.nombre || '')],
+      ['DNI', String(fila[5] || ''), 'LEGAJO', String(fila[6] || '')],
+      ['EMPRESA', String(data.empresa || ''), 'OBJETIVO', String(fila[8] || '')],
+      ['TURNO', String(fila[7] || ''), 'VEHÍCULO', String(fila[10] || '')],
+      ['KILOMETRAJE', String(fila[11] || ''), 'CORREO SUPERVISOR', String(data.supervisor.correo || '')]
+    ]);
+    for (var r = 0; r < meta.getNumRows(); r++) {
+      for (var c = 0; c < meta.getRow(r).getNumCells(); c++) {
+        var cell = meta.getRow(r).getCell(c);
+        cell.setPaddingTop(5).setPaddingBottom(5).setPaddingLeft(7).setPaddingRight(7);
+        if (c % 2 === 0) cell.setBackgroundColor('#eaf3fb');
+      }
+    }
+
+    body.appendParagraph('');
+    body.appendParagraph('INSPECCIÓN TÉCNICA').setHeading(DocumentApp.ParagraphHeading.HEADING2).setForegroundColor('#1f5f99');
+    var controles = data.tipo.toLowerCase().indexOf('bici') >= 0
+      ? ['Manubrio','Freno Delantero','Freno Trasero','Guardabarros','Pedales','Cargador','Pie de Apoyo','Acelerador','Asiento','Pintura']
+      : ['Estado Externo General','Interior (Butacas)','Luces','Neumático Delantero Der.','Neumático Delantero Izq.','Neumático Trasero Der.','Neumático Trasero Izq.','Rueda de Auxilio','Escobillas Parabrisas','Luces Bajas','Luces Altas','Luz Trasera Izq.','Luz Trasera Der.','Luces de Giro','Bocina','Limpieza Int./Ext.','Baliza Lumínica','Ploteos'];
+    var startIdx = data.tipo.toLowerCase().indexOf('bici') >= 0 ? 9 : 12;
+    var tbl = body.appendTable();
+    for (var i = 0; i < controles.length; i++) {
+      var row = tbl.appendTableRow();
+      var label = row.appendTableCell(String(i + 1) + '. ' + controles[i]);
+      var val = row.appendTableCell(String(fila[startIdx + i] || ''));
+      label.setBackgroundColor('#f3f7fb');
+      if (String(fila[startIdx + i] || '') === 'Con Novedad') val.setBackgroundColor('#fde8e8');
+      else if (String(fila[startIdx + i] || '') === 'Sin Novedad') val.setBackgroundColor('#e8f6ed');
+    }
+    var novIdx = startIdx + controles.length;
+    body.appendParagraph('');
+    body.appendParagraph('NOVEDAD / OBSERVACIÓN GENERAL').setBold(true).setForegroundColor('#1f5f99');
+    body.appendParagraph(String(fila[novIdx] || 'Sin Novedad'));
+
+    if (data.fotosIds && data.fotosIds.length) {
+      body.appendPageBreak();
+      body.appendParagraph('REGISTRO FOTOGRÁFICO').setHeading(DocumentApp.ParagraphHeading.HEADING2).setForegroundColor('#1f5f99');
+      for (var p = 0; p < data.fotosIds.length; p++) {
+        var img = body.appendImage(DriveApp.getFileById(data.fotosIds[p]).getBlob());
+        var maxW = 430, w = img.getWidth(), hh = img.getHeight();
+        if (w > maxW) img.setWidth(maxW).setHeight(Math.round(hh * maxW / w));
+        body.appendParagraph('Vista ' + (p + 1)).setAlignment(DocumentApp.HorizontalAlignment.CENTER).setBold(true).setForegroundColor('#6b7f92');
+      }
+    }
+
+    body.appendParagraph('');
+    body.appendParagraph('Informe generado automáticamente por DELBEN SGI').setAlignment(DocumentApp.HorizontalAlignment.CENTER).setForegroundColor('#7a8fa3').setFontSize(8);
+    doc.saveAndClose();
+
+    var pdf = DriveApp.getFileById(doc.getId()).getAs(MimeType.PDF).setName(docName + '.pdf');
+    var subject = 'DELBEN · Control de Móvil #' + data.id + ' · ' + (fila[4] || '');
+    var html = '<div style="font-family:Arial,sans-serif;color:#23466f"><h2 style="color:#1f5f99">Control de móvil registrado</h2><p>Se adjunta el informe PDF del control <b>#' + data.id + '</b>.</p><p><b>Movilero:</b> ' + escHtml_(fila[4]) + '<br><b>Vehículo:</b> ' + escHtml_(fila[10] || '') + '<br><b>Fecha:</b> ' + escHtml_(fila[1] || '') + ' · <b>Hora:</b> ' + escHtml_(fila[3] || '') + '</p><p>Este correo fue generado automáticamente por DELBEN SGI.</p></div>';
+    MailApp.sendEmail({to:data.supervisor.correo, cc:CC_CONTROL_MOVILES, subject:subject, htmlBody:html, body:'Se adjunta el informe PDF del control #' + data.id + '.', attachments:[pdf]});
+    DriveApp.getFileById(doc.getId()).setTrashed(true);
+    return {ok:true};
+  } catch (e) {
+    if (doc) { try { DriveApp.getFileById(doc.getId()).setTrashed(true); } catch (_) {} }
+    return {ok:false,error:String(e && e.message ? e.message : e)};
+  }
+}
+function escHtml_(s) {
+  return String(s == null ? '' : s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
 
 // -----------------------------------------------------------------------------
