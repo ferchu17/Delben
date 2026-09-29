@@ -136,9 +136,13 @@ body{
   cursor:pointer;margin-top:5px
 }
 .back-btn{
-  border:0;background:transparent;color:#52759a;font-size:.59rem;
-  font-weight:700;cursor:pointer;padding:2px 0 4px;text-align:left
+  display:inline-flex;align-items:center;justify-content:center;gap:5px;
+  border:1px solid #b9d5eb;background:#edf6fd;color:#2f67a9;
+  font-size:.72rem;font-weight:800;cursor:pointer;
+  padding:8px 14px;border-radius:8px;text-align:center;
+  box-shadow:0 1px 3px rgba(35,76,120,.12);margin-bottom:7px
 }
+.back-btn:active{transform:scale(.98);background:#e1f0fb}
 .form-head{
   text-align:center;color:#315e94;font-size:.72rem;font-weight:800;
   text-transform:uppercase;margin:-2px 0 1px
@@ -232,7 +236,7 @@ button,.type-card,.photo-slot,.dd-item{-webkit-tap-highlight-color:transparent;t
     <button type="button" class="back-btn" onclick="volverInicio()">‹ Volver</button>
     <div class="form-head">MÓDULO OPERATIVO<br><strong>CONTROL DE MÓVILES - <span id="form-tipo-label">COMBUSTIBLE</span></strong></div>
 
-    <form id="form-control" novalidate onsubmit="event.preventDefault(); guardarControl();">
+    <form id="form-control" novalidate onsubmit="event.preventDefault(); return false;">
       <input type="hidden" id="tipo-movil">
       <div class="section-card">
         <div class="two-col">
@@ -661,22 +665,34 @@ function validarDatos() {
   return '';
 }
 
-function continuarInspeccion() {
-  var err = validarDatos();
-  if (err) { mostrarAviso(err); return; }
+function continuarInspeccion(event) {
+  // Este botón nunca debe enviar el formulario.
+  if (event) {
+    event.preventDefault();
+    event.stopPropagation();
+  }
 
-  // IMPORTANTE: este primer clic SOLO avanza a la segunda pantalla.
-  // No debe convertirse en submit durante el mismo evento de clic.
+  var err = validarDatos();
+  if (err) { mostrarAviso(err); return false; }
+
   mostrar('inspection-section', true);
   mostrar('photos-section', true);
 
   var b = $('btn-submit');
   b.type = 'button';
-  b.onclick = guardarControl;
+  b.onclick = function(ev) {
+    if (ev) {
+      ev.preventDefault();
+      ev.stopPropagation();
+    }
+    guardarControl();
+    return false;
+  };
   b.innerHTML = '<i class="fas fa-cloud-arrow-up"></i> GUARDAR CONTROL <span>→</span>';
 
   var s = $('inspection-section');
   if (s && s.scrollIntoView) s.scrollIntoView({behavior:'smooth', block:'start'});
+  return false;
 }
 
 function volverInicio() {
