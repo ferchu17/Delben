@@ -664,14 +664,19 @@ function validarDatos() {
 function continuarInspeccion() {
   var err = validarDatos();
   if (err) { mostrarAviso(err); return; }
+
+  // IMPORTANTE: este primer clic SOLO avanza a la segunda pantalla.
+  // No debe convertirse en submit durante el mismo evento de clic.
   mostrar('inspection-section', true);
   mostrar('photos-section', true);
+
   var b = $('btn-submit');
-  b.type = 'submit';
-  b.onclick = null;
+  b.type = 'button';
+  b.onclick = guardarControl;
   b.innerHTML = '<i class="fas fa-cloud-arrow-up"></i> GUARDAR CONTROL <span>→</span>';
+
   var s = $('inspection-section');
-  if (s && s.scrollIntoView) s.scrollIntoView(true);
+  if (s && s.scrollIntoView) s.scrollIntoView({behavior:'smooth', block:'start'});
 }
 
 function volverInicio() {
