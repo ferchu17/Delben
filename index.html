@@ -284,6 +284,13 @@ button,.type-card,.photo-slot,.dd-item{-webkit-tap-highlight-color:transparent;t
           <div class="field"><label>Legajo</label><input type="text" id="ctrl-legajo" readonly placeholder="—"></div>
         </div>
         <div class="field"><label>Empresa</label><input type="text" id="ctrl-empresa" readonly placeholder="—"></div>
+        <div class="field">
+          <label>Supervisor</label>
+          <select id="ctrl-supervisor" required>
+            <option value="">Seleccione supervisor...</option>
+          </select>
+          <div id="supervisor-email-hint" style="font-size:.58rem;color:#71849a;margin-top:2px"></div>
+        </div>
       </div>
 
       <div id="inspection-section" class="section-card">
@@ -489,18 +496,18 @@ function apiGetDatos(ok, fail) {
       });
     });
 }
-function apiGuardar(tipo, fila, fotos, ok, fail) {
+function apiGuardar(tipo, fila, fotos, supervisor, empresa, ok, fail) {
   if (hayGoogleRun()) {
     google.script.run.withSuccessHandler(ok)
       .withFailureHandler(function (e) { fail(new Error(e && e.message ? e.message : String(e))); })
-      .guardarControlCompleto(tipo, fila, fotos);
+      .guardarControlCompleto(tipo, fila, fotos, supervisor, empresa);
     return;
   }
   // text/plain evita el "preflight" CORS que Apps Script no soporta
   fetchJson(BACKEND_URL, {
     method: 'POST', redirect: 'follow',
     headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-    body: JSON.stringify({ action: 'guardar', tipo: tipo, filaDatos: fila, fotosArray: fotos })
+    body: JSON.stringify({ action: 'guardar', tipo: tipo, filaDatos: fila, fotosArray: fotos, supervisor: supervisor, empresa: empresa })
   }, 180000).then(ok).catch(fail);
 }
 
@@ -614,6 +621,15 @@ function iniciarCombos() {
       return { value: f.patente, text: f.patente, sub: f.movil || '' };
     });
   }, function () { onPatenteSelect(); });
+
+  var sup = $('ctrl-supervisor');
+  if (sup) {
+    sup.innerHTML = '<option value="">Seleccione supervisor...</option>' +
+      (DB_LOADED.supervisores || []).map(function (s) {
+        return '<option value="' + esc(s.nombre) + '" data-correo="' + esc(s.correo) + '">' + esc(s.nombre) + '</option>';
+      }).join('');
+    sup.onchange = onSupervisorSelect;
+  }
 }
 
 function onPersonalSelect() {
@@ -631,6 +647,12 @@ function onPatenteSelect() {
   var val = inp.value.trim().toUpperCase();
   var m = (DB_LOADED.flota || []).filter(function (f) { return String(f.patente || '').toUpperCase() === val; })[0];
   if (m) $('ctrl-movil').value = m.movil || m.patente;
+}
+function onSupervisorSelect() {
+  var sel = $('ctrl-supervisor'); if (!sel) return;
+  var opt = sel.options[sel.selectedIndex];
+  var correo = opt ? (opt.getAttribute('data-correo') || '') : '';
+  $('supervisor-email-hint').textContent = correo ? 'Correo: ' + correo : '';
 }
 
 /* ---------- Pantallas ---------- */
@@ -671,6 +693,10 @@ function validarDatos() {
   if (!objetivo) return 'Debe indicar el objetivo / cliente.';
   if (!turno) return 'Debe seleccionar el turno / guardia.';
   if (!personal) return 'Debe indicar el nombre del personal.';
+  var sup = $('ctrl-supervisor');
+  if (!sup || !sup.value) return 'Debe seleccionar un supervisor.';
+  var optSup = sup.options[sup.selectedIndex];
+  if (!optSup || !(optSup.getAttribute('data-correo') || '').trim()) return 'El supervisor seleccionado no tiene correo electrónico.';
   return '';
 }
 
@@ -735,6 +761,8 @@ function resetForm() {
   ['ctrl-dni', 'ctrl-legajo', 'ctrl-empresa', 'ctrl-movil', 'ctrl-patente', 'ctrl-km',
    'ctrl-novedad', 'ctrl-personal', 'ctrl-objetivo'].forEach(function (id) { var e = $(id); if (e) e.value = ''; });
   $('tipo-movil').value = '';
+  var sup = $('ctrl-supervisor');
+  if (sup) { sup.value = ''; onSupervisorSelect(); }
   for (var i = 0; i < 4; i++) removePhoto(i);
   renderControles();
   mostrar('inspection-section', false);
@@ -847,6 +875,13 @@ function guardarControl() {
   var personal = $('ctrl-personal').value.trim();
   var dni = $('ctrl-dni').value.trim(), legajo = $('ctrl-legajo').value.trim();
   var turno = $('ctrl-turno').value, objetivo = $('ctrl-objetivo').value.trim();
+  var empresa = $('ctrl-empresa').value.trim();
+  var supSel = $('ctrl-supervisor');
+  var supOpt = supSel.options[supSel.selectedIndex];
+  var supervisor = {
+    nombre: supSel.value.trim(),
+    correo: (supOpt.getAttribute('data-correo') || '').trim()
+  };
   var novedad = $('ctrl-novedad').value.trim();
   var fila = [];
   if (tipo === 'Bicicleta') {
@@ -866,10 +901,10 @@ function guardarControl() {
   var btn = $('btn-submit');
   showLoading('Guardando registro' + (fotos.length ? ' y subiendo fotos' : '') + '...');
   btn.disabled = true;
-  apiGuardar(tipo, fila, fotos, function (res) {
+  apiGuardar(tipo, fila, fotos, supervisor, empresa, function (res) {
     hideLoading(); btn.disabled = false;
     if (res && res.ok) {
-      mostrarModalExito((res.persona || personal || '').trim());
+      mostrarModalExito((res.persona || personal || '').trim(), res);
     } else {
       mostrarAviso('No se pudo guardar: ' + ((res && (res.error || res.message)) || JSON.stringify(res)), 'Error al guardar');
     }
@@ -878,8 +913,14 @@ function guardarControl() {
     mostrarAviso((e && e.message) || String(e), 'Error al guardar');
   });
 }
-function mostrarModalExito(nombre) {
+function mostrarModalExito(nombre, res) {
   $('modal-nombre-exito').textContent = nombre || 'Persona no identificada';
+  var sub = $('modal-sub-exito');
+  if (sub) {
+    sub.innerHTML = res && res.correoEnviado
+      ? 'Control guardado y <b>PDF enviado al supervisor</b>.'
+      : 'Control guardado. El PDF no pudo enviarse: <b>' + esc((res && res.errorCorreo) || 'revise la configuración de correo') + '</b>';
+  }
   $('modal-backdrop-exito').style.display = 'flex';
 }
 function cerrarModalExito() {
