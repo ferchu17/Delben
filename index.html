@@ -208,6 +208,8 @@ body{
 .sheet .sheet-title{font-size:.85rem;font-weight:800;color:#274f83;text-align:center;text-transform:uppercase;margin-bottom:2px}
 .sheet button{padding:14px;border-radius:10px;border:0;font-size:.9rem;font-weight:800;cursor:pointer;background:#2b6bb3;color:#fff}
 .sheet button.sec{background:#edf5fb;color:#3d5f86;border:1.5px solid #d4e4f1}
+.sheet-action{display:flex;align-items:center;justify-content:center;gap:8px;padding:14px;border-radius:10px;border:0;font-size:.9rem;font-weight:800;cursor:pointer;background:#2b6bb3;color:#fff;text-align:center}
+.sheet-action:active{transform:scale(.98);background:#245d9c}
 .modal-icon-aviso{font-size:2.4rem;color:#d97706;margin-bottom:10px}
 .modal-msg-aviso{font-size:.85rem;color:#3d5f86;margin-bottom:16px;line-height:1.4;word-break:break-word}
 button,.type-card,.photo-slot,.dd-item{-webkit-tap-highlight-color:transparent;touch-action:manipulation}
@@ -336,8 +338,8 @@ button,.type-card,.photo-slot,.dd-item{-webkit-tap-highlight-color:transparent;t
 <div id="sheet-foto" class="sheet-backdrop" onclick="if(event.target===this)cerrarSheetFoto()">
   <div class="sheet">
     <div class="sheet-title"><i class="fas fa-camera"></i> Agregar fotografía</div>
-    <button type="button" onclick="elegirFoto('cam')"><i class="fas fa-camera"></i> Tomar foto con la cámara</button>
-    <button type="button" onclick="elegirFoto('gal')"><i class="fas fa-image"></i> Elegir de la galería</button>
+    <label for="inp-cam" class="sheet-action"><i class="fas fa-camera"></i> Tomar foto con la cámara</label>
+    <label for="inp-gal" class="sheet-action"><i class="fas fa-image"></i> Elegir de la galería</label>
     <button type="button" class="sec" onclick="cerrarSheetFoto()">Cancelar</button>
   </div>
 </div>
