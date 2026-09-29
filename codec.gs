@@ -7,10 +7,13 @@ var CC_CONTROL_MOVILES = 'fjacyno@ktl-seguridad.com,gsanmartin@ktl-seguridad.com
 // -----------------------------------------------------------------------------
 function doGet(e) {
   // --- API JSON para la APK (index.html fuera de Apps Script) ---
-  if (e && e.parameter && e.parameter.action === 'getDatos') {
+  if (e && e.parameter && (e.parameter.action === 'getDatos' || e.parameter.action === 'getSupervisores')) {
     var datosOut;
     try {
       datosOut = getDatosControlMoviles();
+      if (e.parameter.action === 'getSupervisores') {
+        datosOut = { supervisores: datosOut.supervisores || [] };
+      }
     } catch (err) {
       datosOut = { error: String(err && err.message ? err.message : err) };
     }
