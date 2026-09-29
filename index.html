@@ -624,11 +624,9 @@ function iniciarCombos() {
 
   var sup = $('ctrl-supervisor');
   if (sup) {
-    sup.innerHTML = '<option value="">Seleccione supervisor...</option>' +
-      (DB_LOADED.supervisores || []).map(function (s) {
-        return '<option value="' + esc(s.nombre) + '" data-correo="' + esc(s.correo) + '">' + esc(s.nombre) + '</option>';
-      }).join('');
+    sup.innerHTML = '<option value="">Seleccione supervisor...</option>';
     sup.onchange = onSupervisorSelect;
+    cargarSupervisores();
   }
 }
 
@@ -653,6 +651,38 @@ function onSupervisorSelect() {
   var opt = sel.options[sel.selectedIndex];
   var correo = opt ? (opt.getAttribute('data-correo') || '') : '';
   $('supervisor-email-hint').textContent = correo ? 'Correo: ' + correo : '';
+}
+
+function cargarSupervisores() {
+  var sup = $('ctrl-supervisor');
+  if (!sup) return;
+  sup.innerHTML = '<option value="">Cargando supervisores...</option>';
+  sup.disabled = true;
+  function pintar(lista) {
+    lista = Array.isArray(lista) ? lista : [];
+    sup.innerHTML = '<option value="">Seleccione supervisor...</option>' +
+      lista.map(function(s) {
+        return '<option value="' + esc(s.nombre) + '" data-correo="' + esc(s.correo) + '">' +
+          esc(s.nombre) + '</option>';
+      }).join('');
+    sup.disabled = false;
+    DB_LOADED.supervisores = lista;
+    try { localStorage.setItem('delben_supervisores', JSON.stringify(lista)); } catch(e) {}
+    if (!lista.length) sup.innerHTML = '<option value="">No hay supervisores cargados</option>';
+  }
+  var url = BACKEND_URL + '?action=getSupervisores&_=' + Date.now();
+  fetchJson(url, {method:'GET', redirect:'follow'}, 30000).then(function(data) {
+    if (data && Array.isArray(data.supervisores)) { pintar(data.supervisores); return; }
+    throw new Error('Respuesta sin supervisores');
+  }).catch(function() {
+    var cb = 'delbenSupCb' + Date.now(), script = document.createElement('script'), terminado = false;
+    function limpiar(){ try{delete window[cb];}catch(e){window[cb]=undefined;} if(script.parentNode)script.parentNode.removeChild(script); }
+    window[cb]=function(data){ if(terminado)return; terminado=true; limpiar(); pintar(data && Array.isArray(data.supervisores)?data.supervisores:[]); };
+    script.onerror=function(){ if(terminado)return; terminado=true; limpiar(); sup.innerHTML='<option value="">No se pudo cargar supervisores</option>'; sup.disabled=false; };
+    script.src=BACKEND_URL+'?action=getSupervisores&callback='+cb+'&_='+Date.now();
+    document.head.appendChild(script);
+    setTimeout(function(){ if(!terminado){terminado=true;limpiar();sup.innerHTML='<option value="">No se pudo cargar supervisores</option>';sup.disabled=false;} },30000);
+  });
 }
 
 /* ---------- Pantallas ---------- */
