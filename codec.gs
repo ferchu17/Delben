@@ -378,7 +378,17 @@ function testGuardado() {
     'Sin Novedad','Sin Novedad','Sin Novedad','Sin Novedad','Sin Novedad','Sin Novedad',
     'Prueba conexión exitosa', ''
   ];
-  var res = guardarControlCompleto('Combustible', filaPrueba, []);
+  var supervisorPrueba = {
+    nombre: 'Fernando Jacyno',
+    correo: 'fjacyno@ktl-seguridad.com'
+  };
+  var res = guardarControlCompleto(
+    'Combustible',
+    filaPrueba,
+    [],
+    supervisorPrueba,
+    'PRUEBA'
+  );
   Logger.log('Resultado: ' + JSON.stringify(res));
 }
 
