@@ -316,9 +316,25 @@ function enviarControlPorCorreo_(data) {
     var pdf = DriveApp.getFileById(doc.getId()).getAs(MimeType.PDF).setName(docName + '.pdf');
     var subject = 'DELBEN · Control de Móvil #' + data.id + ' · ' + (fila[4] || '');
     var html = '<div style="font-family:Arial,sans-serif;color:#23466f"><h2 style="color:#1f5f99">Control de móvil registrado</h2><p>Se adjunta el informe PDF del control <b>#' + data.id + '</b>.</p><p><b>Movilero:</b> ' + escHtml_(fila[4]) + '<br><b>Vehículo:</b> ' + escHtml_(fila[10] || '') + '<br><b>Fecha:</b> ' + escHtml_(fila[1] || '') + ' · <b>Hora:</b> ' + escHtml_(fila[3] || '') + '</p><p>Este correo fue generado automáticamente por DELBEN SGI.</p></div>';
-    MailApp.sendEmail({to:data.supervisor.correo, cc:CC_CONTROL_MOVILES, subject:subject, htmlBody:html, body:'Se adjunta el informe PDF del control #' + data.id + '.', attachments:[pdf]});
+    var cuentaEjecutora = String(Session.getEffectiveUser().getEmail() || '').trim().toLowerCase();
+    if (cuentaEjecutora !== 'fjacyno@gmail.com') {
+      throw new Error('El envío de correo está configurado para salir de fjacyno@gmail.com, pero esta implementación se está ejecutando como ' + (cuentaEjecutora || 'cuenta no identificada') + '. En Administrar implementaciones debe quedar "Ejecutar como: yo" usando la cuenta fjacyno@gmail.com.');
+    }
+    GmailApp.sendEmail(
+      data.supervisor.correo,
+      subject,
+      'Se adjunta el informe PDF del control #' + data.id + '.',
+      {
+        cc: CC_CONTROL_MOVILES,
+        htmlBody: html,
+        attachments: [pdf],
+        name: 'DELBEN SGI',
+        replyTo: 'fjacyno@gmail.com',
+        from: 'fjacyno@gmail.com'
+      }
+    );
     DriveApp.getFileById(doc.getId()).setTrashed(true);
-    return {ok:true};
+    return {ok:true, cuentaEjecutora:cuentaEjecutora};
   } catch (e) {
     if (doc) { try { DriveApp.getFileById(doc.getId()).setTrashed(true); } catch (_) {} }
     return {ok:false,error:String(e && e.message ? e.message : e)};
