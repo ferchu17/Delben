@@ -168,6 +168,12 @@ body{
 #form-control{display:none;flex-direction:column;gap:9px}
 #form-screen{display:none}
 #inspection-section,#photos-section{display:none}
+.camera-modal{position:fixed;inset:0;background:rgba(0,0,0,.88);z-index:99999;display:none;align-items:center;justify-content:center;padding:14px}
+.camera-box{width:min(100%,520px);background:#fff;border-radius:14px;padding:12px;box-shadow:0 10px 40px rgba(0,0,0,.4)}
+.camera-video{width:100%;aspect-ratio:4/3;object-fit:cover;background:#111;border-radius:10px;display:block}
+.camera-actions{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px}
+.camera-actions button{border:0;border-radius:9px;padding:12px;font-weight:800;font-size:.82rem}
+.camera-shot{background:#159b50;color:#fff}.camera-cancel{background:#edf2f7;color:#526579}
 .photos-grid{display:flex;flex-direction:column;gap:10px;margin-top:9px}
 .photo-card{
   border:1px solid #b9d8ef;border-radius:10px;background:#f7fbff;
@@ -927,27 +933,67 @@ function styleSelect(el) {
 }
 
 /* ---------- Fotos ---------- */
+var camStream = null;
 function abrirCamaraMovil(idx) {
   activeSlotIdx = idx;
-  var inp = $('inp-cam-' + idx);
-  if (!inp) {
-    mostrarAviso('No se encontró el control de cámara.');
+  var modal = $('camera-modal');
+  var video = $('camera-video');
+  if (!modal || !video) {
+    mostrarAviso('No se pudo abrir la cámara.');
     return;
   }
-  try {
-    // showPicker() funciona mejor en Chrome/Android para abrir el selector
-    // de cámara cuando el usuario toca directamente el botón.
-    if (typeof inp.showPicker === 'function') {
-      inp.showPicker();
-    } else {
-      inp.click();
-    }
-  } catch (e) {
-    // Fallback para navegadores que no soportan showPicker().
-    try { inp.click(); } catch (e2) {
-      mostrarAviso('No se pudo abrir la cámara. Probá nuevamente o elegí un archivo.');
-    }
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+    mostrarAviso('Este navegador no permite usar la cámara desde esta página. Podés elegir un archivo.');
+    return;
   }
+  modal.style.display = 'flex';
+  navigator.mediaDevices.getUserMedia({
+    video: { facingMode: { ideal: 'environment' }, width: { ideal: 1280 }, height: { ideal: 960 } },
+    audio: false
+  }).then(function(stream) {
+    camStream = stream;
+    video.srcObject = stream;
+    video.play();
+  }).catch(function(err) {
+    modal.style.display = 'none';
+    var msg = 'No se pudo acceder a la cámara.';
+    if (err && err.name === 'NotAllowedError') msg += ' Revisá el permiso de cámara del navegador.';
+    if (err && err.name === 'NotFoundError') msg += ' No se encontró una cámara disponible.';
+    mostrarAviso(msg);
+  });
+}
+function cerrarCamaraMovil() {
+  var video = $('camera-video');
+  if (camStream) {
+    camStream.getTracks().forEach(function(t){ t.stop(); });
+    camStream = null;
+  }
+  if (video) video.srcObject = null;
+  var modal = $('camera-modal');
+  if (modal) modal.style.display = 'none';
+}
+function capturarFotoMovil() {
+  var video = $('camera-video');
+  if (!video || !video.videoWidth) {
+    mostrarAviso('La cámara todavía no está lista. Esperá un segundo.');
+    return;
+  }
+  var canvas = document.createElement('canvas');
+  var max = 1280;
+  var k = Math.min(1, max / Math.max(video.videoWidth, video.videoHeight));
+  canvas.width = Math.round(video.videoWidth * k);
+  canvas.height = Math.round(video.videoHeight * k);
+  canvas.getContext('2d').drawImage(video, 0, 0, canvas.width, canvas.height);
+  var dataUrl = canvas.toDataURL('image/jpeg', 0.78);
+  photoSlots[activeSlotIdx] = {
+    base64: dataUrl.split(',')[1],
+    mimeType: 'image/jpeg',
+    name: 'control_' + Date.now() + '_' + (activeSlotIdx + 1) + '.jpg'
+  };
+  var idx = activeSlotIdx;
+  var slot = $('slot-' + idx);
+  if (slot) slot.innerHTML = '<div class="photo-preview"><img src="' + dataUrl + '"><button type="button" class="btn-del-photo" onclick="event.stopPropagation(); removePhoto(' + idx + ')">✕</button></div>';
+  cerrarCamaraMovil();
 }
 function abrirArchivoMovil(idx) {
   activeSlotIdx = idx;
@@ -1108,5 +1154,14 @@ function guardarConfig() {
 
 
 </script>
+<div id="camera-modal" class="camera-modal" onclick="if(event.target===this)cerrarCamaraMovil()">
+  <div class="camera-box">
+    <video id="camera-video" class="camera-video" autoplay playsinline muted></video>
+    <div class="camera-actions">
+      <button type="button" class="camera-cancel" onclick="cerrarCamaraMovil()">CANCELAR</button>
+      <button type="button" class="camera-shot" onclick="capturarFotoMovil()"><i class="fas fa-camera"></i> TOMAR FOTO</button>
+    </div>
+  </div>
+</div>
 </body>
 </html>
