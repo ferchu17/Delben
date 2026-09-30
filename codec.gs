@@ -253,12 +253,30 @@ function enviarControlPorCorreo_(data) {
     var docName = 'Control Movil #' + data.id + ' - ' + (fila[10] || data.tipo || 'Vehiculo');
     doc = DocumentApp.create(docName);
     var body = doc.getBody();
-    body.setMarginTop(28).setMarginBottom(28).setMarginLeft(30).setMarginRight(30);
+    body.setMarginTop(24).setMarginBottom(24).setMarginLeft(28).setMarginRight(28);
 
-    var title = body.appendParagraph('DELBEN');
-    title.setHeading(DocumentApp.ParagraphHeading.TITLE).setAlignment(DocumentApp.HorizontalAlignment.CENTER);
-    title.setForegroundColor('#1f5f99');
-    body.appendParagraph('CONTROL DE MÓVIL · INFORME DE INSPECCIÓN').setAlignment(DocumentApp.HorizontalAlignment.CENTER).setBold(true).setForegroundColor('#4b6f8f');
+    // Encabezado DELBEN: logo real + colores institucionales.
+    try {
+      var logoBlob = UrlFetchApp.fetch('https://raw.githubusercontent.com/ferchu17/Delben/main/delben-logo.webp').getBlob();
+      var logo = body.appendImage(logoBlob);
+      var logoW = 185;
+      var logoH = Math.round(logo.getHeight() * logoW / logo.getWidth());
+      logo.setWidth(logoW).setHeight(logoH);
+      var logoPar = logo.getParent();
+      if (logoPar && logoPar.getType && logoPar.getType() === DocumentApp.ElementType.PARAGRAPH) {
+        logoPar.setAlignment(DocumentApp.HorizontalAlignment.CENTER);
+      }
+    } catch (logoErr) {
+      var titleFallback = body.appendParagraph('DELBEN');
+      titleFallback.setHeading(DocumentApp.ParagraphHeading.TITLE)
+        .setAlignment(DocumentApp.HorizontalAlignment.CENTER)
+        .setForegroundColor('#159447');
+    }
+
+    body.appendParagraph('CONTROL DE MÓVIL · INFORME DE INSPECCIÓN')
+      .setAlignment(DocumentApp.HorizontalAlignment.CENTER)
+      .setBold(true)
+      .setForegroundColor('#0878d1');
     body.appendHorizontalRule();
 
     var meta = body.appendTable([
@@ -274,12 +292,15 @@ function enviarControlPorCorreo_(data) {
       for (var c = 0; c < meta.getRow(r).getNumCells(); c++) {
         var cell = meta.getRow(r).getCell(c);
         cell.setPaddingTop(5).setPaddingBottom(5).setPaddingLeft(7).setPaddingRight(7);
-        if (c % 2 === 0) cell.setBackgroundColor('#eaf3fb');
+        if (c % 2 === 0) cell.setBackgroundColor('#e8f4ff');
       }
     }
 
     body.appendParagraph('');
-    body.appendParagraph('INSPECCIÓN TÉCNICA').setHeading(DocumentApp.ParagraphHeading.HEADING2).setForegroundColor('#1f5f99');
+    body.appendParagraph('INSPECCIÓN TÉCNICA')
+      .setHeading(DocumentApp.ParagraphHeading.HEADING2)
+      .setForegroundColor('#0878d1');
+
     var controles = data.tipo.toLowerCase().indexOf('bici') >= 0
       ? ['Manubrio','Freno Delantero','Freno Trasero','Guardabarros','Pedales','Cargador','Pie de Apoyo','Acelerador','Asiento','Pintura']
       : ['Estado Externo General','Interior (Butacas)','Luces','Neumático Delantero Der.','Neumático Delantero Izq.','Neumático Trasero Der.','Neumático Trasero Izq.','Rueda de Auxilio','Escobillas Parabrisas','Luces Bajas','Luces Altas','Luz Trasera Izq.','Luz Trasera Der.','Luces de Giro','Bocina','Limpieza Int./Ext.','Baliza Lumínica','Ploteos'];
@@ -289,41 +310,75 @@ function enviarControlPorCorreo_(data) {
       var row = tbl.appendTableRow();
       var label = row.appendTableCell(String(i + 1) + '. ' + controles[i]);
       var val = row.appendTableCell(String(fila[startIdx + i] || ''));
-      label.setBackgroundColor('#f3f7fb');
+      label.setBackgroundColor('#f3f8fc');
       if (String(fila[startIdx + i] || '') === 'Con Novedad') val.setBackgroundColor('#fde8e8');
       else if (String(fila[startIdx + i] || '') === 'Sin Novedad') val.setBackgroundColor('#e8f6ed');
     }
+
     var novIdx = startIdx + controles.length;
     body.appendParagraph('');
-    body.appendParagraph('NOVEDAD / OBSERVACIÓN GENERAL').setBold(true).setForegroundColor('#1f5f99');
+    body.appendParagraph('NOVEDAD / OBSERVACIÓN GENERAL')
+      .setBold(true)
+      .setForegroundColor('#0878d1');
     body.appendParagraph(String(fila[novIdx] || 'Sin Novedad'));
 
+    // Registro fotográfico: exactamente 2 fotos por hoja, centradas y dentro de recuadros.
     if (data.fotosIds && data.fotosIds.length) {
       body.appendPageBreak();
-      body.appendParagraph('REGISTRO FOTOGRÁFICO').setHeading(DocumentApp.ParagraphHeading.HEADING2).setForegroundColor('#1f5f99');
-      for (var p = 0; p < data.fotosIds.length; p++) {
-        var img = body.appendImage(DriveApp.getFileById(data.fotosIds[p]).getBlob());
-        var maxW = 430, w = img.getWidth(), hh = img.getHeight();
-        if (w > maxW) img.setWidth(maxW).setHeight(Math.round(hh * maxW / w));
-        body.appendParagraph('Vista ' + (p + 1)).setAlignment(DocumentApp.HorizontalAlignment.CENTER).setBold(true).setForegroundColor('#6b7f92');
+      body.appendParagraph('REGISTRO FOTOGRÁFICO')
+        .setHeading(DocumentApp.ParagraphHeading.HEADING2)
+        .setAlignment(DocumentApp.HorizontalAlignment.CENTER)
+        .setForegroundColor('#0878d1');
+
+      for (var p = 0; p < data.fotosIds.length; p += 2) {
+        var fotoTable = body.appendTable();
+        fotoTable.setBorderWidth(1).setBorderColor('#8fc4f0');
+        fotoTable.setColumnWidth(0, 500);
+
+        for (var q = 0; q < 2 && (p + q) < data.fotosIds.length; q++) {
+          var fotoCell = fotoTable.appendTableRow().appendTableCell();
+          fotoCell.setBackgroundColor('#f8fbfe');
+          fotoCell.setPaddingTop(10).setPaddingBottom(10).setPaddingLeft(10).setPaddingRight(10);
+
+          var img = fotoCell.appendImage(DriveApp.getFileById(data.fotosIds[p + q]).getBlob());
+          var maxW = 430;
+          var maxH = 250;
+          var w = img.getWidth();
+          var h = img.getHeight();
+          var scale = Math.min(maxW / w, maxH / h, 1);
+          img.setWidth(Math.round(w * scale)).setHeight(Math.round(h * scale));
+
+          var par = img.getParent();
+          if (par && par.getType && par.getType() === DocumentApp.ElementType.PARAGRAPH) {
+            par.setAlignment(DocumentApp.HorizontalAlignment.CENTER);
+          }
+
+          fotoCell.appendParagraph('Vista ' + (p + q + 1))
+            .setAlignment(DocumentApp.HorizontalAlignment.CENTER)
+            .setBold(true)
+            .setForegroundColor('#315e94')
+            .setFontSize(9);
+        }
+
+        if (p + 2 < data.fotosIds.length) body.appendPageBreak();
       }
     }
 
     body.appendParagraph('');
-    body.appendParagraph('Informe generado automáticamente por DELBEN SGI').setAlignment(DocumentApp.HorizontalAlignment.CENTER).setForegroundColor('#7a8fa3').setFontSize(8);
+    body.appendParagraph('Informe generado automáticamente por DELBEN SGI')
+      .setAlignment(DocumentApp.HorizontalAlignment.CENTER)
+      .setForegroundColor('#7a8fa3')
+      .setFontSize(8);
     doc.saveAndClose();
 
     var pdf = DriveApp.getFileById(doc.getId()).getAs(MimeType.PDF).setName(docName + '.pdf');
     var subject = 'DELBEN · Control de Móvil #' + data.id + ' · ' + (fila[4] || '');
-    var html = '<div style="font-family:Arial,sans-serif;color:#23466f"><h2 style="color:#1f5f99">Control de móvil registrado</h2><p>Se adjunta el informe PDF del control <b>#' + data.id + '</b>.</p><p><b>Movilero:</b> ' + escHtml_(fila[4]) + '<br><b>Vehículo:</b> ' + escHtml_(fila[10] || '') + '<br><b>Fecha:</b> ' + escHtml_(fila[1] || '') + ' · <b>Hora:</b> ' + escHtml_(fila[3] || '') + '</p><p>Este correo fue generado automáticamente por DELBEN SGI.</p></div>';
+    var html = '<div style="font-family:Arial,sans-serif;color:#23466f"><h2 style="color:#0878d1">Control de móvil registrado</h2><p>Se adjunta el informe PDF del control <b>#' + data.id + '</b>.</p><p><b>Movilero:</b> ' + escHtml_(fila[4]) + '<br><b>Vehículo:</b> ' + escHtml_(fila[10] || '') + '<br><b>Fecha:</b> ' + escHtml_(fila[1] || '') + ' · <b>Hora:</b> ' + escHtml_(fila[3] || '') + '</p><p>Este correo fue generado automáticamente por DELBEN SGI.</p></div>';
     var cuentaEjecutora = String(Session.getEffectiveUser().getEmail() || '').trim().toLowerCase();
     if (cuentaEjecutora !== 'fjacyno@gmail.com') {
       throw new Error('La implementación NO está ejecutándose como fjacyno@gmail.com. Cuenta efectiva detectada: ' + (cuentaEjecutora || 'no identificada') + '. En Administrar implementaciones debe figurar "Ejecutar como: Yo" y ese Yo debe ser fjacyno@gmail.com.');
     }
 
-    // MailApp envía desde la cuenta con la que se ejecuta la implementación.
-    // No se fuerza "from", porque Gmail solo permite "from" cuando es un alias
-    // configurado/verificado en la cuenta.
     MailApp.sendEmail({
       to: data.supervisor.correo,
       cc: CC_CONTROL_MOVILES,
@@ -341,6 +396,7 @@ function enviarControlPorCorreo_(data) {
     return {ok:false,error:String(e && e.message ? e.message : e)};
   }
 }
+
 function probarCorreo() {
   var cuenta = String(Session.getEffectiveUser().getEmail() || '').trim();
   if (cuenta.toLowerCase() !== 'fjacyno@gmail.com') {
