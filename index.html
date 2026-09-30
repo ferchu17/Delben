@@ -156,14 +156,39 @@ body{
 #form-control{display:none;flex-direction:column;gap:9px}
 #form-screen{display:none}
 #inspection-section,#photos-section{display:none}
-.photos-grid{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin-top:9px}
-.photo-slot{
-  height:105px;border:2px dashed #9ab9d5;border-radius:10px;
-  background:#f7fbff;display:flex;flex-direction:column;align-items:center;
-  justify-content:center;gap:5px;cursor:pointer;position:relative;overflow:hidden
+.photos-grid{display:flex;flex-direction:column;gap:10px;margin-top:9px}
+.photo-card{
+  border:1px solid #b9d8ef;border-radius:10px;background:#f7fbff;
+  padding:9px;overflow:hidden
 }
-.photo-slot i{font-size:1.6rem;color:#3774ac}.photo-slot span{font-size:.68rem;font-weight:800;color:#678097}
-.photo-slot:active{transform:scale(.98);background:#edf7ff}
+.photo-card-title{
+  display:flex;align-items:center;gap:6px;background:#e8f4fd;
+  border-left:4px solid #2b79b9;border-radius:7px;padding:7px 9px;
+  color:#245b8d;font-size:.68rem;font-weight:800;margin-bottom:7px
+}
+.photo-actions{display:grid;grid-template-columns:1fr 1fr;gap:7px}
+.btn-foto,.btn-archivo{
+  border:0;border-radius:8px;padding:10px 7px;min-height:42px;
+  color:#fff;font-family:'Source Sans 3',Arial,sans-serif;font-size:.66rem;
+  font-weight:800;line-height:1.05;cursor:pointer;display:flex;
+  align-items:center;justify-content:center;gap:5px;text-align:center
+}
+.btn-foto{background:#159b50}.btn-archivo{background:#0967b7}
+.btn-foto:active,.btn-archivo:active{transform:scale(.98)}
+.photo-name{
+  margin-top:7px;padding:7px 8px;border:1px solid #cfe1ef;border-radius:7px;
+  background:#fff;color:#6c8196;font-size:.61rem;line-height:1.2;
+  min-height:29px;word-break:break-word
+}
+.photo-preview{
+  position:relative;height:150px;border-radius:8px;overflow:hidden;background:#eef6fc
+}
+.photo-preview img{width:100%;height:100%;object-fit:cover}
+.photo-preview .btn-del-photo{
+  position:absolute;top:6px;right:6px;background:#d54a4a;color:#fff;border:0;
+  width:28px;height:28px;border-radius:50%;display:flex;align-items:center;
+  justify-content:center;font-size:12px;cursor:pointer
+}
 .inspection-screen-title{
   text-align:center;color:#315e94;font-size:.82rem;font-weight:800;
   text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px
@@ -304,16 +329,55 @@ button,.type-card,.photo-slot,.dd-item{-webkit-tap-highlight-color:transparent;t
       </div>
 
       <div id="photos-section" class="section-card">
-        <div class="section-title"><i class="fas fa-camera"></i> Fotografías</div>
-        <p style="font-size:.61rem;color:#b47b22;font-weight:600">Hasta 4 fotos. Toque un cuadro para tomar o seleccionar.</p>
+        <div class="section-title"><i class="fas fa-camera"></i> Fotografías del móvil</div>
+        <p style="font-size:.61rem;color:#b47b22;font-weight:700">Para cada vista podés sacar la foto con la cámara o elegir una imagen del teléfono.</p>
         <div class="photos-grid">
-          <div class="photo-slot" id="slot-0" onclick="triggerPhoto(0)"><i class="fas fa-camera"></i><span>Vista 1</span></div>
-          <div class="photo-slot" id="slot-1" onclick="triggerPhoto(1)"><i class="fas fa-camera"></i><span>Vista 2</span></div>
-          <div class="photo-slot" id="slot-2" onclick="triggerPhoto(2)"><i class="fas fa-camera"></i><span>Vista 3</span></div>
-          <div class="photo-slot" id="slot-3" onclick="triggerPhoto(3)"><i class="fas fa-camera"></i><span>Vista 4</span></div>
+          <div class="photo-card" id="card-0">
+            <div class="photo-card-title"><i class="fas fa-camera"></i> FOTO 1 — VISTA 1</div>
+            <div id="slot-0">
+              <div class="photo-actions">
+                <button type="button" class="btn-foto" onclick="abrirCamaraMovil(0)"><i class="fas fa-camera"></i> SACAR FOTO</button>
+                <button type="button" class="btn-archivo" onclick="abrirArchivoMovil(0)"><i class="fas fa-folder-open"></i> ELEGIR ARCHIVO</button>
+              </div>
+              <div class="photo-name" id="nombre-foto-0">No se seleccionó ninguna foto.</div>
+            </div>
+            <input type="file" id="inp-cam-0" accept="image/*" capture="environment" hidden onchange="onFileSelected(this)">
+            <input type="file" id="inp-gal-0" accept="image/*" hidden onchange="onFileSelected(this)">
+          </div><div class="photo-card" id="card-1">
+            <div class="photo-card-title"><i class="fas fa-camera"></i> FOTO 2 — VISTA 2</div>
+            <div id="slot-1">
+              <div class="photo-actions">
+                <button type="button" class="btn-foto" onclick="abrirCamaraMovil(1)"><i class="fas fa-camera"></i> SACAR FOTO</button>
+                <button type="button" class="btn-archivo" onclick="abrirArchivoMovil(1)"><i class="fas fa-folder-open"></i> ELEGIR ARCHIVO</button>
+              </div>
+              <div class="photo-name" id="nombre-foto-1">No se seleccionó ninguna foto.</div>
+            </div>
+            <input type="file" id="inp-cam-1" accept="image/*" capture="environment" hidden onchange="onFileSelected(this)">
+            <input type="file" id="inp-gal-1" accept="image/*" hidden onchange="onFileSelected(this)">
+          </div><div class="photo-card" id="card-2">
+            <div class="photo-card-title"><i class="fas fa-camera"></i> FOTO 3 — VISTA 3</div>
+            <div id="slot-2">
+              <div class="photo-actions">
+                <button type="button" class="btn-foto" onclick="abrirCamaraMovil(2)"><i class="fas fa-camera"></i> SACAR FOTO</button>
+                <button type="button" class="btn-archivo" onclick="abrirArchivoMovil(2)"><i class="fas fa-folder-open"></i> ELEGIR ARCHIVO</button>
+              </div>
+              <div class="photo-name" id="nombre-foto-2">No se seleccionó ninguna foto.</div>
+            </div>
+            <input type="file" id="inp-cam-2" accept="image/*" capture="environment" hidden onchange="onFileSelected(this)">
+            <input type="file" id="inp-gal-2" accept="image/*" hidden onchange="onFileSelected(this)">
+          </div><div class="photo-card" id="card-3">
+            <div class="photo-card-title"><i class="fas fa-camera"></i> FOTO 4 — VISTA 4</div>
+            <div id="slot-3">
+              <div class="photo-actions">
+                <button type="button" class="btn-foto" onclick="abrirCamaraMovil(3)"><i class="fas fa-camera"></i> SACAR FOTO</button>
+                <button type="button" class="btn-archivo" onclick="abrirArchivoMovil(3)"><i class="fas fa-folder-open"></i> ELEGIR ARCHIVO</button>
+              </div>
+              <div class="photo-name" id="nombre-foto-3">No se seleccionó ninguna foto.</div>
+            </div>
+            <input type="file" id="inp-cam-3" accept="image/*" capture="environment" hidden onchange="onFileSelected(this)">
+            <input type="file" id="inp-gal-3" accept="image/*" hidden onchange="onFileSelected(this)">
+          </div>
         </div>
-        <input type="file" id="inp-cam" accept="image/*" capture="environment" style="display:none" onchange="onFileSelected(this)">
-        <input type="file" id="inp-gal" accept="image/*" style="display:none" onchange="onFileSelected(this)">
       </div>
 
       <div>
@@ -335,14 +399,6 @@ button,.type-card,.photo-slot,.dd-item{-webkit-tap-highlight-color:transparent;t
   </div>
 </div>
 
-<div id="sheet-foto" class="sheet-backdrop" onclick="if(event.target===this)cerrarSheetFoto()">
-  <div class="sheet">
-    <div class="sheet-title"><i class="fas fa-camera"></i> Agregar fotografía</div>
-    <label for="inp-cam" class="sheet-action"><i class="fas fa-camera"></i> Tomar foto con la cámara</label>
-    <label for="inp-gal" class="sheet-action"><i class="fas fa-image"></i> Elegir de la galería</label>
-    <button type="button" class="sec" onclick="cerrarSheetFoto()">Cancelar</button>
-  </div>
-</div>
 <div id="modal-aviso" class="modal-backdrop-exito">
   <div class="modal-card-exito">
     <div class="modal-icon-aviso"><i class="fas fa-triangle-exclamation"></i></div>
@@ -832,14 +888,14 @@ function styleSelect(el) {
 }
 
 /* ---------- Fotos ---------- */
-function triggerPhoto(idx) {
+function abrirCamaraMovil(idx) {
   activeSlotIdx = idx;
-  var s = $('sheet-foto'); if (s) s.style.display = 'flex';
+  var inp = $('inp-cam-' + idx);
+  if (inp) inp.click();
 }
-function cerrarSheetFoto() { var s = $('sheet-foto'); if (s) s.style.display = 'none'; }
-function elegirFoto(origen) {
-  cerrarSheetFoto();
-  var inp = $(origen === 'cam' ? 'inp-cam' : 'inp-gal');
+function abrirArchivoMovil(idx) {
+  activeSlotIdx = idx;
+  var inp = $('inp-gal-' + idx);
   if (inp) inp.click();
 }
 function comprimirImagen(file, cb) {
@@ -874,14 +930,23 @@ function onFileSelected(input) {
       name: 'control_' + Date.now() + '_' + (idx + 1) + '.jpg'
     };
     var slot = $('slot-' + idx);
-    if (slot) slot.innerHTML = '<img src="' + dataUrl + '"><button type="button" class="btn-del-photo" onclick="event.stopPropagation(); removePhoto(' + idx + ')">✕</button>';
+    if (slot) {
+      slot.innerHTML = '<div class="photo-preview"><img src="' + dataUrl + '"><button type="button" class="btn-del-photo" onclick="event.stopPropagation(); removePhoto(' + idx + ')">✕</button></div>';
+    }
   });
   input.value = '';
 }
 function removePhoto(idx) {
   photoSlots[idx] = null;
   var slot = $('slot-' + idx);
-  if (slot) slot.innerHTML = '<i class="fas fa-camera"></i><span>Vista ' + (idx + 1) + '</span>';
+  if (slot) {
+    slot.innerHTML =
+      '<div class="photo-actions">' +
+        '<button type="button" class="btn-foto" onclick="abrirCamaraMovil(' + idx + ')"><i class="fas fa-camera"></i> SACAR FOTO</button>' +
+        '<button type="button" class="btn-archivo" onclick="abrirArchivoMovil(' + idx + ')"><i class="fas fa-folder-open"></i> ELEGIR ARCHIVO</button>' +
+      '</div>' +
+      '<div class="photo-name" id="nombre-foto-' + idx + '">No se seleccionó ninguna foto.</div>';
+  }
 }
 
 /* ---------- Guardado ---------- */
