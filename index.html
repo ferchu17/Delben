@@ -179,6 +179,11 @@ body{
   color:#245b8d;font-size:.78rem;font-weight:800;margin-bottom:8px
 }
 .photo-actions{display:grid;grid-template-columns:1fr 1fr;gap:7px}
+.camera-file-input{
+  position:fixed!important;left:-10000px!important;top:0!important;
+  width:2px!important;height:2px!important;opacity:0!important;
+  pointer-events:none!important
+}
 .btn-foto,.btn-archivo{
   border:0;border-radius:9px;padding:11px 7px;min-height:46px;
   color:#fff;font-family:'Source Sans 3',Arial,sans-serif;font-size:.78rem;
@@ -353,7 +358,7 @@ button,.type-card,.photo-slot,.dd-item{-webkit-tap-highlight-color:transparent;t
               </div>
               <div class="photo-name" id="nombre-foto-0">No se seleccionó ninguna foto.</div>
             </div>
-            <input type="file" id="inp-cam-0" accept="image/*" capture="environment" hidden onchange="onFileSelected(this)">
+            <input type="file" id="inp-cam-0" accept="image/*" capture="environment" class="camera-file-input" onchange="onFileSelected(this)">
             <input type="file" id="inp-gal-0" accept="image/*" hidden onchange="onFileSelected(this)">
           </div><div class="photo-card" id="card-1">
             <div class="photo-card-title"><i class="fas fa-camera"></i> FOTO 2 — VISTA 2</div>
@@ -364,7 +369,7 @@ button,.type-card,.photo-slot,.dd-item{-webkit-tap-highlight-color:transparent;t
               </div>
               <div class="photo-name" id="nombre-foto-1">No se seleccionó ninguna foto.</div>
             </div>
-            <input type="file" id="inp-cam-1" accept="image/*" capture="environment" hidden onchange="onFileSelected(this)">
+            <input type="file" id="inp-cam-1" accept="image/*" capture="environment" class="camera-file-input" onchange="onFileSelected(this)">
             <input type="file" id="inp-gal-1" accept="image/*" hidden onchange="onFileSelected(this)">
           </div><div class="photo-card" id="card-2">
             <div class="photo-card-title"><i class="fas fa-camera"></i> FOTO 3 — VISTA 3</div>
@@ -375,7 +380,7 @@ button,.type-card,.photo-slot,.dd-item{-webkit-tap-highlight-color:transparent;t
               </div>
               <div class="photo-name" id="nombre-foto-2">No se seleccionó ninguna foto.</div>
             </div>
-            <input type="file" id="inp-cam-2" accept="image/*" capture="environment" hidden onchange="onFileSelected(this)">
+            <input type="file" id="inp-cam-2" accept="image/*" capture="environment" class="camera-file-input" onchange="onFileSelected(this)">
             <input type="file" id="inp-gal-2" accept="image/*" hidden onchange="onFileSelected(this)">
           </div><div class="photo-card" id="card-3">
             <div class="photo-card-title"><i class="fas fa-camera"></i> FOTO 4 — VISTA 4</div>
@@ -386,7 +391,7 @@ button,.type-card,.photo-slot,.dd-item{-webkit-tap-highlight-color:transparent;t
               </div>
               <div class="photo-name" id="nombre-foto-3">No se seleccionó ninguna foto.</div>
             </div>
-            <input type="file" id="inp-cam-3" accept="image/*" capture="environment" hidden onchange="onFileSelected(this)">
+            <input type="file" id="inp-cam-3" accept="image/*" capture="environment" class="camera-file-input" onchange="onFileSelected(this)">
             <input type="file" id="inp-gal-3" accept="image/*" hidden onchange="onFileSelected(this)">
           </div>
         </div>
@@ -925,7 +930,24 @@ function styleSelect(el) {
 function abrirCamaraMovil(idx) {
   activeSlotIdx = idx;
   var inp = $('inp-cam-' + idx);
-  if (inp) inp.click();
+  if (!inp) {
+    mostrarAviso('No se encontró el control de cámara.');
+    return;
+  }
+  try {
+    // showPicker() funciona mejor en Chrome/Android para abrir el selector
+    // de cámara cuando el usuario toca directamente el botón.
+    if (typeof inp.showPicker === 'function') {
+      inp.showPicker();
+    } else {
+      inp.click();
+    }
+  } catch (e) {
+    // Fallback para navegadores que no soportan showPicker().
+    try { inp.click(); } catch (e2) {
+      mostrarAviso('No se pudo abrir la cámara. Probá nuevamente o elegí un archivo.');
+    }
+  }
 }
 function abrirArchivoMovil(idx) {
   activeSlotIdx = idx;
