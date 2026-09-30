@@ -141,6 +141,27 @@
     .btn-foto { background:linear-gradient(90deg,#18a558,#128746); }
     .btn-archivo { background:linear-gradient(90deg,#0878d1,#0056a6); }
     .nombre-foto { margin-top:8px; padding:8px 10px; border-radius:8px; background:#f4faff; color:#536273; font-size:12px; border:1px solid #d8e9f7; }
+    .pantalla { display:none; min-height:420px; }
+    .pantalla.activa { display:block; }
+    .progreso { padding:12px 16px 10px; background:#f7fbff; border-bottom:1px solid #c9dff5; }
+    .progreso-linea { display:flex; gap:5px; }
+    .progreso-paso { flex:1; height:7px; border-radius:8px; background:#d8e8f5; }
+    .progreso-paso.activo { background:linear-gradient(90deg,#0878d1,#18a558); }
+    .progreso-texto { margin-top:7px; text-align:center; font-size:12px; font-weight:700; color:#245579; }
+    .navegacion { display:flex; gap:10px; justify-content:space-between; padding:18px 24px; background:#f7fbff; border-top:1px solid #d8e9f7; }
+    .navegacion button { min-width:135px; }
+    .btn-anterior { background:#64748b; }
+    .btn-siguiente { background:linear-gradient(90deg,#0878d1,#0056a6); }
+    .btn-final { background:linear-gradient(90deg,#18a558,#128746); }
+    .pie-final { padding:0 0 18px; }
+    .familiar-bloque { border:1px solid #d5e6f5; border-radius:12px; padding:14px; margin:0 0 14px; background:#f8fcff; }
+    .familiar-titulo { font-size:14px; font-weight:800; color:#075f9f; margin-bottom:10px; }
+    .pareja-bloque { border:2px solid #8fc4f0; background:#eef8ff; }
+    .dni-aviso { margin:-2px 0 16px; padding:13px 14px; border-radius:12px; background:#fff3cd; color:#664d03; border:2px solid #ffda6a; font-size:13px; line-height:1.4; }
+    .dni-label { font-size:15px; padding:9px 11px; border-radius:9px; margin-bottom:9px; }
+    .anverso-label { color:#075f9f; background:#e8f4ff; border-left:5px solid #0878d1; }
+    .reverso-label { color:#176b48; background:#eaf8f0; border-left:5px solid #18a558; }
+    .dni-card { border:2px solid #b8d8ef; border-radius:14px; padding:13px; margin-bottom:16px; background:#fbfdff; }
   @media (max-width: 600px) {
       body { padding: 0 0 24px; }
       .contenedor { border-radius: 0; box-shadow:none; }
@@ -151,6 +172,11 @@
       .seccion { padding: 18px 14px; }
       .fila .campo { min-width: 100%; }
       .pie { padding: 18px 14px; }
+      .pantalla { min-height: 0; }
+      .navegacion { padding:14px; }
+      .navegacion button { min-width:0; flex:1; padding:13px 10px; font-size:14px; }
+      .dni-card { padding:12px; }
+      .dni-label { font-size:14px; }
       button { width:100%; }
     }
   </style>
@@ -158,17 +184,26 @@
 <body>
   <div class="contenedor">
     <div class="encabezado">
-      <img src="./delben-control-icon.jpg" alt="Delben">
+      <img src="./delben-logo.webp" alt="Delben">
       <div class="encabezado-texto">
         <h1>Ficha de Datos del Personal</h1>
         <p>Completá el formulario con tus datos. Los campos con <span style="color:#ffd">*</span> son obligatorios.</p>
       </div>
     </div>
 
+    <div class="progreso">
+      <div class="progreso-linea">
+        <div class="progreso-paso" data-paso-ind="1"></div><div class="progreso-paso" data-paso-ind="2"></div><div class="progreso-paso" data-paso-ind="3"></div><div class="progreso-paso" data-paso-ind="4"></div>
+        <div class="progreso-paso" data-paso-ind="5"></div><div class="progreso-paso" data-paso-ind="6"></div><div class="progreso-paso" data-paso-ind="7"></div><div class="progreso-paso" data-paso-ind="8"></div>
+      </div>
+      <div class="progreso-texto" id="progreso-texto">Pantalla 1 de 8 · Datos personales</div>
+    </div>
+
     <form id="form-personal">
 
       <!-- DATOS PERSONALES -->
-      <div class="seccion">
+      <div class="pantalla" data-pantalla="1">
+<div class="seccion">
         <h2>Datos personales</h2>
         <div class="campo">
           <label>Dirección de correo <span class="requerido">*</span></label>
@@ -194,8 +229,10 @@
         </div>
       </div>
 
-      <!-- DOMICILIO -->
-      <div class="seccion">
+      <div class="navegacion"><span></span><button type="button" class="btn-siguiente" data-next>Continuar →</button></div></div>
+<!-- DOMICILIO -->
+      <div class="pantalla" data-pantalla="2">
+<div class="seccion">
         <h2>Domicilio</h2>
         <div class="fila">
           <div class="campo" style="flex:2">
@@ -241,8 +278,16 @@
         </div>
       </div>
 
-      <!-- CONTACTO -->
-      <div class="seccion">
+            <div class="pie-final">
+        <div class="navegacion">
+          <button type="button" class="btn-anterior" data-prev>← Anterior</button>
+          <button type="submit" id="btn-enviar" class="btn-final">✓ ENVIAR DATOS</button>
+        </div>
+        <div id="mensaje" class="mensaje"></div>
+      </div></div>
+<!-- CONTACTO -->
+      <div class="pantalla" data-pantalla="3">
+<div class="seccion">
         <h2>Datos de contacto</h2>
         <div class="fila">
           <div class="campo">
@@ -268,8 +313,10 @@
         </div>
       </div>
 
-      <!-- CON QUIEN VIVE -->
-      <div class="seccion">
+      <div class="navegacion"><button type="button" class="btn-anterior" data-prev>← Anterior</button><button type="button" class="btn-siguiente" data-next>Continuar →</button></div></div>
+<!-- CON QUIEN VIVE -->
+      <div class="pantalla" data-pantalla="4">
+<div class="seccion">
         <h2>¿Con quién vive?</h2>
         <div class="checkbox-grupo">
           <div class="checkbox-item"><input type="checkbox" id="cqv-padre" name="conQuienVive.padre"><label for="cqv-padre">Padre</label></div>
@@ -285,8 +332,10 @@
         </div>
       </div>
 
-      <!-- FAMILIARES -->
-      <div class="seccion">
+      <div class="navegacion"><button type="button" class="btn-anterior" data-prev>← Anterior</button><button type="button" class="btn-siguiente" data-next>Continuar →</button></div></div>
+<!-- FAMILIARES -->
+      <div class="pantalla" data-pantalla="5">
+<div class="seccion">
         <h2>Familiares</h2>
         <div class="fila">
           <div class="campo"><label>Padre</label><input type="text" name="nombrePadre"></div>
@@ -295,6 +344,14 @@
         <div class="fila">
           <div class="campo"><label>Suegro</label><input type="text" name="nombreSuegro"></div>
           <div class="campo"><label>Suegra</label><input type="text" name="nombreSuegra"></div>
+        </div>
+
+        <div class="familiar-bloque pareja-bloque">
+          <div class="familiar-titulo">Esposo/a</div>
+          <div class="fila">
+            <div class="campo"><label>Nombre y Apellido</label><input type="text" name="nombreEsposa"></div>
+            <div class="campo"><label>Fecha de nacimiento</label><input type="date" name="esposaFecha"></div>
+          </div>
         </div>
 
         <div class="hijo-bloque">
@@ -329,8 +386,10 @@
         </div>
       </div>
 
-      <!-- EDUCACIÓN -->
-      <div class="seccion">
+      <div class="navegacion"><button type="button" class="btn-anterior" data-prev>← Anterior</button><button type="button" class="btn-siguiente" data-next>Continuar →</button></div></div>
+<!-- EDUCACIÓN -->
+      <div class="pantalla" data-pantalla="6">
+<div class="seccion">
         <h2>Educación</h2>
         <div class="campo">
           <label>¿Posee secundario?</label>
@@ -352,39 +411,44 @@
         </div>
       </div>
 
-      <!-- FOTOS DNI -->
-      <div class="seccion">
+      <div class="navegacion"><button type="button" class="btn-anterior" data-prev>← Anterior</button><button type="button" class="btn-siguiente" data-next>Continuar →</button></div></div>
+<!-- FOTOS DNI -->
+      <div class="pantalla" data-pantalla="7">
+<div class="seccion">
         <h2>Fotos del DNI</h2>
+        <div class="dni-aviso">⚠️ <strong>IMPORTANTE:</strong> necesitás cargar <strong>2 fotos del DNI</strong>: primero el ANVERSO y después el REVERSO.</div>
 
         <div class="fila">
-          <div class="campo">
-            <label>Foto DNI - Anverso</label>
+          <div class="dni-card"><div class="campo">
+            <label class="dni-label anverso-label">1️⃣ DNI — ANVERSO (frente)</label>
             <div class="foto-botones">
-              <button type="button" class="btn-foto" onclick="abrirCamara('anverso')">📷 Cámara</button>
-              <button type="button" class="btn-archivo" onclick="abrirArchivo('anverso')">📁 Archivo</button>
+              <button type="button" class="btn-foto" onclick="abrirCamara('anverso')">📷 SACAR FOTO DEL ANVERSO</button>
+              <button type="button" class="btn-archivo" onclick="abrirArchivo('anverso')">📁 ELEGIR ANVERSO</button>
             </div>
             <input type="file" id="camara-anverso" accept="image/*" capture="environment" hidden>
             <input type="file" id="archivo-anverso" accept="image/*,.pdf" hidden>
             <div id="nombre-anverso" class="nombre-foto">No se seleccionó ninguna foto.</div>
-          </div>
+          </div></div>
 
-          <div class="campo">
-            <label>Foto DNI - Reverso</label>
+          <div class="dni-card"><div class="campo">
+            <label class="dni-label reverso-label">2️⃣ DNI — REVERSO (dorso)</label>
             <div class="foto-botones">
-              <button type="button" class="btn-foto" onclick="abrirCamara('reverso')">📷 Cámara</button>
-              <button type="button" class="btn-archivo" onclick="abrirArchivo('reverso')">📁 Archivo</button>
+              <button type="button" class="btn-foto" onclick="abrirCamara('reverso')">📷 SACAR FOTO DEL REVERSO</button>
+              <button type="button" class="btn-archivo" onclick="abrirArchivo('reverso')">📁 ELEGIR REVERSO</button>
             </div>
             <input type="file" id="camara-reverso" accept="image/*" capture="environment" hidden>
             <input type="file" id="archivo-reverso" accept="image/*,.pdf" hidden>
             <div id="nombre-reverso" class="nombre-foto">No se seleccionó ninguna foto.</div>
-          </div>
+          </div></div>
         </div>
 
-        <small class="ayuda">Podés sacar la foto directamente con la cámara del teléfono o elegir un archivo de la galería/archivos. El anverso y reverso se guardan en sus respectivas carpetas de Drive y el link queda registrado en la hoja.</small>
+        <small class="ayuda">📌 <strong>ANVERSO:</strong> lado donde aparece tu foto y tus datos. <strong>REVERSO:</strong> lado posterior del DNI. Podés sacar cada foto con la cámara o elegirla desde el teléfono.</small>
       </div>
 
-      <!-- DECLARACIONES -->
-      <div class="seccion">
+      <div class="navegacion"><button type="button" class="btn-anterior" data-prev>← Anterior</button><button type="button" class="btn-siguiente" data-next>Continuar →</button></div></div>
+<!-- DECLARACIONES -->
+      <div class="pantalla" data-pantalla="8">
+<div class="seccion">
         <h2>Declaraciones</h2>
         <div class="declaracion">
           <input type="checkbox" id="decl-domicilio" name="declaracionDomicilio" required>
@@ -399,11 +463,9 @@
           <label for="decl-jurada2">Declaración jurada. <span class="requerido">*</span></label>
         </div>
       </div>
+<div class="navegacion"><button type="button" class="btn-anterior" data-prev>← Anterior</button><button type="button" class="btn-siguiente" data-next>Continuar →</button></div></div>
 
-      <div class="pie">
-        <button type="submit" id="btn-enviar">Enviar</button>
-        <div id="mensaje" class="mensaje"></div>
-      </div>
+
     </form>
   </div>
 
@@ -411,6 +473,29 @@
     const form = document.getElementById('form-personal');
     const btn = document.getElementById('btn-enviar');
     const mensaje = document.getElementById('mensaje');
+
+    const pantallas = Array.from(document.querySelectorAll('.pantalla'));
+    const indicadores = Array.from(document.querySelectorAll('[data-paso-ind]'));
+    const nombresPantalla = ['Datos personales','Domicilio','Datos de contacto','¿Con quién vive?','Familiares','Educación','Fotos del DNI','Declaraciones'];
+    let pantallaActual = 0;
+
+    function mostrarPantalla(indice) {
+      if (indice < 0 || indice >= pantallas.length) return;
+      pantallas.forEach((p, i) => p.classList.toggle('activa', i === indice));
+      indicadores.forEach((p, i) => p.classList.toggle('activo', i <= indice));
+      pantallaActual = indice;
+      document.getElementById('progreso-texto').textContent =
+        'Pantalla ' + (indice + 1) + ' de 8 · ' + nombresPantalla[indice];
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
+    document.querySelectorAll('[data-next]').forEach(b => b.addEventListener('click', () => {
+      if (pantallaActual < 7) mostrarPantalla(pantallaActual + 1);
+    }));
+    document.querySelectorAll('[data-prev]').forEach(b => b.addEventListener('click', () => {
+      if (pantallaActual > 0) mostrarPantalla(pantallaActual - 1);
+    }));
+    mostrarPantalla(0);
 
     function abrirCamara(lado) {
       document.getElementById('camara-' + lado).click();
@@ -468,7 +553,7 @@
         'domicilio','altura','pisoDpto','entreCalle1','entreCalle2','datosAdicional',
         'localidad','partido','observaciones','telefonoCelular','telefonoFijo',
         'otroTelefono','telefonoOtroContacto','correoElectronico',
-        'nombrePadre','nombreMadre','nombreSuegro','nombreSuegra',
+        'nombrePadre','nombreMadre','nombreSuegro','nombreSuegra','nombreEsposa','esposaFecha',
         'hijo1Nombre','hijo1Fecha','hijo2Nombre','hijo2Fecha',
         'hijo3Nombre','hijo3Fecha','hijo4Nombre','hijo4Fecha',
         'hijo5Nombre','hijo5Fecha','poseeSecundario','poseeAnaliticoTitulo',
