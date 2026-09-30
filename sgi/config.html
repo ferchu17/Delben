@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>DELBEN SGI · Configuración</title>
+<style>
+body{font-family:Arial,sans-serif;background:#eef3f8;margin:0;padding:24px;color:#1f2937}
+.card{max-width:720px;margin:40px auto;background:#fff;border-radius:14px;padding:24px;box-shadow:0 8px 30px rgba(0,0,0,.10)}
+h1{margin:0 0 8px;color:#1e3a5f}p{color:#5f6b78}
+label{display:block;font-weight:700;margin:18px 0 7px}
+input{width:100%;box-sizing:border-box;padding:12px;border:1px solid #c9d6e2;border-radius:8px;font-size:15px}
+button{border:0;border-radius:8px;padding:11px 16px;margin:12px 8px 0 0;background:#1e3a5f;color:#fff;font-weight:700;cursor:pointer}
+button.secondary{background:#6b7280}
+#estado{margin-top:18px;padding:12px;border-radius:8px;background:#f3f6fa;white-space:pre-wrap}
+a{color:#0065bc;font-weight:700}
+small{color:#6b7280}
+</style>
+<script src="../sgi-github-adapter.js"></script>
+</head>
+<body>
+<div class="card">
+<h1>DELBEN SGI</h1>
+<p>Configuración de conexión del SGI migrado a GitHub Pages. Esta página solo guarda la URL del backend en este navegador.</p>
+<label for="backend">URL de la implementación Apps Script</label>
+<input id="backend" placeholder="https://script.google.com/macros/s/XXXXXXXX/exec">
+<button onclick="guardar()">Guardar URL</button>
+<button class="secondary" onclick="probar()">Probar conexión</button>
+<div id="estado">Estado: esperando.</div>
+<p><a href="./">Abrir DELBEN SGI</a></p>
+<small>El sistema original no se modifica desde esta página.</small>
+</div>
+<script>
+(function(){try{document.getElementById('backend').value=localStorage.getItem('delben_sgi_backend')||'';}catch(e){}})();
+function guardar(){
+ var u=document.getElementById('backend').value.trim();
+ if(!u){document.getElementById('estado').textContent='Falta la URL del backend.';return;}
+ setDelbenSgiBackendUrl(u);
+ document.getElementById('estado').textContent='URL guardada correctamente.';
+}
+function probar(){
+ var out=document.getElementById('estado');
+ out.textContent='Probando conexión con getAparienciaConfig...';
+ google.script.run
+ .withSuccessHandler(function(r){out.textContent='CONEXIÓN CORRECTA.\nRespuesta: '+JSON.stringify(r);})
+ .withFailureHandler(function(e){out.textContent='ERROR DE CONEXIÓN.\n'+(e&&e.message?e.message:String(e));})
+ .getAparienciaConfig();
+}
+</script>
+</body>
+</html>
