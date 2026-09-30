@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>DELBEN SGI</title>
+<style>
+body{font-family:Arial,sans-serif;background:#f0f4f8;margin:0;padding:24px;color:#111827}
+.card{max-width:760px;margin:0 auto;background:#fff;border-radius:12px;padding:24px;box-shadow:0 4px 20px rgba(0,0,0,.1)}
+h1{margin:0 0 6px;color:#304ffe}p{color:#4b5563}
+label{display:block;font-weight:700;margin:18px 0 6px}
+input{width:100%;box-sizing:border-box;padding:11px;border:1px solid #c5cef5;border-radius:7px;font-size:15px}
+button{margin-top:12px;padding:10px 16px;border:0;border-radius:7px;background:#304ffe;color:#fff;font-weight:700;cursor:pointer}
+button.secondary{background:#6b7280}
+#estado{margin-top:16px;padding:12px;border-radius:7px;background:#eef2ff;white-space:pre-wrap}
+small{color:#6b7280}
+</style>
+<script src="../sgi-github-adapter.js"></script>
+</head>
+<body>
+<div class="card">
+  <h1>DELBEN SGI</h1>
+  <p>Puerta de prueba de la migración a GitHub Pages. Esta pantalla es temporal: sirve para validar la comunicación con el Apps Script antes de trasladar la interfaz completa.</p>
+
+  <label for="backend">URL de la implementación Apps Script</label>
+  <input id="backend" placeholder="https://script.google.com/macros/s/XXXXXXXX/exec">
+  <button onclick="guardarUrl()">Guardar URL</button>
+  <button class="secondary" onclick="probar()">Probar conexión</button>
+
+  <div id="estado">Estado: esperando configuración.</div>
+  <small>La URL se guarda localmente en este navegador. No modifica el SGI original.</small>
+</div>
+
+<script>
+(function(){
+  var input=document.getElementById('backend');
+  try{input.value=localStorage.getItem('delben_sgi_backend')||'';}catch(e){}
+})();
+function guardarUrl(){
+  var url=document.getElementById('backend').value.trim();
+  if(!url){document.getElementById('estado').textContent='Estado: falta la URL del backend.';return;}
+  setDelbenSgiBackendUrl(url);
+  document.getElementById('estado').textContent='Estado: URL guardada. Ahora podés probar la conexión.';
+}
+function probar(){
+  var out=document.getElementById('estado');
+  out.textContent='Estado: probando getAparienciaConfig...';
+  google.script.run
+    .withSuccessHandler(function(r){
+      out.textContent='Estado: CONEXIÓN CORRECTA.\nRespuesta recibida del Apps Script:\n'+JSON.stringify(r,null,2);
+    })
+    .withFailureHandler(function(e){
+      out.textContent='Estado: ERROR DE CONEXIÓN.\n'+(e&&e.message?e.message:String(e));
+    })
+    .getAparienciaConfig();
+}
+</script>
+</body>
+</html>
