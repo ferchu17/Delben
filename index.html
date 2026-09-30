@@ -85,8 +85,15 @@ body{
 }
 .field:last-child{margin-bottom:0}
 .field label,.ctrl-item label{
+  display:flex;align-items:center;gap:7px;
   font-size:.74rem;font-weight:800;text-transform:uppercase;
   letter-spacing:.35px;color:#315d8e;line-height:1.15
+}
+.ctrl-item .item-icon{
+  width:24px;height:24px;min-width:24px;border-radius:7px;
+  display:inline-flex;align-items:center;justify-content:center;
+  background:#e8f4fd;color:#0878c9;font-size:.78rem;
+  border:1px solid #b9d8f0
 }
 .field input,.field select,.field textarea{
   width:100%;padding:10px 11px;
@@ -873,9 +880,31 @@ function resetForm() {
 
 /* ---------- Inspección ---------- */
 function renderControles() {
-  function bloque(lista, clase) {
+  function iconoInspeccion(item) {
+  var n = norm(item);
+  if (n.indexOf('estado externo') >= 0) return 'fa-car';
+  if (n.indexOf('interior') >= 0 || n.indexOf('butacas') >= 0) return 'fa-chair';
+  if (n === 'luces' || n.indexOf('luces ') === 0 || n.indexOf('luz ') === 0) return 'fa-lightbulb';
+  if (n.indexOf('neumatico') >= 0) return 'fa-circle-dot';
+  if (n.indexOf('rueda') >= 0) return 'fa-life-ring';
+  if (n.indexOf('escobillas') >= 0) return 'fa-wind';
+  if (n.indexOf('bocina') >= 0) return 'fa-bullhorn';
+  if (n.indexOf('limpieza') >= 0) return 'fa-soap';
+  if (n.indexOf('baliza') >= 0) return 'fa-triangle-exclamation';
+  if (n.indexOf('ploteos') >= 0 || n.indexOf('pintura') >= 0) return 'fa-paint-roller';
+  if (n.indexOf('manubrio') >= 0) return 'fa-bicycle';
+  if (n.indexOf('freno') >= 0) return 'fa-hand';
+  if (n.indexOf('guardabarros') >= 0) return 'fa-shield-halved';
+  if (n.indexOf('pedales') >= 0 || n.indexOf('pie de apoyo') >= 0) return 'fa-shoe-prints';
+  if (n.indexOf('cargador') >= 0) return 'fa-plug';
+  if (n.indexOf('acelerador') >= 0) return 'fa-gauge-high';
+  if (n.indexOf('asiento') >= 0) return 'fa-chair';
+  return 'fa-screwdriver-wrench';
+}
+function bloque(lista, clase) {
     return lista.map(function (item, idx) {
-      return '<div class="ctrl-item"><label>' + (idx + 1) + '. ' + esc(item) + '</label>' +
+      var icono = iconoInspeccion(item);
+      return '<div class="ctrl-item"><label><span class="item-icon"><i class="fas ' + icono + '"></i></span>' + (idx + 1) + '. ' + esc(item) + '</label>' +
         '<select class="' + clase + ' estado-placeholder" data-item="' + esc(item) + '" onchange="styleSelect(this)">' +
         '<option value="" selected>Seleccione estado...</option><option value="Sin Novedad">Sin Novedad</option><option value="Con Novedad">Con Novedad</option></select></div>';
     }).join('');
