@@ -34,20 +34,22 @@
     .encabezado {
       background: linear-gradient(135deg,#063b75 0%,#0878d1 65%,#12a6e8 100%);
       color: #fff;
-      padding: 18px 22px;
+      padding: 14px 18px;
       display: flex;
       align-items: center;
-      gap: 20px;
+      gap: 14px;
     }
     .encabezado img {
-      height: 72px;
-      width: 190px;
-      object-fit: contain;
-      border-radius: 10px;
+      height: 76px;
+      width: 76px;
+      flex: 0 0 76px;
+      object-fit: cover;
+      border-radius: 16px;
       background: #fff;
-      padding: 5px 8px;
+      padding: 0;
+      box-shadow: 0 2px 8px rgba(0,0,0,.18);
     }
-    .encabezado-texto h1 { margin: 0 0 6px; font-size: 24px; }
+    .encabezado-texto h1 { margin: 0 0 5px; font-size: 22px; }
     .encabezado-texto p { margin: 0; opacity: .9; font-size: 14px; }
     .seccion {
       padding: 22px 24px;
@@ -138,7 +140,7 @@
       body { padding: 0 0 24px; }
       .contenedor { border-radius: 0; box-shadow:none; }
       .encabezado { padding: 16px 14px; gap: 12px; }
-      .encabezado img { width: 118px; height: 58px; }
+      .encabezado img { width: 64px; height: 64px; flex-basis:64px; border-radius:14px; }
       .encabezado-texto h1 { font-size: 20px; }
       .encabezado-texto p { font-size: 12px; }
       .seccion { padding: 18px 14px; }
@@ -151,7 +153,7 @@
 <body>
   <div class="contenedor">
     <div class="encabezado">
-      <img src="./delben-logo.webp" alt="Delben SGI">
+      <img src="./delben-control-icon.jpg" alt="Delben">
       <div class="encabezado-texto">
         <h1>Ficha de Datos del Personal</h1>
         <p>Completá el formulario con tus datos. Los campos con <span style="color:#ffd">*</span> son obligatorios.</p>
