@@ -25,6 +25,7 @@
     }
     fetch(BACKEND_URL,{
       method:'POST',
+      redirect:'follow',
       headers:{'Content-Type':'text/plain;charset=utf-8'},
       body:JSON.stringify({fn:fn,args:args||[]})
     }).then(function(res){
