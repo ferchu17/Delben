@@ -246,6 +246,26 @@ function guardarControlCompleto(tipo, filaDatos, fotosArray, supervisor, empresa
   };
 }
 
+function formatearFechaPDF_(valor) {
+  if (valor === null || valor === undefined || valor === '') return '';
+  var s = String(valor).trim();
+  var m = s.match(/^(\\d{4})-(\\d{2})-(\\d{2})$/);
+  if (m) return m[3] + '/' + m[2] + '/' + m[1];
+  var d = new Date(valor);
+  if (!isNaN(d.getTime())) return Utilities.formatDate(d, Session.getScriptTimeZone() || 'America/Argentina/Buenos_Aires', 'dd/MM/yyyy');
+  return s;
+}
+
+function formatearHoraPDF_(valor) {
+  if (valor === null || valor === undefined || valor === '') return '';
+  var s = String(valor).trim();
+  var m = s.match(/^(\\d{1,2}):(\\d{2})(?::\\d{2})?/);
+  if (m) return ('0' + m[1]).slice(-2) + ':' + m[2];
+  var d = new Date(valor);
+  if (!isNaN(d.getTime())) return Utilities.formatDate(d, Session.getScriptTimeZone() || 'America/Argentina/Buenos_Aires', 'HH:mm');
+  return s;
+}
+
 function enviarControlPorCorreo_(data) {
   var fila = data.fila || [];
   var doc = null;
@@ -279,9 +299,11 @@ function enviarControlPorCorreo_(data) {
       .setForegroundColor('#0878d1');
     body.appendHorizontalRule();
 
+    var fechaFormato = formatearFechaPDF_(fila[1]);
+    var horaFormato = formatearHoraPDF_(fila[3]);
     var meta = body.appendTable([
       ['N° CONTROL', String(data.id), 'TIPO', String(data.tipo || '')],
-      ['FECHA', String(fila[1] || ''), 'HORA', String(fila[3] || '')],
+      ['FECHA', fechaFormato, 'HORA', horaFormato],
       ['MOVILERO', String(fila[4] || ''), 'SUPERVISOR', String(data.supervisor.nombre || '')],
       ['DNI', String(fila[5] || ''), 'LEGAJO', String(fila[6] || '')],
       ['EMPRESA', String(data.empresa || ''), 'OBJETIVO', String(fila[8] || '')],
@@ -373,7 +395,7 @@ function enviarControlPorCorreo_(data) {
 
     var pdf = DriveApp.getFileById(doc.getId()).getAs(MimeType.PDF).setName(docName + '.pdf');
     var subject = 'DELBEN · Control de Móvil #' + data.id + ' · ' + (fila[4] || '');
-    var html = '<div style="font-family:Arial,sans-serif;color:#23466f"><h2 style="color:#0878d1">Control de móvil registrado</h2><p>Se adjunta el informe PDF del control <b>#' + data.id + '</b>.</p><p><b>Movilero:</b> ' + escHtml_(fila[4]) + '<br><b>Vehículo:</b> ' + escHtml_(fila[10] || '') + '<br><b>Fecha:</b> ' + escHtml_(fila[1] || '') + ' · <b>Hora:</b> ' + escHtml_(fila[3] || '') + '</p><p>Este correo fue generado automáticamente por DELBEN SGI.</p></div>';
+    var html = '<div style="font-family:Arial,sans-serif;color:#23466f"><h2 style="color:#0878d1">Control de móvil registrado</h2><p>Se adjunta el informe PDF del control <b>#' + data.id + '</b>.</p><p><b>Movilero:</b> ' + escHtml_(fila[4]) + '<br><b>Vehículo:</b> ' + escHtml_(fila[10] || '') + '<br><b>Fecha:</b> ' + escHtml_(fechaFormato) + ' · <b>Hora:</b> ' + escHtml_(horaFormato) + '</p><p>Este correo fue generado automáticamente por DELBEN SGI.</p></div>';
     var cuentaEjecutora = String(Session.getEffectiveUser().getEmail() || '').trim().toLowerCase();
     if (cuentaEjecutora !== 'fjacyno@gmail.com') {
       throw new Error('La implementación NO está ejecutándose como fjacyno@gmail.com. Cuenta efectiva detectada: ' + (cuentaEjecutora || 'no identificada') + '. En Administrar implementaciones debe figurar "Ejecutar como: Yo" y ese Yo debe ser fjacyno@gmail.com.');
