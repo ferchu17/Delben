@@ -278,12 +278,9 @@
         </div>
       </div>
 
-            <div class="pie-final">
-        <div class="navegacion">
-          <button type="button" class="btn-anterior" data-prev>← Anterior</button>
-          <button type="submit" id="btn-enviar" class="btn-final">✓ ENVIAR DATOS</button>
-        </div>
-        <div id="mensaje" class="mensaje"></div>
+            <div class="navegacion">
+        <button type="button" class="btn-anterior" data-prev>← Anterior</button>
+        <button type="button" class="btn-siguiente" data-next>Continuar →</button>
       </div></div>
 <!-- CONTACTO -->
       <div class="pantalla" data-pantalla="3">
@@ -463,7 +460,13 @@
           <label for="decl-jurada2">Declaración jurada. <span class="requerido">*</span></label>
         </div>
       </div>
-<div class="navegacion"><button type="button" class="btn-anterior" data-prev>← Anterior</button><button type="button" class="btn-siguiente" data-next>Continuar →</button></div></div>
+<div class="pie-final">
+        <div class="navegacion">
+          <button type="button" class="btn-anterior" data-prev>← Anterior</button>
+          <button type="submit" id="btn-enviar" class="btn-final">✓ ENVIAR DATOS</button>
+        </div>
+        <div id="mensaje" class="mensaje"></div>
+      </div></div>
 
 
     </form>
@@ -586,7 +589,7 @@
       google.script.run
         .withSuccessHandler(function(res) {
           btn.disabled = false;
-          btn.textContent = 'Enviar';
+          btn.textContent = '✓ ENVIAR DATOS';
           if (res.ok) {
             mensaje.className = 'mensaje ok';
             mensaje.textContent = 'Datos guardados correctamente (ID ' + res.id + ').';
