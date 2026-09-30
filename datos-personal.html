@@ -136,6 +136,11 @@
     .requerido { color: #d93025; }
     small.ayuda { display:block; color: #176b48; margin-top: 8px; background:#e8f8ef; padding:10px 12px; border-radius:10px; }
     input[type=file] { width:100%; padding:12px; border:2px dashed #8fc4f0; border-radius:12px; background:#f4faff; color:#1d4f7a; }
+    .foto-botones { display:flex; gap:10px; flex-wrap:wrap; }
+    .foto-botones button { flex:1; min-width:130px; padding:11px 14px; font-size:14px; border-radius:10px; }
+    .btn-foto { background:linear-gradient(90deg,#18a558,#128746); }
+    .btn-archivo { background:linear-gradient(90deg,#0878d1,#0056a6); }
+    .nombre-foto { margin-top:8px; padding:8px 10px; border-radius:8px; background:#f4faff; color:#536273; font-size:12px; border:1px solid #d8e9f7; }
   @media (max-width: 600px) {
       body { padding: 0 0 24px; }
       .contenedor { border-radius: 0; box-shadow:none; }
@@ -271,7 +276,7 @@
           <div class="checkbox-item"><input type="checkbox" id="cqv-madre" name="conQuienVive.madre"><label for="cqv-madre">Madre</label></div>
           <div class="checkbox-item"><input type="checkbox" id="cqv-suegro" name="conQuienVive.suegro"><label for="cqv-suegro">Suegro</label></div>
           <div class="checkbox-item"><input type="checkbox" id="cqv-suegra" name="conQuienVive.suegra"><label for="cqv-suegra">Suegra</label></div>
-          <div class="checkbox-item"><input type="checkbox" id="cqv-esposa" name="conQuienVive.esposa"><label for="cqv-esposa">Esposa</label></div>
+          <div class="checkbox-item"><input type="checkbox" id="cqv-esposa" name="conQuienVive.esposa"><label for="cqv-esposa">Esposo/a</label></div>
           <div class="checkbox-item"><input type="checkbox" id="cqv-hijo1" name="conQuienVive.hijo1"><label for="cqv-hijo1">Hijo 1</label></div>
           <div class="checkbox-item"><input type="checkbox" id="cqv-hijo2" name="conQuienVive.hijo2"><label for="cqv-hijo2">Hijo 2</label></div>
           <div class="checkbox-item"><input type="checkbox" id="cqv-hijo3" name="conQuienVive.hijo3"><label for="cqv-hijo3">Hijo 3</label></div>
@@ -349,18 +354,33 @@
 
       <!-- FOTOS DNI -->
       <div class="seccion">
-        <h2>Foto del DNI</h2>
+        <h2>Fotos del DNI</h2>
+
         <div class="fila">
           <div class="campo">
             <label>Foto DNI - Anverso</label>
-            <input type="file" name="fotoDniAnverso" accept="image/*,.pdf">
+            <div class="foto-botones">
+              <button type="button" class="btn-foto" onclick="abrirCamara('anverso')">📷 Cámara</button>
+              <button type="button" class="btn-archivo" onclick="abrirArchivo('anverso')">📁 Archivo</button>
+            </div>
+            <input type="file" id="camara-anverso" accept="image/*" capture="environment" hidden>
+            <input type="file" id="archivo-anverso" accept="image/*,.pdf" hidden>
+            <div id="nombre-anverso" class="nombre-foto">No se seleccionó ninguna foto.</div>
           </div>
+
           <div class="campo">
             <label>Foto DNI - Reverso</label>
-            <input type="file" name="fotoDniReverso" accept="image/*,.pdf">
+            <div class="foto-botones">
+              <button type="button" class="btn-foto" onclick="abrirCamara('reverso')">📷 Cámara</button>
+              <button type="button" class="btn-archivo" onclick="abrirArchivo('reverso')">📁 Archivo</button>
+            </div>
+            <input type="file" id="camara-reverso" accept="image/*" capture="environment" hidden>
+            <input type="file" id="archivo-reverso" accept="image/*,.pdf" hidden>
+            <div id="nombre-reverso" class="nombre-foto">No se seleccionó ninguna foto.</div>
           </div>
         </div>
-        <small class="ayuda">Las fotos se guardan en una carpeta de Drive y el link se registra en la hoja.</small>
+
+        <small class="ayuda">Podés sacar la foto directamente con la cámara del teléfono o elegir un archivo de la galería/archivos. El anverso y reverso se guardan en sus respectivas carpetas de Drive y el link queda registrado en la hoja.</small>
       </div>
 
       <!-- DECLARACIONES -->
@@ -391,6 +411,31 @@
     const form = document.getElementById('form-personal');
     const btn = document.getElementById('btn-enviar');
     const mensaje = document.getElementById('mensaje');
+
+    function abrirCamara(lado) {
+      document.getElementById('camara-' + lado).click();
+    }
+
+    function abrirArchivo(lado) {
+      document.getElementById('archivo-' + lado).click();
+    }
+
+    function actualizarNombreFoto(lado, input) {
+      const file = input.files && input.files[0];
+      const destino = document.getElementById('nombre-' + lado);
+      destino.textContent = file ? file.name : 'No se seleccionó ninguna foto.';
+    }
+
+    ['anverso','reverso'].forEach(function(lado) {
+      document.getElementById('camara-' + lado).addEventListener('change', function() {
+        document.getElementById('archivo-' + lado).value = '';
+        actualizarNombreFoto(lado, this);
+      });
+      document.getElementById('archivo-' + lado).addEventListener('change', function() {
+        document.getElementById('camara-' + lado).value = '';
+        actualizarNombreFoto(lado, this);
+      });
+    });
 
     function leerArchivo(input) {
       return new Promise((resolve) => {
@@ -442,8 +487,16 @@
       data.declaracionJurada2 = form.querySelector('[name="declaracionJurada2"]').checked;
 
       // Archivos DNI
-      data.fotoDniAnverso = await leerArchivo(form.querySelector('[name="fotoDniAnverso"]'));
-      data.fotoDniReverso = await leerArchivo(form.querySelector('[name="fotoDniReverso"]'));
+      data.fotoDniAnverso = await leerArchivo(
+        document.getElementById('camara-anverso').files[0]
+          ? document.getElementById('camara-anverso')
+          : document.getElementById('archivo-anverso')
+      );
+      data.fotoDniReverso = await leerArchivo(
+        document.getElementById('camara-reverso').files[0]
+          ? document.getElementById('camara-reverso')
+          : document.getElementById('archivo-reverso')
+      );
 
       google.script.run
         .withSuccessHandler(function(res) {
