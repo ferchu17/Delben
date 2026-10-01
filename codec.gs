@@ -392,7 +392,9 @@ function enviarControlPorCorreo_(data) {
         fotosPagina.setBorderWidth(1).setBorderColor('#159447');
 
         for (var q = 0; q < 2; q++) {
-          var celda = fotosPagina.appendTableRow().appendTableCell();
+          var filaFoto = fotosPagina.appendTableRow();
+          filaFoto.setMinimumHeight(330);
+          var celda = filaFoto.appendTableCell();
           celda.setBackgroundColor('#F7FBFD');
           celda.setPaddingTop(8).setPaddingBottom(8).setPaddingLeft(8).setPaddingRight(8);
           celda.setVerticalAlignment(DocumentApp.VerticalAlignment.CENTER);
