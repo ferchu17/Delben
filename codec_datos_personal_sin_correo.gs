@@ -10,7 +10,7 @@
  * ============================================================
  */
 
-const SPREADSHEET_ID = '1Z06eLpbng51tYcycQ1rf0LNI1OYmOpnmQp94YHY_coY';
+const SPREADSHEET_ID = '1Z06eLpbng51tYcycQlr0fLNI1OYmOpnmQp94YHY_coY';
 const SHEET_NAME = 'informacionpersonal';
 
 const CARPETA_DNI_ANVERSO_ID = '1pM7yFfOkEyTuZy058s74xW-PqIHN-G8CbS3pfNEX--leby4mrhyLuZBV_aKnpzwlIgI9RkCV';
