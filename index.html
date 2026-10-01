@@ -456,7 +456,7 @@ button,.type-card,.photo-slot,.dd-item{-webkit-tap-highlight-color:transparent;t
 
 // >>> URL de la "Aplicación web" de Apps Script (termina en /exec) <<<
 // URL por defecto (se puede cambiar desde la app: pie de pantalla > "Servidor")
-var BACKEND_URL_DEFECTO = 'https://script.google.com/macros/s/AKfycbyBi-tu0DQoN9f1jFOcMtYzyyEs6wsCY6W5P9I-HXjQ_N2Gyv5Ih-P3FodJBr8vnIowzA/exec';
+var BACKEND_URL_DEFECTO = 'https://script.google.com/macros/s/AKfycbxdBItqLGmffFxFQHJ8X3wnlvOh10cP4bUupAk-6RwtCVMzAX5f25D0BvC0h4FJaNaINA/exec';
 var BACKEND_URL = BACKEND_URL_DEFECTO;
 try {
   var _u = localStorage.getItem('delben_url');
@@ -762,41 +762,19 @@ function cargarSupervisores() {
     try { localStorage.setItem('delben_supervisores', JSON.stringify(lista)); } catch(e) {}
     if (!lista.length) sup.innerHTML = '<option value="">No hay supervisores cargados</option>';
   }
-  // Si la aplicación está servida por Apps Script, consultamos directamente
-  // la función del servidor. Esto evita depender de fetch/CORS dentro del Web App.
-  if (hayGoogleRun()) {
-    google.script.run
-      .withSuccessHandler(function(data) {
-        if (data && Array.isArray(data.supervisores)) {
-          pintar(data.supervisores);
-        } else {
-          cargarSupervisoresPorHttp();
-        }
-      })
-      .withFailureHandler(function() {
-        cargarSupervisoresPorHttp();
-      })
-      .getSupervisores();
-    return;
-  }
-
-  cargarSupervisoresPorHttp();
-
-  function cargarSupervisoresPorHttp() {
-    var url = BACKEND_URL + '?action=getSupervisores&_=' + Date.now();
-    fetchJson(url, {method:'GET', redirect:'follow'}, 30000).then(function(data) {
-      if (data && Array.isArray(data.supervisores)) { pintar(data.supervisores); return; }
-      throw new Error('Respuesta sin supervisores');
-    }).catch(function() {
-      var cb = 'delbenSupCb' + Date.now(), script = document.createElement('script'), terminado = false;
+  var url = BACKEND_URL + '?action=getSupervisores&_=' + Date.now();
+  fetchJson(url, {method:'GET', redirect:'follow'}, 30000).then(function(data) {
+    if (data && Array.isArray(data.supervisores)) { pintar(data.supervisores); return; }
+    throw new Error('Respuesta sin supervisores');
+  }).catch(function() {
+    var cb = 'delbenSupCb' + Date.now(), script = document.createElement('script'), terminado = false;
     function limpiar(){ try{delete window[cb];}catch(e){window[cb]=undefined;} if(script.parentNode)script.parentNode.removeChild(script); }
     window[cb]=function(data){ if(terminado)return; terminado=true; limpiar(); pintar(data && Array.isArray(data.supervisores)?data.supervisores:[]); };
     script.onerror=function(){ if(terminado)return; terminado=true; limpiar(); sup.innerHTML='<option value="">No se pudo cargar supervisores</option>'; sup.disabled=false; };
     script.src=BACKEND_URL+'?action=getSupervisores&callback='+cb+'&_='+Date.now();
     document.head.appendChild(script);
     setTimeout(function(){ if(!terminado){terminado=true;limpiar();sup.innerHTML='<option value="">No se pudo cargar supervisores</option>';sup.disabled=false;} },30000);
-    });
-  }
+  });
 }
 
 /* ---------- Pantallas ---------- */
@@ -806,11 +784,8 @@ function seleccionarTipo(tipo) {
   $('tipo-movil').value = tipo;
   var lbl = $('form-tipo-label'); if (lbl) lbl.textContent = tipo.toUpperCase();
   var esBici = (tipo === 'Bicicleta');
-  var esElectrico = (tipo === 'Eléctrico');
-  // En Bicicleta y Eléctrico no corresponde pedir Patente ni Móvil.
-  mostrar('vehicle-fields', !esBici && !esElectrico, 'flex');
-  mostrar('mobile-field', !esBici && !esElectrico, 'flex');
-  // El kilometraje sigue disponible para los móviles que no son bicicleta.
+  mostrar('vehicle-fields', !esBici, 'flex');
+  mostrar('mobile-field', !esBici, 'flex');
   mostrar('km-field', !esBici, 'flex');
   mostrar('block-ctrl-vehiculo', !esBici);
   mostrar('block-ctrl-bicicleta', esBici);
@@ -836,7 +811,7 @@ function validarDatos() {
   if (!tipo) return 'Por favor seleccione el tipo de móvil.';
   if (!$('ctrl-fecha').value) return 'Debe indicar la fecha.';
   if (!$('ctrl-hora').value) return 'Debe indicar la hora.';
-  if (tipo !== 'Bicicleta' && tipo !== 'Eléctrico' && !patente) return 'Debe seleccionar la patente / dominio.';
+  if (tipo !== 'Bicicleta' && !patente) return 'Debe seleccionar la patente / dominio.';
   if (!objetivo) return 'Debe indicar el objetivo / cliente.';
   if (!turno) return 'Debe seleccionar el turno / guardia.';
   if (!personal) return 'Debe indicar el nombre del personal.';
@@ -998,3 +973,210 @@ function abrirCamaraMovil(idx) {
     mostrarAviso(msg);
   });
 }
+function cerrarCamaraMovil() {
+  var video = $('camera-video');
+  if (camStream) {
+    camStream.getTracks().forEach(function(t){ t.stop(); });
+    camStream = null;
+  }
+  if (video) video.srcObject = null;
+  var modal = $('camera-modal');
+  if (modal) modal.style.display = 'none';
+}
+function capturarFotoMovil() {
+  var video = $('camera-video');
+  if (!video || !video.videoWidth) {
+    mostrarAviso('La cámara todavía no está lista. Esperá un segundo.');
+    return;
+  }
+  var canvas = document.createElement('canvas');
+  var max = 1280;
+  var k = Math.min(1, max / Math.max(video.videoWidth, video.videoHeight));
+  canvas.width = Math.round(video.videoWidth * k);
+  canvas.height = Math.round(video.videoHeight * k);
+  canvas.getContext('2d').drawImage(video, 0, 0, canvas.width, canvas.height);
+  var dataUrl = canvas.toDataURL('image/jpeg', 0.78);
+  photoSlots[activeSlotIdx] = {
+    base64: dataUrl.split(',')[1],
+    mimeType: 'image/jpeg',
+    name: 'control_' + Date.now() + '_' + (activeSlotIdx + 1) + '.jpg'
+  };
+  var idx = activeSlotIdx;
+  var slot = $('slot-' + idx);
+  if (slot) slot.innerHTML = '<div class="photo-preview"><img src="' + dataUrl + '"><button type="button" class="btn-del-photo" onclick="event.stopPropagation(); removePhoto(' + idx + ')">✕</button></div>';
+  cerrarCamaraMovil();
+}
+function abrirArchivoMovil(idx) {
+  activeSlotIdx = idx;
+  var inp = $('inp-gal-' + idx);
+  if (inp) inp.click();
+}
+function comprimirImagen(file, cb) {
+  var fr = new FileReader();
+  fr.onerror = function () { cb(null); };
+  fr.onload = function (e) {
+    var original = e.target.result;
+    var img = new Image();
+    img.onload = function () {
+      try {
+        var MAX = 1280, w = img.width, h = img.height;
+        var k = Math.min(1, MAX / Math.max(w, h));
+        var c = document.createElement('canvas');
+        c.width = Math.round(w * k); c.height = Math.round(h * k);
+        c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+        cb(c.toDataURL('image/jpeg', 0.72));
+      } catch (er) { cb(original); }
+    };
+    img.onerror = function () { cb(original); };
+    img.src = original;
+  };
+  fr.readAsDataURL(file);
+}
+function onFileSelected(input) {
+  var file = input.files && input.files[0];
+  if (!file) return;
+  var idx = activeSlotIdx;
+  comprimirImagen(file, function (dataUrl) {
+    if (!dataUrl) { mostrarAviso('No se pudo leer la fotografía.'); return; }
+    photoSlots[idx] = {
+      base64: dataUrl.split(',')[1], mimeType: 'image/jpeg',
+      name: 'control_' + Date.now() + '_' + (idx + 1) + '.jpg'
+    };
+    var slot = $('slot-' + idx);
+    if (slot) {
+      slot.innerHTML = '<div class="photo-preview"><img src="' + dataUrl + '"><button type="button" class="btn-del-photo" onclick="event.stopPropagation(); removePhoto(' + idx + ')">✕</button></div>';
+    }
+  });
+  input.value = '';
+}
+function removePhoto(idx) {
+  photoSlots[idx] = null;
+  var slot = $('slot-' + idx);
+  if (slot) {
+    slot.innerHTML =
+      '<div class="photo-actions">' +
+        '<button type="button" class="btn-foto" onclick="abrirCamaraMovil(' + idx + ')"><i class="fas fa-camera"></i> SACAR FOTO</button>' +
+        '<button type="button" class="btn-archivo" onclick="abrirArchivoMovil(' + idx + ')"><i class="fas fa-folder-open"></i> ELEGIR ARCHIVO</button>' +
+      '</div>' +
+      '<div class="photo-name" id="nombre-foto-' + idx + '">No se seleccionó ninguna foto.</div>';
+  }
+}
+
+/* ---------- Guardado ---------- */
+function validarInspeccion() {
+  var selector = $('tipo-movil').value === 'Bicicleta' ? '.select-ctrl-bici' : '.select-ctrl';
+  var controles = document.querySelectorAll(selector);
+  for (var i = 0; i < controles.length; i++) {
+    if (!controles[i].value) {
+      var n = controles[i].getAttribute('data-item') || ('ítem ' + (i + 1));
+      return 'Debe indicar "Sin Novedad" o "Con Novedad" en: ' + n + '.';
+    }
+  }
+  return '';
+}
+function guardarControl() {
+  var err = validarDatos();
+  if (err) { mostrarAviso(err); return; }
+  err = validarInspeccion();
+  if (err) { mostrarAviso(err); return; }
+  if (err) { mostrarAviso(err); return; }
+  var tipo = $('tipo-movil').value;
+  var fecha = $('ctrl-fecha').value, hora = $('ctrl-hora').value, dia = $('ctrl-dia').value;
+  var personal = $('ctrl-personal').value.trim();
+  var dni = $('ctrl-dni').value.trim(), legajo = $('ctrl-legajo').value.trim();
+  var turno = $('ctrl-turno').value, objetivo = $('ctrl-objetivo').value.trim();
+  var empresa = $('ctrl-empresa').value.trim();
+  var supSel = $('ctrl-supervisor');
+  var supOpt = supSel.options[supSel.selectedIndex];
+  var supervisor = {
+    nombre: supSel.value.trim(),
+    correo: (supOpt.getAttribute('data-correo') || '').trim()
+  };
+  var novedad = $('ctrl-novedad').value.trim();
+  var fila = [];
+  if (tipo === 'Bicicleta') {
+    fila = ['', fecha, dia, hora, personal, dni, legajo, turno, objetivo, 'Bicicleta'];
+    Array.prototype.forEach.call(document.querySelectorAll('.select-ctrl-bici'), function (s) { fila.push(s.value); });
+  } else {
+    var patente = $('ctrl-patente').value.trim().toUpperCase();
+    var movilDesc = $('ctrl-movil').value.trim();
+    var vehiculo = patente + (movilDesc ? ' (' + movilDesc + ')' : '');
+    var km = $('ctrl-km').value.trim() || '0';
+    fila = ['', fecha, dia, hora, personal, dni, legajo, turno, objetivo, tipo, vehiculo, km];
+    Array.prototype.forEach.call(document.querySelectorAll('.select-ctrl'), function (s) { fila.push(s.value); });
+  }
+  fila.push(novedad || 'Sin Novedad');
+  fila.push('');
+  var fotos = photoSlots.filter(function (p) { return p !== null; });
+  var btn = $('btn-submit');
+  showLoading('Guardando registro' + (fotos.length ? ' y subiendo fotos' : '') + '...');
+  btn.disabled = true;
+  apiGuardar(tipo, fila, fotos, supervisor, empresa, function (res) {
+    hideLoading(); btn.disabled = false;
+    if (res && res.ok) {
+      mostrarModalExito((res.persona || personal || '').trim(), res);
+    } else {
+      mostrarAviso('No se pudo guardar: ' + ((res && (res.error || res.message)) || JSON.stringify(res)), 'Error al guardar');
+    }
+  }, function (e) {
+    hideLoading(); btn.disabled = false;
+    mostrarAviso((e && e.message) || String(e), 'Error al guardar');
+  });
+}
+function mostrarModalExito(nombre, res) {
+  $('modal-nombre-exito').textContent = nombre || 'Persona no identificada';
+  var sub = $('modal-sub-exito');
+  if (sub) {
+    if (res && res.correoPendiente) {
+      sub.innerHTML = 'Control guardado correctamente. <b>El PDF será enviado al supervisor.</b>';
+    } else if (res && res.correoEnviado) {
+      sub.innerHTML = 'Control guardado y <b>PDF enviado al supervisor</b>.';
+    } else {
+      sub.innerHTML = 'Control guardado. El PDF no pudo enviarse: <b>' + esc((res && res.errorCorreo) || 'revise la configuración de correo') + '</b>';
+    }
+  }
+  $('modal-backdrop-exito').style.display = 'flex';
+}
+function cerrarModalExito() {
+  $('modal-backdrop-exito').style.display = 'none';
+  volverInicio();
+}
+
+/* ---------- Configuración de la URL del servidor ---------- */
+function abrirConfig() {
+  var m = $('modal-config'); if (!m) return;
+  $('cfg-url').value = (BACKEND_URL === BACKEND_URL_DEFECTO) ? '' : BACKEND_URL;
+  $('cfg-msg').textContent = '';
+  m.style.display = 'flex';
+}
+function cerrarConfig() { var m = $('modal-config'); if (m) m.style.display = 'none'; }
+function guardarConfig() {
+  var v = ($('cfg-url').value || '').trim();
+  if (!v) {
+    try { localStorage.removeItem('delben_url'); } catch (e) {}
+    BACKEND_URL = BACKEND_URL_DEFECTO;
+  } else {
+    if (v.indexOf('/exec') < 0) { $('cfg-msg').textContent = 'La URL debe terminar en /exec (es la "URL de la aplicación web").'; return; }
+    v = v.replace(/\/exec.*$/, '/exec');
+    BACKEND_URL = v;
+    try { localStorage.setItem('delben_url', v); } catch (e) {}
+  }
+  cerrarConfig();
+  try { localStorage.removeItem('delben_datos'); } catch (e) {}
+  DB_LOADED = { personal: [], objetivos: [], flota: [] };
+  cargarDatos(true);
+}
+
+
+</script>
+<div id="camera-modal" class="camera-modal" onclick="if(event.target===this)cerrarCamaraMovil()">
+  <div class="camera-box">
+    <video id="camera-video" class="camera-video" autoplay playsinline muted></video>
+    <div class="camera-actions">
+      <button type="button" class="camera-cancel" onclick="cerrarCamaraMovil()">CANCELAR</button>
+      <button type="button" class="camera-shot" onclick="capturarFotoMovil()"><i class="fas fa-camera"></i> TOMAR FOTO</button>
+    </div>
+  </div>
+</div>
+</body>
+</html>
