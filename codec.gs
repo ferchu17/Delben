@@ -273,34 +273,43 @@ function enviarControlPorCorreo_(data) {
     var docName = 'Control Movil #' + data.id + ' - ' + (fila[10] || data.tipo || 'Vehiculo');
     doc = DocumentApp.create(docName);
     var body = doc.getBody();
-    body.setMarginTop(24).setMarginBottom(24).setMarginLeft(28).setMarginRight(28);
 
-    // Encabezado DELBEN: logo real + colores institucionales.
+    body.setMarginTop(28).setMarginBottom(28).setMarginLeft(36).setMarginRight(36);
+
+    // ---------------------------------------------------------
+    // ENCABEZADO DEFINITIVO:
+    // logo real, pequeño, arriba a la izquierda.
+    // El título queda en una línea independiente y centrado.
+    // ---------------------------------------------------------
     try {
-      var logoBlob = UrlFetchApp.fetch('https://raw.githubusercontent.com/ferchu17/Delben/main/delben-logo.webp').getBlob();
-      var logo = body.appendImage(logoBlob);
-      var logoW = 185;
-      var logoH = Math.round(logo.getHeight() * logoW / logo.getWidth());
-      logo.setWidth(logoW).setHeight(logoH);
-      var logoPar = logo.getParent();
-      if (logoPar && logoPar.getType && logoPar.getType() === DocumentApp.ElementType.PARAGRAPH) {
-        logoPar.setAlignment(DocumentApp.HorizontalAlignment.CENTER);
-      }
+      var logoBlob = UrlFetchApp.fetch(
+        'https://raw.githubusercontent.com/ferchu17/Delben/main/delben-logo.webp',
+        {muteHttpExceptions:false}
+      ).getBlob();
+
+      var logoPar = body.appendParagraph('');
+      logoPar.setAlignment(DocumentApp.HorizontalAlignment.LEFT);
+      var logoImg = logoPar.appendInlineImage(logoBlob);
+
+      // Aproximadamente 30 mm de ancho.
+      var logoW = 85;
+      var logoH = Math.round(logoImg.getHeight() * logoW / logoImg.getWidth());
+      logoImg.setWidth(logoW).setHeight(logoH);
     } catch (logoErr) {
-      var titleFallback = body.appendParagraph('DELBEN');
-      titleFallback.setHeading(DocumentApp.ParagraphHeading.TITLE)
-        .setAlignment(DocumentApp.HorizontalAlignment.CENTER)
-        .setForegroundColor('#159447');
+      throw new Error('No se pudo cargar el logo DELBEN desde GitHub: ' + logoErr.message);
     }
 
     body.appendParagraph('CONTROL DE MÓVIL · INFORME DE INSPECCIÓN')
       .setAlignment(DocumentApp.HorizontalAlignment.CENTER)
       .setBold(true)
-      .setForegroundColor('#0878d1');
+      .setForegroundColor('#0065BC')
+      .setFontSize(15);
+
     body.appendHorizontalRule();
 
     var fechaFormato = formatearFechaPDF_(fila[1]);
     var horaFormato = formatearHoraPDF_(fila[3]);
+
     var meta = body.appendTable([
       ['N° CONTROL', String(data.id), 'TIPO', String(data.tipo || '')],
       ['FECHA', fechaFormato, 'HORA', horaFormato],
@@ -310,95 +319,126 @@ function enviarControlPorCorreo_(data) {
       ['TURNO', String(fila[7] || ''), 'VEHÍCULO', String(fila[10] || '')],
       ['KILOMETRAJE', String(fila[11] || ''), 'CORREO SUPERVISOR', String(data.supervisor.correo || '')]
     ]);
+
     for (var r = 0; r < meta.getNumRows(); r++) {
-      for (var c = 0; c < meta.getRow(r).getNumCells(); c++) {
-        var cell = meta.getRow(r).getCell(c);
+      for (var cc = 0; cc < meta.getRow(r).getNumCells(); cc++) {
+        var cell = meta.getRow(r).getCell(cc);
         cell.setPaddingTop(5).setPaddingBottom(5).setPaddingLeft(7).setPaddingRight(7);
-        if (c % 2 === 0) cell.setBackgroundColor('#e8f4ff');
+        if (cc === 0 || cc === 2) {
+          cell.setBackgroundColor('#EEF7FD');
+          cell.getChild(0).asParagraph().setBold(true);
+        }
       }
     }
 
     body.appendParagraph('');
     body.appendParagraph('INSPECCIÓN TÉCNICA')
-      .setHeading(DocumentApp.ParagraphHeading.HEADING2)
-      .setForegroundColor('#0878d1');
+      .setAlignment(DocumentApp.HorizontalAlignment.LEFT)
+      .setBold(true)
+      .setForegroundColor('#159447')
+      .setFontSize(13);
 
-    var controles = data.tipo.toLowerCase().indexOf('bici') >= 0
+    var esBici = String(data.tipo || '').toLowerCase().indexOf('bici') >= 0;
+    var controles = esBici
       ? ['Manubrio','Freno Delantero','Freno Trasero','Guardabarros','Pedales','Cargador','Pie de Apoyo','Acelerador','Asiento','Pintura']
       : ['Estado Externo General','Interior (Butacas)','Luces','Neumático Delantero Der.','Neumático Delantero Izq.','Neumático Trasero Der.','Neumático Trasero Izq.','Rueda de Auxilio','Escobillas Parabrisas','Luces Bajas','Luces Altas','Luz Trasera Izq.','Luz Trasera Der.','Luces de Giro','Bocina','Limpieza Int./Ext.','Baliza Lumínica','Ploteos'];
-    var startIdx = data.tipo.toLowerCase().indexOf('bici') >= 0 ? 9 : 12;
+
+    var startIdx = esBici ? 9 : 12;
     var tbl = body.appendTable();
+    var headerRow = tbl.appendTableRow();
+    var h1 = headerRow.appendTableCell('CONTROL');
+    var h2 = headerRow.appendTableCell('RESULTADO');
+    h1.setBackgroundColor('#0065BC').setForegroundColor('#FFFFFF').setPaddingTop(5).setPaddingBottom(5);
+    h2.setBackgroundColor('#0065BC').setForegroundColor('#FFFFFF').setPaddingTop(5).setPaddingBottom(5);
+    h1.getChild(0).asParagraph().setBold(true);
+    h2.getChild(0).asParagraph().setBold(true);
+
     for (var i = 0; i < controles.length; i++) {
       var row = tbl.appendTableRow();
-      var label = row.appendTableCell(String(i + 1) + '. ' + controles[i]);
-      var val = row.appendTableCell(String(fila[startIdx + i] || ''));
-      label.setBackgroundColor('#f3f8fc');
-      if (String(fila[startIdx + i] || '') === 'Con Novedad') val.setBackgroundColor('#fde8e8');
-      else if (String(fila[startIdx + i] || '') === 'Sin Novedad') val.setBackgroundColor('#e8f6ed');
+      var c1 = row.appendTableCell(String(i + 1) + '. ' + controles[i]);
+      var valor = String(fila[startIdx + i] || '');
+      var c2 = row.appendTableCell(valor);
+      c1.setBackgroundColor('#F5FAFD').setPaddingTop(4).setPaddingBottom(4);
+      c2.setPaddingTop(4).setPaddingBottom(4);
+      c2.getChild(0).asParagraph().setAlignment(DocumentApp.HorizontalAlignment.CENTER);
+      if (valor === 'Con Novedad') c2.setBackgroundColor('#FDE8E8');
+      else if (valor === 'Sin Novedad') c2.setBackgroundColor('#EEF8F2');
     }
 
     var novIdx = startIdx + controles.length;
     body.appendParagraph('');
     body.appendParagraph('NOVEDAD / OBSERVACIÓN GENERAL')
       .setBold(true)
-      .setForegroundColor('#0878d1');
+      .setForegroundColor('#159447')
+      .setFontSize(11);
     body.appendParagraph(String(fila[novIdx] || 'Sin Novedad'));
 
-    // Registro fotográfico: exactamente 2 fotos por hoja, centradas y dentro de recuadros.
-    if (data.fotosIds && data.fotosIds.length) {
+    // ---------------------------------------------------------
+    // FOTOS: 2 POR HOJA.
+    // Cada foto está dentro de un marco y centrada horizontal
+    // y verticalmente en su mitad de la página.
+    // ---------------------------------------------------------
+    var idsFotos = data.fotosIds || [];
+    if (idsFotos.length) {
       body.appendPageBreak();
       body.appendParagraph('REGISTRO FOTOGRÁFICO')
-        .setHeading(DocumentApp.ParagraphHeading.HEADING2)
         .setAlignment(DocumentApp.HorizontalAlignment.CENTER)
-        .setForegroundColor('#0878d1');
+        .setBold(true)
+        .setForegroundColor('#0065BC')
+        .setFontSize(15);
 
-      for (var p = 0; p < data.fotosIds.length; p += 2) {
-        var fotoTable = body.appendTable();
-        fotoTable.setBorderWidth(1).setBorderColor('#8fc4f0');
-        fotoTable.setColumnWidth(0, 500);
+      for (var p = 0; p < idsFotos.length; p += 2) {
+        var fotosPagina = body.appendTable();
+        fotosPagina.setBorderWidth(1).setBorderColor('#159447');
 
-        for (var q = 0; q < 2 && (p + q) < data.fotosIds.length; q++) {
-          var fotoCell = fotoTable.appendTableRow().appendTableCell();
-          fotoCell.setBackgroundColor('#f8fbfe');
-          fotoCell.setPaddingTop(10).setPaddingBottom(10).setPaddingLeft(10).setPaddingRight(10);
+        for (var q = 0; q < 2; q++) {
+          var celda = fotosPagina.appendTableRow().appendTableCell();
+          celda.setBackgroundColor('#F7FBFD');
+          celda.setPaddingTop(8).setPaddingBottom(8).setPaddingLeft(8).setPaddingRight(8);
+          celda.setVerticalAlignment(DocumentApp.VerticalAlignment.CENTER);
 
-          var img = fotoCell.appendImage(DriveApp.getFileById(data.fotosIds[p + q]).getBlob());
-          var maxW = 430;
-          var maxH = 250;
-          var w = img.getWidth();
-          var h = img.getHeight();
-          var scale = Math.min(maxW / w, maxH / h, 1);
-          img.setWidth(Math.round(w * scale)).setHeight(Math.round(h * scale));
+          if (idsFotos[p + q]) {
+            var imgPar = celda.appendParagraph('');
+            imgPar.setAlignment(DocumentApp.HorizontalAlignment.CENTER);
+            var img = imgPar.appendInlineImage(
+              DriveApp.getFileById(idsFotos[p + q]).getBlob()
+            );
 
-          var par = img.getParent();
-          if (par && par.getType && par.getType() === DocumentApp.ElementType.PARAGRAPH) {
-            par.setAlignment(DocumentApp.HorizontalAlignment.CENTER);
+            var maxW = 470;
+            var maxH = 275;
+            var iw = img.getWidth();
+            var ih = img.getHeight();
+            var scale = Math.min(maxW / iw, maxH / ih, 1);
+            img.setWidth(Math.round(iw * scale));
+            img.setHeight(Math.round(ih * scale));
+
+            celda.appendParagraph('Vista ' + (p + q + 1))
+              .setAlignment(DocumentApp.HorizontalAlignment.CENTER)
+              .setBold(true)
+              .setForegroundColor('#315E94')
+              .setFontSize(9);
           }
-
-          fotoCell.appendParagraph('Vista ' + (p + q + 1))
-            .setAlignment(DocumentApp.HorizontalAlignment.CENTER)
-            .setBold(true)
-            .setForegroundColor('#315e94')
-            .setFontSize(9);
         }
 
-        if (p + 2 < data.fotosIds.length) body.appendPageBreak();
+        if (p + 2 < idsFotos.length) body.appendPageBreak();
       }
     }
 
     body.appendParagraph('');
     body.appendParagraph('Informe generado automáticamente por DELBEN SGI')
       .setAlignment(DocumentApp.HorizontalAlignment.CENTER)
-      .setForegroundColor('#7a8fa3')
+      .setForegroundColor('#7A8FA3')
       .setFontSize(8);
+
     doc.saveAndClose();
 
     var pdf = DriveApp.getFileById(doc.getId()).getAs(MimeType.PDF).setName(docName + '.pdf');
     var subject = 'DELBEN · Control de Móvil #' + data.id + ' · ' + (fila[4] || '');
-    var html = '<div style="font-family:Arial,sans-serif;color:#23466f"><h2 style="color:#0878d1">Control de móvil registrado</h2><p>Se adjunta el informe PDF del control <b>#' + data.id + '</b>.</p><p><b>Movilero:</b> ' + escHtml_(fila[4]) + '<br><b>Vehículo:</b> ' + escHtml_(fila[10] || '') + '<br><b>Fecha:</b> ' + escHtml_(fechaFormato) + ' · <b>Hora:</b> ' + escHtml_(horaFormato) + '</p><p>Este correo fue generado automáticamente por DELBEN SGI.</p></div>';
+    var html = '<div style="font-family:Arial,sans-serif;color:#37414A"><h2 style="color:#0065BC">Control de móvil registrado</h2><p>Se adjunta el informe PDF del control <b>#' + data.id + '</b>.</p><p><b>Movilero:</b> ' + escHtml_(fila[4]) + '<br><b>Vehículo:</b> ' + escHtml_(fila[10] || '') + '<br><b>Fecha:</b> ' + escHtml_(fechaFormato) + ' · <b>Hora:</b> ' + escHtml_(horaFormato) + '</p><p>Este correo fue generado automáticamente por DELBEN SGI.</p></div>';
+
     var cuentaEjecutora = String(Session.getEffectiveUser().getEmail() || '').trim().toLowerCase();
     if (cuentaEjecutora !== 'fjacyno@gmail.com') {
-      throw new Error('La implementación NO está ejecutándose como fjacyno@gmail.com. Cuenta efectiva detectada: ' + (cuentaEjecutora || 'no identificada') + '. En Administrar implementaciones debe figurar "Ejecutar como: Yo" y ese Yo debe ser fjacyno@gmail.com.');
+      throw new Error('La implementación debe ejecutarse como fjacyno@gmail.com. Cuenta efectiva detectada: ' + (cuentaEjecutora || 'no identificada') + '.');
     }
 
     MailApp.sendEmail({
@@ -411,14 +451,16 @@ function enviarControlPorCorreo_(data) {
       name: 'DELBEN SGI',
       replyTo: 'fjacyno@gmail.com'
     });
+
     DriveApp.getFileById(doc.getId()).setTrashed(true);
     return {ok:true, cuentaEjecutora:cuentaEjecutora};
   } catch (e) {
-    if (doc) { try { DriveApp.getFileById(doc.getId()).setTrashed(true); } catch (_) {} }
+    if (doc) {
+      try { DriveApp.getFileById(doc.getId()).setTrashed(true); } catch (_) {}
+    }
     return {ok:false,error:String(e && e.message ? e.message : e)};
   }
 }
-
 function probarCorreo() {
   var cuenta = String(Session.getEffectiveUser().getEmail() || '').trim();
   if (cuenta.toLowerCase() !== 'fjacyno@gmail.com') {
