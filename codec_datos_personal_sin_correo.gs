@@ -22,7 +22,27 @@ const CARPETA_PDF_ID = '';
 
 const COLUMNAS_TEXTO_FORZADO = [5, 6, 9, 10, 17, 18, 19, 20];
 
-function doGet() {
+function doGet(e) {
+  if (e && e.parameter && e.parameter.action === 'getPersonalActivo') {
+    var salida;
+    try {
+      salida = { ok: true, personal: getPersonalActivo() };
+    } catch (err) {
+      salida = { ok: false, error: String(err && err.message ? err.message : err) };
+    }
+
+    var callback = e.parameter.callback;
+    if (callback && /^[A-Za-z_$][\\w$.]*$/.test(callback)) {
+      return ContentService
+        .createTextOutput(callback + '(' + JSON.stringify(salida) + ');')
+        .setMimeType(ContentService.MimeType.JAVASCRIPT);
+    }
+
+    return ContentService
+      .createTextOutput(JSON.stringify(salida))
+      .setMimeType(ContentService.MimeType.JSON);
+  }
+
   return HtmlService.createTemplateFromFile('Index')
     .evaluate()
     .setTitle('Datos del Personal')
@@ -53,6 +73,115 @@ function doPost(e) {
 
 function include(filename) {
   return HtmlService.createHtmlOutputFromFile(filename).getContent();
+}
+
+function _normalizarCabeceraPersonal_(valor) {
+  return String(valor || '')
+    .toLowerCase()
+    .trim()
+    .normalize('NFD')
+    .replace(/[\\u0300-\\u036f]/g, '')
+    .replace(/[._-]+/g, ' ')
+    .replace(/\\s+/g, ' ');
+}
+
+function _buscarIndicePersonal_(cabeceras, nombres, fallback) {
+  for (var i = 0; i < nombres.length; i++) {
+    var objetivo = _normalizarCabeceraPersonal_(nombres[i]);
+    var idx = cabeceras.indexOf(objetivo);
+    if (idx >= 0) return idx;
+  }
+  return fallback;
+}
+
+function getPersonalActivo() {
+  var ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+  var sheet = ss.getSheetByName('personal');
+  if (!sheet) throw new Error('No se encontró la pestaña "personal".');
+
+  var values = sheet.getDataRange().getDisplayValues();
+  if (!values || values.length < 2) return [];
+
+  var headers = values[0].map(_normalizarCabeceraPersonal_);
+
+  var iNombre = _buscarIndicePersonal_(headers, [
+    'apellido y nombre', 'apellido nombre', 'apellidos y nombre',
+    'nombre y apellido', 'nombre completo', 'apellido_nombre',
+    'nombre del personal', 'personal'
+  ], -1);
+
+  var iApellido = _buscarIndicePersonal_(headers, [
+    'apellido', 'apellidos'
+  ], -1);
+
+  var iNombres = _buscarIndicePersonal_(headers, [
+    'nombre', 'nombres'
+  ], -1);
+
+  var iDni = _buscarIndicePersonal_(headers, [
+    'dni', 'documento', 'documento nacional de identidad',
+    'nro dni', 'n° dni', 'nro. dni'
+  ], -1);
+
+  var iLegajo = _buscarIndicePersonal_(headers, [
+    'legajo', 'nro legajo', 'n° legajo', 'nro. legajo'
+  ], -1);
+
+  var iFecha = _buscarIndicePersonal_(headers, [
+    'fecha de nacimiento', 'fecha nacimiento', 'fec nacimiento',
+    'f. nacimiento', 'nacimiento'
+  ], -1);
+
+  var iEstado = _buscarIndicePersonal_(headers, [
+    'estado', 'status', 'situacion', 'situación'
+  ], -1);
+
+  if (iNombre < 0 && (iApellido < 0 || iNombres < 0)) {
+    throw new Error('No se encontró la columna de nombre en la pestaña "personal".');
+  }
+  if (iDni < 0) throw new Error('No se encontró la columna DNI en la pestaña "personal".');
+  if (iLegajo < 0) throw new Error('No se encontró la columna Legajo en la pestaña "personal".');
+  if (iFecha < 0) throw new Error('No se encontró la columna Fecha de nacimiento en la pestaña "personal".');
+  if (iEstado < 0) throw new Error('No se encontró la columna Estado en la pestaña "personal".');
+
+  var salida = [];
+  var vistos = {};
+
+  for (var r = 1; r < values.length; r++) {
+    var row = values[r] || [];
+    var estado = String(row[iEstado] || '').trim();
+    if (_normalizarCabeceraPersonal_(estado).indexOf('baja') >= 0) continue;
+
+    var nombre = '';
+    if (iNombre >= 0) {
+      nombre = String(row[iNombre] || '').trim();
+    } else {
+      nombre = (String(row[iApellido] || '').trim() + ' ' + String(row[iNombres] || '').trim()).trim();
+    }
+
+    var dni = String(row[iDni] || '').trim();
+    var legajo = String(row[iLegajo] || '').trim();
+    var fechaNacimiento = String(row[iFecha] || '').trim();
+
+    if (!nombre) continue;
+
+    var clave = _normalizarCabeceraPersonal_(nombre) + '|' + dni;
+    if (vistos[clave]) continue;
+    vistos[clave] = true;
+
+    salida.push({
+      nombre: nombre,
+      dni: dni,
+      legajo: legajo,
+      fechaNacimiento: fechaNacimiento
+    });
+  }
+
+  salida.sort(function(a, b) {
+    return _normalizarCabeceraPersonal_(a.nombre).localeCompare(_normalizarCabeceraPersonal_(b.nombre), 'es');
+  });
+
+  return salida;
 }
 
 function _getSheet() {
