@@ -1,8 +1,8 @@
-name: Deploy Delben to GitHub Pages
+name: Deploy SGI API Test to GitHub Pages
 
 on:
   push:
-    branches: ["main"]
+    branches: ["test-api-sgi"]
   workflow_dispatch:
 
 permissions:
@@ -11,7 +11,7 @@ permissions:
   id-token: write
 
 concurrency:
-  group: "pages"
+  group: "pages-test-api"
   cancel-in-progress: true
 
 jobs:
@@ -24,11 +24,11 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Prepare site
+      - name: Prepare test site
         run: |
           rm -rf _site
           mkdir -p _site
-          cp *.html _site/
+          cp test-api/index.html _site/index.html
 
       - name: Configure Pages
         uses: actions/configure-pages@v5
