@@ -107,7 +107,7 @@ function getPersonalActivo() {
   var iNombre = _buscarIndicePersonal_(headers, [
     'apellido y nombre', 'apellido nombre', 'apellidos y nombre',
     'nombre y apellido', 'nombre completo', 'apellido_nombre',
-    'nombre del personal', 'personal'
+    'nombre del personal', 'personal', 'nombre', 'nombres'
   ], -1);
 
   var iApellido = _buscarIndicePersonal_(headers, [
@@ -129,7 +129,7 @@ function getPersonalActivo() {
 
   var iFecha = _buscarIndicePersonal_(headers, [
     'fecha de nacimiento', 'fecha nacimiento', 'fec nacimiento',
-    'f. nacimiento', 'nacimiento'
+    'f. nacimiento', 'nacimiento', 'fecha'
   ], -1);
 
   var iEstado = _buscarIndicePersonal_(headers, [
