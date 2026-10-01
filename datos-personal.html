@@ -239,14 +239,256 @@
   </style>
   
 <style id="camera-dni-css">
-.camera-modal{position:fixed;inset:0;background:rgba(0,0,0,.88);z-index:99999;display:none;align-items:center;justify-content:center;padding:14px;box-sizing:border-box}
-.camera-box{width:min(100%,520px);background:#fff;border-radius:14px;padding:12px;box-shadow:0 10px 40px rgba(0,0,0,.4);box-sizing:border-box}
-.camera-video{width:100%;aspect-ratio:4/3;object-fit:cover;background:#111;border-radius:10px;display:block}
-.camera-video::-webkit-media-controls{display:none!important}
-.camera-actions{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px}
-.camera-actions button{border:0;border-radius:9px;padding:12px;font-weight:800;font-size:.82rem;min-height:48px}
-.camera-shot{background:#159b50;color:#fff}.camera-cancel{background:#edf2f7;color:#526579}
-@media(max-width:520px){.camera-actions{grid-template-columns:1fr 1fr}.camera-actions button{width:100%}}
+    .dni-referencia {
+      width:100%;
+      aspect-ratio:475 / 280;
+      border:2px solid #b8d8ef;
+      border-radius:12px;
+      overflow:hidden;
+      position:relative;
+      background:linear-gradient(135deg,#eef9ff,#dff2fb);
+      margin-bottom:12px;
+      box-shadow:inset 0 0 0 1px rgba(255,255,255,.7);
+    }
+    .dni-referencia .ref-titulo {
+      position:absolute;
+      top:10px; left:15px; right:15px;
+      text-align:center;
+      font-weight:900;
+      font-size:clamp(10px,2.4vw,18px);
+      color:#19739e;
+      letter-spacing:.4px;
+    }
+    .dni-referencia .ref-pais {
+      position:absolute;
+      top:10px; left:10px;
+      font-size:clamp(7px,1.7vw,11px);
+      font-weight:800;
+      color:#526579;
+      width:80px;
+      line-height:1.1;
+    }
+    .dni-referencia .ref-foto {
+      position:absolute;
+      left:6%;
+      top:28%;
+      width:22%;
+      height:57%;
+      border:2px solid #8abfdc;
+      border-radius:8px;
+      background:linear-gradient(#d8eef8,#b7dced);
+      display:flex; align-items:center; justify-content:center;
+      color:#2a7597; font-size:clamp(9px,2vw,13px); font-weight:800;
+    }
+    .dni-referencia .ref-lineas {
+      position:absolute;
+      left:32%; right:5%;
+      top:31%;
+      font-size:clamp(7px,1.8vw,11px);
+      color:#4d6b7c;
+      line-height:1.75;
+      font-weight:700;
+    }
+    .dni-referencia .ref-chip {
+      position:absolute;
+      left:4%; bottom:10%;
+      width:14%; height:9%;
+      border:2px solid #5d9fbd;
+      border-radius:3px;
+    }
+    .dni-referencia .ref-chip:after {
+      content:'';
+      position:absolute; left:25%; right:25%; top:35%;
+      border-top:2px solid #5d9fbd;
+      border-bottom:2px solid #5d9fbd;
+      height:25%;
+    }
+    .dni-referencia .ref-circulo {
+      position:absolute; right:7%; top:28%;
+      width:12%; aspect-ratio:1;
+      border-radius:50%;
+      border:2px solid #8abfdc;
+      background:#d7edf7;
+    }
+    .dni-referencia .ref-circulo2 {
+      position:absolute; right:3%; bottom:10%;
+      width:11%; aspect-ratio:1;
+      border-radius:50%;
+      border:2px solid #8abfdc;
+      background:#d7edf7;
+    }
+    .dni-referencia .ref-reverso {
+      position:absolute; left:33%; right:5%; top:35%;
+      height:38%;
+      border:2px solid #91bfd3;
+      border-radius:7px;
+      background:rgba(255,255,255,.28);
+    }
+    .dni-referencia .ref-reverso:before,
+    .dni-referencia .ref-reverso:after {
+      content:'';
+      position:absolute; left:7%; right:45%;
+      height:2px; background:#8fb4c4;
+    }
+    .dni-referencia .ref-reverso:before { top:34%; }
+    .dni-referencia .ref-reverso:after { top:52%; }
+    .dni-referencia .ref-firma {
+      position:absolute; right:9%; bottom:18%;
+      width:22%; height:16%;
+      border:2px solid #9cc5d8;
+      border-radius:6px;
+      background:#f8fdff;
+    }
+    .foto-botones .btn-foto,
+    .foto-botones .btn-archivo {
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      text-align:center;
+      text-decoration:none;
+      cursor:pointer;
+    }
+    .foto-botones .solo-movil { display:none; }
+    .foto-botones .solo-pc { display:flex; }
+    .foto-normalizada {
+      display:none;
+      width:100%;
+      margin-top:10px;
+      border:1px solid #c9dff5;
+      border-radius:10px;
+      background:#fff;
+      overflow:hidden;
+    }
+    .foto-normalizada img {
+      display:block;
+      width:100%;
+      height:auto;
+      aspect-ratio:475 / 280;
+      object-fit:cover;
+    }
+    .foto-normalizada .foto-ok {
+      padding:7px 10px;
+      color:#176b48;
+      font-weight:700;
+      font-size:13px;
+      background:#eaf8f0;
+    }
+
+    .camera-modal {
+      position:fixed;
+      inset:0;
+      background:rgba(0,0,0,.90);
+      z-index:99999;
+      display:none;
+      align-items:center;
+      justify-content:center;
+      padding:12px;
+      box-sizing:border-box;
+    }
+    .camera-modal.activa { display:flex; }
+    .camera-box {
+      width:min(100%,560px);
+      background:#fff;
+      border-radius:16px;
+      padding:12px;
+      box-shadow:0 10px 40px rgba(0,0,0,.45);
+      box-sizing:border-box;
+    }
+    .camera-titulo {
+      margin:0 0 10px;
+      color:#075f9f;
+      font-weight:900;
+      font-size:18px;
+      text-align:center;
+    }
+    .camera-stage {
+      position:relative;
+      width:100%;
+      aspect-ratio:475 / 280;
+      border-radius:12px;
+      overflow:hidden;
+      background:#111;
+    }
+    .camera-video {
+      width:100%;
+      height:100%;
+      object-fit:cover;
+      display:block;
+      background:#111;
+    }
+    .camera-guide {
+      position:absolute;
+      left:4%;
+      top:9%;
+      width:92%;
+      height:82%;
+      border:3px solid #18a558;
+      border-radius:12px;
+      box-shadow:0 0 0 9999px rgba(0,0,0,.20);
+      display:flex;
+      align-items:flex-start;
+      justify-content:center;
+      pointer-events:none;
+    }
+    .camera-guide span {
+      margin-top:8px;
+      padding:6px 10px;
+      border-radius:8px;
+      background:rgba(0,0,0,.68);
+      color:#fff;
+      font-size:12px;
+      font-weight:900;
+      letter-spacing:.2px;
+    }
+    .camera-hint {
+      margin-top:9px;
+      color:#536273;
+      font-size:13px;
+      text-align:center;
+      line-height:1.35;
+    }
+    .camera-actions {
+      display:grid;
+      grid-template-columns:1fr 1fr;
+      gap:8px;
+      margin-top:10px;
+    }
+    .camera-actions button {
+      border:0;
+      border-radius:10px;
+      padding:12px;
+      font-weight:800;
+      font-size:14px;
+      min-height:48px;
+    }
+    .camera-shot {
+      background:linear-gradient(90deg,#18a558,#128746);
+      color:#fff;
+    }
+    .camera-shot:disabled {
+      background:#9aa0a6;
+      color:#fff;
+    }
+    .camera-cancel {
+      background:#edf2f7;
+      color:#526579;
+    }
+    .camera-status {
+      margin-top:8px;
+      min-height:18px;
+      text-align:center;
+      font-size:13px;
+      font-weight:700;
+      color:#a3271b;
+    }
+    @media (max-width:700px) {
+      .foto-botones .solo-movil { display:flex; }
+      .foto-botones .solo-pc { display:none; }
+      .dni-referencia { margin-bottom:10px; }
+      .camera-box { padding:10px; border-radius:14px; }
+      .camera-titulo { font-size:16px; }
+      .camera-hint { font-size:12px; }
+    }
 </style>
 </head>
 <body>
@@ -486,30 +728,61 @@
         <div class="dni-aviso">⚠️ <strong>IMPORTANTE:</strong> necesitás cargar <strong>2 fotos del DNI</strong>: primero el ANVERSO y después el REVERSO.</div>
 
         <div class="fila">
-          <div class="dni-card"><div class="campo">
-            <label class="dni-label anverso-label">1️⃣ DNI — ANVERSO (frente)</label>
-            <div class="foto-botones">
-              <label for="camara-anverso" class="btn-foto">📷 SACAR FOTO DEL ANVERSO</label>
-              <button type="button" class="btn-archivo" onclick="abrirArchivo('anverso')">📁 ELEGIR ANVERSO</button>
-            </div>
-            <input type="file" id="camara-anverso" accept="image/*" capture="environment" hidden>
-            <input type="file" id="archivo-anverso" accept="image/*,.pdf" hidden>
-            <div id="nombre-anverso" class="nombre-foto">No se seleccionó ninguna foto.</div>
-          </div></div>
+          <div class="dni-card">
+            <div class="campo">
+              <label class="dni-label anverso-label">1️⃣ DNI — ANVERSO (frente)</label>
 
-          <div class="dni-card"><div class="campo">
-            <label class="dni-label reverso-label">2️⃣ DNI — REVERSO (dorso)</label>
-            <div class="foto-botones">
-              <label for="camara-reverso" class="btn-foto">📷 SACAR FOTO DEL REVERSO</label>
-              <button type="button" class="btn-archivo" onclick="abrirArchivo('reverso')">📁 ELEGIR REVERSO</button>
+              <div class="dni-referencia" aria-label="Ejemplo visual de DNI anverso">
+                <div class="ref-pais">REPÚBLICA ARGENTINA<br>DOCUMENTO DE IDENTIDAD</div>
+                <div class="ref-titulo">DOCUMENTO NACIONAL DE IDENTIDAD</div>
+                <div class="ref-foto">FOTO</div>
+                <div class="ref-lineas">Apellido y Nombre<br>Sexo · Nacionalidad<br>Fecha de nacimiento<br>DNI · Fecha de vencimiento</div>
+                <div class="ref-circulo"></div>
+                <div class="ref-circulo2"></div>
+                <div class="ref-chip"></div>
+              </div>
+
+              <div class="foto-botones">
+                <button type="button" class="btn-foto solo-movil" onclick="abrirCamara('anverso')">📷 SACAR FOTO DEL ANVERSO</button>
+                <label for="archivo-anverso" class="btn-archivo solo-pc">📁 ADJUNTAR FOTO DEL ANVERSO</label>
+              </div>
+
+              <input type="file" id="camara-anverso" accept="image/*" capture="environment" hidden>
+              <input type="file" id="archivo-anverso" accept="image/*" hidden>
+
+              <div id="nombre-anverso" class="nombre-foto">No se seleccionó ninguna foto.</div>
+              <div id="preview-anverso" class="foto-normalizada"></div>
             </div>
-            <input type="file" id="camara-reverso" accept="image/*" capture="environment" hidden>
-            <input type="file" id="archivo-reverso" accept="image/*,.pdf" hidden>
-            <div id="nombre-reverso" class="nombre-foto">No se seleccionó ninguna foto.</div>
-          </div></div>
+          </div>
+
+          <div class="dni-card">
+            <div class="campo">
+              <label class="dni-label reverso-label">2️⃣ DNI — REVERSO (dorso)</label>
+
+              <div class="dni-referencia" aria-label="Ejemplo visual de DNI reverso">
+                <div class="ref-titulo">DOCUMENTO NACIONAL DE IDENTIDAD</div>
+                <div class="ref-pais">REPÚBLICA ARGENTINA</div>
+                <div class="ref-reverso"></div>
+                <div class="ref-firma"></div>
+                <div class="ref-circulo2"></div>
+                <div class="ref-chip"></div>
+              </div>
+
+              <div class="foto-botones">
+                <button type="button" class="btn-foto solo-movil" onclick="abrirCamara('reverso')">📷 SACAR FOTO DEL REVERSO</button>
+                <label for="archivo-reverso" class="btn-archivo solo-pc">📁 ADJUNTAR FOTO DEL REVERSO</label>
+              </div>
+
+              <input type="file" id="camara-reverso" accept="image/*" capture="environment" hidden>
+              <input type="file" id="archivo-reverso" accept="image/*" hidden>
+
+              <div id="nombre-reverso" class="nombre-foto">No se seleccionó ninguna foto.</div>
+              <div id="preview-reverso" class="foto-normalizada"></div>
+            </div>
+          </div>
         </div>
 
-        <small class="ayuda">📌 <strong>ANVERSO:</strong> lado donde aparece tu foto y tus datos. <strong>REVERSO:</strong> lado posterior del DNI. Podés sacar cada foto con la cámara o elegirla desde el teléfono.</small>
+        <small class="ayuda">📌 <strong>EN EL TELÉFONO:</strong> se habilita solamente la cámara. <strong>EN LA PC:</strong> se habilita solamente adjuntar una imagen. La foto se recorta y se normaliza automáticamente a la misma proporción.</small>
       </div>
 
       <div class="navegacion"><button type="button" class="btn-anterior" data-prev>← Anterior</button><button type="button" class="btn-siguiente" data-next>Continuar →</button></div></div>
@@ -542,6 +815,21 @@
     </form>
   </div>
 
+<div id="camera-modal" class="camera-modal" aria-hidden="true">
+  <div class="camera-box" role="dialog" aria-modal="true" aria-labelledby="camera-titulo">
+    <div id="camera-titulo" class="camera-titulo">Sacar foto del DNI</div>
+    <div class="camera-stage">
+      <video id="camera-video" class="camera-video" autoplay playsinline muted></video>
+      <div class="camera-guide"><span>COLOCÁ EL DNI DENTRO DEL RECUADRO</span></div>
+    </div>
+    <div class="camera-hint">Alineá todo el DNI dentro del recuadro y mantené el teléfono lo más recto posible.</div>
+    <div id="camera-status" class="camera-status"></div>
+    <div class="camera-actions">
+      <button type="button" id="camera-cancel" class="camera-cancel">Cancelar</button>
+      <button type="button" id="camera-capture" class="camera-shot" disabled>📷 CAPTURAR FOTO</button>
+    </div>
+  </div>
+</div>
   <script>
     const PERSONAL_BACKEND_URL = 'https://script.google.com/macros/s/AKfycbz-e7wo1_vj8xgex84teWOJctZfh3bfyFW_90cnBq-xf3P85RMXzCD96Md0FOSsxu_w/exec';
     const form = document.getElementById('form-personal');
@@ -842,77 +1130,347 @@
     }
 
     const fotosDni = { anverso: null, reverso: null };
+    const DNI_ASPECT = 475 / 280;
+    const DNI_OUTPUT_WIDTH = 1280;
+    const DNI_OUTPUT_HEIGHT = Math.round(DNI_OUTPUT_WIDTH / DNI_ASPECT);
+
+    const cameraModal = document.getElementById('camera-modal');
+    const cameraVideo = document.getElementById('camera-video');
+    const cameraTitle = document.getElementById('camera-titulo');
+    const cameraStatus = document.getElementById('camera-status');
+    const cameraCapture = document.getElementById('camera-capture');
+    const cameraCancel = document.getElementById('camera-cancel');
+
+    let cameraStream = null;
+    let cameraLado = null;
+
+    function esDispositivoMovil() {
+      const ua = navigator.userAgent || '';
+      const tactilMac =
+        navigator.platform === 'MacIntel' &&
+        navigator.maxTouchPoints &&
+        navigator.maxTouchPoints > 1;
+
+      return /Android|iPhone|iPad|iPod|Windows Phone|webOS|BlackBerry|IEMobile|Opera Mini/i.test(ua) || !!tactilMac;
+    }
+
+    function aplicarModoFotos() {
+      document.body.classList.toggle('modo-movil', esDispositivoMovil());
+    }
 
     function abrirCamara(lado) {
-      const input = document.getElementById('camara-' + lado);
-      if (input) input.click();
+      if (!esDispositivoMovil()) return;
+
+      cameraLado = lado;
+      cameraTitle.textContent =
+        lado === 'anverso'
+          ? 'Sacar foto del DNI — ANVERSO'
+          : 'Sacar foto del DNI — REVERSO';
+
+      cameraStatus.textContent = '';
+      cameraCapture.disabled = true;
+      cameraModal.classList.add('activa');
+      cameraModal.setAttribute('aria-hidden', 'false');
+
+      iniciarCamara();
     }
 
-    function abrirArchivo(lado) {
-      const input = document.getElementById('archivo-' + lado);
-      if (input) input.click();
-    }
-
-    function leerFotoSeleccionada(lado, input) {
-      const file = input.files && input.files[0];
-      const destino = document.getElementById('nombre-' + lado);
-      if (!file) {
-        return;
-      }
-
-      destino.textContent = 'Preparando foto...';
-
-      const reader = new FileReader();
-
-      reader.onload = function(e) {
-        const result = String(e.target.result || '');
-        const base64 = result.indexOf(',') >= 0 ? result.split(',')[1] : '';
-        if (!base64) {
-          fotosDni[lado] = null;
-          destino.textContent = 'No se pudo leer la foto.';
-          return;
-        }
-
-        fotosDni[lado] = {
-          fileName: file.name || ('dni_' + lado + '.jpg'),
-          mimeType: file.type || 'image/jpeg',
-          bytes: base64
-        };
-        destino.textContent = file.name || 'Foto cargada correctamente.';
-      };
-
-      reader.onerror = function() {
-        fotosDni[lado] = null;
-        destino.textContent = 'No se pudo leer la foto.';
-      };
-
-      reader.onabort = function() {
-        fotosDni[lado] = null;
-        destino.textContent = 'Lectura cancelada.';
-      };
-
-      reader.readAsDataURL(file);
-    }
-
-    ['anverso','reverso'].forEach(function(lado) {
-      const cam = document.getElementById('camara-' + lado);
-      const archivo = document.getElementById('archivo-' + lado);
-
-      if (cam) {
-        cam.addEventListener('change', function() {
-          leerFotoSeleccionada(lado, this);
-          if (archivo) archivo.value = '';
+    function cerrarCamara() {
+      if (cameraStream) {
+        cameraStream.getTracks().forEach(function(track) {
+          try { track.stop(); } catch (_) {}
         });
       }
 
+      cameraStream = null;
+      cameraVideo.srcObject = null;
+      cameraCapture.disabled = true;
+      cameraLado = null;
+
+      cameraModal.classList.remove('activa');
+      cameraModal.setAttribute('aria-hidden', 'true');
+    }
+
+    async function iniciarCamara() {
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        cameraStatus.textContent = 'Este teléfono/navegador no permite usar la cámara desde la aplicación.';
+        return;
+      }
+
+      try {
+        cameraStatus.textContent = 'Solicitando acceso a la cámara...';
+
+        const constraints = {
+          audio: false,
+          video: {
+            facingMode: { ideal: 'environment' },
+            width: { ideal: 1920 },
+            height: { ideal: 1080 }
+          }
+        };
+
+        cameraStream = await navigator.mediaDevices.getUserMedia(constraints);
+        cameraVideo.srcObject = cameraStream;
+
+        await cameraVideo.play();
+
+        cameraVideo.onloadedmetadata = function() {
+          cameraCapture.disabled = false;
+          cameraStatus.textContent = '';
+        };
+
+      } catch (err) {
+        cameraCapture.disabled = true;
+
+        let texto =
+          'No se pudo abrir la cámara.';
+
+        if (err && err.name === 'NotAllowedError') {
+          texto =
+            'El permiso de cámara fue rechazado. Habilitá la cámara para este sitio y volvé a intentarlo.';
+        } else if (err && err.name === 'NotFoundError') {
+          texto =
+            'No se encontró una cámara disponible en el teléfono.';
+        } else if (err && err.name === 'NotReadableError') {
+          texto =
+            'La cámara está siendo utilizada por otra aplicación.';
+        }
+
+        cameraStatus.textContent = texto;
+      }
+    }
+
+    function capturarFotoDni() {
+      if (!cameraStream || !cameraVideo.videoWidth || !cameraVideo.videoHeight || !cameraLado) {
+        return;
+      }
+
+      const sourceW = cameraVideo.videoWidth;
+      const sourceH = cameraVideo.videoHeight;
+
+      let cropW = sourceW;
+      let cropH = Math.round(cropW / DNI_ASPECT);
+
+      if (cropH > sourceH) {
+        cropH = sourceH;
+        cropW = Math.round(cropH * DNI_ASPECT);
+      }
+
+      const sx = Math.max(0, Math.round((sourceW - cropW) / 2));
+      const sy = Math.max(0, Math.round((sourceH - cropH) / 2));
+
+      const canvas = document.createElement('canvas');
+      canvas.width = DNI_OUTPUT_WIDTH;
+      canvas.height = DNI_OUTPUT_HEIGHT;
+
+      const ctx = canvas.getContext('2d', { alpha: false });
+      ctx.drawImage(
+        cameraVideo,
+        sx, sy, cropW, cropH,
+        0, 0, canvas.width, canvas.height
+      );
+
+      const dataUrl = canvas.toDataURL('image/jpeg', 0.90);
+      const base64 = dataUrl.split(',')[1] || '';
+
+      if (!base64) {
+        cameraStatus.textContent = 'No se pudo preparar la foto.';
+        return;
+      }
+
+      const lado = cameraLado;
+
+      fotosDni[lado] = {
+        fileName: lado === 'anverso' ? 'DNI_ANVERSO.jpg' : 'DNI_REVERSO.jpg',
+        mimeType: 'image/jpeg',
+        bytes: base64
+      };
+
+      mostrarResultadoFoto(
+        lado,
+        lado === 'anverso' ? 'DNI_ANVERSO.jpg' : 'DNI_REVERSO.jpg',
+        dataUrl
+      );
+
+      cerrarCamara();
+    }
+
+    function normalizarArchivoImagen(file, lado) {
+      return new Promise(function(resolve, reject) {
+        if (!file || !file.type || file.type.indexOf('image/') !== 0) {
+          reject(new Error('Solo se pueden adjuntar imágenes.'));
+          return;
+        }
+
+        const reader = new FileReader();
+
+        reader.onload = function(e) {
+          const img = new Image();
+
+          img.onload = function() {
+            const sourceW = img.naturalWidth || img.width;
+            const sourceH = img.naturalHeight || img.height;
+
+            let cropW = sourceW;
+            let cropH = Math.round(cropW / DNI_ASPECT);
+
+            if (cropH > sourceH) {
+              cropH = sourceH;
+              cropW = Math.round(cropH * DNI_ASPECT);
+            }
+
+            const sx = Math.max(0, Math.round((sourceW - cropW) / 2));
+            const sy = Math.max(0, Math.round((sourceH - cropH) / 2));
+
+            const canvas = document.createElement('canvas');
+            canvas.width = DNI_OUTPUT_WIDTH;
+            canvas.height = DNI_OUTPUT_HEIGHT;
+
+            const ctx = canvas.getContext('2d', { alpha: false });
+            ctx.drawImage(
+              img,
+              sx, sy, cropW, cropH,
+              0, 0, canvas.width, canvas.height
+            );
+
+            const dataUrl = canvas.toDataURL('image/jpeg', 0.90);
+            const base64 = dataUrl.split(',')[1] || '';
+
+            if (!base64) {
+              reject(new Error('No se pudo preparar la imagen.'));
+              return;
+            }
+
+            resolve({
+              fileName: (lado === 'anverso' ? 'DNI_ANVERSO' : 'DNI_REVERSO') + '.jpg',
+              mimeType: 'image/jpeg',
+              bytes: base64,
+              dataUrl: dataUrl
+            });
+          };
+
+          img.onerror = function() {
+            reject(new Error('No se pudo leer la imagen.'));
+          };
+
+          img.src = String(e.target.result || '');
+        };
+
+        reader.onerror = function() {
+          reject(new Error('No se pudo leer el archivo.'));
+        };
+
+        reader.readAsDataURL(file);
+      });
+    }
+
+    function mostrarResultadoFoto(lado, nombre, dataUrl) {
+      const destino = document.getElementById('nombre-' + lado);
+      const preview = document.getElementById('preview-' + lado);
+
+      if (destino) {
+        destino.textContent =
+          '✓ Foto preparada correctamente — ' +
+          nombre +
+          ' (' +
+          DNI_OUTPUT_WIDTH +
+          ' × ' +
+          DNI_OUTPUT_HEIGHT +
+          ' px)';
+      }
+
+      if (preview) {
+        preview.innerHTML = '';
+
+        const img = document.createElement('img');
+        img.src = dataUrl;
+        img.alt = lado === 'anverso'
+          ? 'Foto normalizada del DNI anverso'
+          : 'Foto normalizada del DNI reverso';
+
+        const ok = document.createElement('div');
+        ok.className = 'foto-ok';
+        ok.textContent = 'Foto lista para enviar.';
+
+        preview.appendChild(img);
+        preview.appendChild(ok);
+        preview.style.display = 'block';
+      }
+    }
+
+    function abrirArchivo(lado) {
+      if (esDispositivoMovil()) return;
+
+      const input = document.getElementById('archivo-' + lado);
+
+      if (input) {
+        input.click();
+      }
+    }
+
+    function procesarArchivoSeleccionado(lado, input) {
+      const file = input.files && input.files[0];
+
+      if (!file) return;
+
+      const destino = document.getElementById('nombre-' + lado);
+
+      if (destino) {
+        destino.textContent = 'Preparando imagen...';
+      }
+
+      normalizarArchivoImagen(file, lado)
+        .then(function(resultado) {
+          fotosDni[lado] = {
+            fileName: resultado.fileName,
+            mimeType: resultado.mimeType,
+            bytes: resultado.bytes
+          };
+
+          mostrarResultadoFoto(
+            lado,
+            file.name || resultado.fileName,
+            resultado.dataUrl
+          );
+        })
+        .catch(function(err) {
+          fotosDni[lado] = null;
+
+          if (destino) {
+            destino.textContent =
+              err && err.message
+                ? err.message
+                : 'No se pudo preparar la imagen.';
+          }
+        });
+    }
+
+    cameraCapture.addEventListener('click', capturarFotoDni);
+    cameraCancel.addEventListener('click', cerrarCamara);
+
+    cameraModal.addEventListener('click', function(e) {
+      if (e.target === cameraModal) {
+        cerrarCamara();
+      }
+    });
+
+    document.addEventListener('keydown', function(e) {
+      if (e.key === 'Escape' && cameraModal.classList.contains('activa')) {
+        cerrarCamara();
+      }
+    });
+
+    ['anverso','reverso'].forEach(function(lado) {
+      const archivo = document.getElementById('archivo-' + lado);
+
       if (archivo) {
         archivo.addEventListener('change', function() {
-          leerFotoSeleccionada(lado, this);
-          if (cam) cam.value = '';
+          procesarArchivoSeleccionado(lado, this);
         });
       }
     });
 
+    aplicarModoFotos();
     // Fechas de carga manual: permite escribir dígito por dígito y arma DD/MM/AAAA.
     function formatearFechaManual(input) {
       var digits = String(input.value || '').replace(/\D/g, '').slice(0, 8);
@@ -1059,6 +1617,10 @@
           fotosDni.reverso = null;
           document.getElementById('nombre-anverso').textContent = 'No se seleccionó ninguna foto.';
           document.getElementById('nombre-reverso').textContent = 'No se seleccionó ninguna foto.';
+          document.getElementById('preview-anverso').innerHTML = '';
+          document.getElementById('preview-reverso').innerHTML = '';
+          document.getElementById('preview-anverso').style.display = 'none';
+          document.getElementById('preview-reverso').style.display = 'none';
         } else {
           mensaje.className = 'mensaje error';
           mensaje.textContent = 'Error al guardar: ' + (res.error || 'Error desconocido.');
