@@ -23,18 +23,61 @@ const CARPETA_PDF_ID = '';
 const COLUMNAS_TEXTO_FORZADO = [5, 6, 9, 10, 17, 18, 19, 20];
 
 function doGet(e) {
+  if (e && e.parameter && e.parameter.action === 'diagnosticoPermisos') {
+    var resultado = {
+      ok: false,
+      usuarioEfectivo: '',
+      carpetaAnverso: '',
+      carpetaReverso: '',
+      error: ''
+    };
+
+    try {
+      resultado.usuarioEfectivo =
+        String(Session.getEffectiveUser().getEmail() || '');
+
+      var carpetaAnverso =
+        DriveApp.getFolderById(CARPETA_DNI_ANVERSO_ID);
+
+      var carpetaReverso =
+        DriveApp.getFolderById(CARPETA_DNI_REVERSO_ID);
+
+      resultado.ok = true;
+      resultado.carpetaAnverso = carpetaAnverso.getName();
+      resultado.carpetaReverso = carpetaReverso.getName();
+
+    } catch (err) {
+      resultado.error =
+        String(err && err.message ? err.message : err);
+    }
+
+    return ContentService
+      .createTextOutput(JSON.stringify(resultado))
+      .setMimeType(ContentService.MimeType.JSON);
+  }
+
   if (e && e.parameter && e.parameter.action === 'getPersonalActivo') {
     var salida;
+
     try {
-      salida = { ok: true, personal: getPersonalActivo() };
+      salida = {
+        ok: true,
+        personal: getPersonalActivo()
+      };
     } catch (err) {
-      salida = { ok: false, error: String(err && err.message ? err.message : err) };
+      salida = {
+        ok: false,
+        error: String(err && err.message ? err.message : err)
+      };
     }
 
     var callback = e.parameter.callback;
+
     if (callback && /^[A-Za-z_$][\w$.]*$/.test(callback)) {
       return ContentService
-        .createTextOutput(callback + '(' + JSON.stringify(salida) + ');')
+        .createTextOutput(
+          callback + '(' + JSON.stringify(salida) + ');'
+        )
         .setMimeType(ContentService.MimeType.JAVASCRIPT);
     }
 
