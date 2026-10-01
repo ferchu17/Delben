@@ -544,8 +544,8 @@
 
     function abrirCamara(lado) {
       ladoCamaraDni = lado;
-      const modal = document.getElementById('camera-modal-dni');
-      const video = document.getElementById('camera-video-dni');
+      var modal = document.getElementById('camera-modal-dni');
+      var video = document.getElementById('camera-video-dni');
 
       if (!modal || !video) {
         mostrarErrorPersonal('No se pudo abrir la cámara.');
@@ -557,15 +557,7 @@
         return;
       }
 
-      // Reiniciamos únicamente el elemento de cámara. El formulario queda intacto.
-      try { video.pause(); } catch (_) {}
-      video.srcObject = null;
-      video.muted = true;
-      video.autoplay = true;
-      video.playsInline = true;
-      video.setAttribute('autoplay', '');
-      video.setAttribute('muted', '');
-      video.setAttribute('playsinline', '');
+      // MISMO MÉTODO QUE CONTROL DE MÓVILES.
       modal.style.display = 'flex';
 
       navigator.mediaDevices.getUserMedia({
@@ -578,24 +570,9 @@
       }).then(function(stream) {
         streamCamaraDni = stream;
         video.srcObject = stream;
-
-        function iniciarVideo() {
-          try {
-            var promesa = video.play();
-            if (promesa && promesa.catch) {
-              promesa.catch(function() {
-                setTimeout(function() {
-                  try { video.play(); } catch (_) {}
-                }, 300);
-              });
-            }
-          } catch (_) {}
-        }
-
-        if (video.readyState >= 1) iniciarVideo();
-        else video.onloadedmetadata = iniciarVideo;
+        video.play();
       }).catch(function(err) {
-        cerrarCamaraDni();
+        modal.style.display = 'none';
         var msg = 'No se pudo acceder a la cámara.';
         if (err && err.name === 'NotAllowedError') msg += ' Revisá el permiso de cámara del navegador.';
         else if (err && err.name === 'NotFoundError') msg += ' No se encontró una cámara disponible.';
@@ -605,50 +582,39 @@
     }
 
     function cerrarCamaraDni() {
-      const video = document.getElementById('camera-video-dni');
-      if (video) {
-        try { video.pause(); } catch (_) {}
-        video.onloadedmetadata = null;
-      }
-
+      var video = document.getElementById('camera-video-dni');
       if (streamCamaraDni) {
-        streamCamaraDni.getTracks().forEach(function(track) { track.stop(); });
+        streamCamaraDni.getTracks().forEach(function(t) { t.stop(); });
         streamCamaraDni = null;
       }
-
       if (video) video.srcObject = null;
-
-      const modal = document.getElementById('camera-modal-dni');
+      var modal = document.getElementById('camera-modal-dni');
       if (modal) modal.style.display = 'none';
-
-      // No resetear, no navegar y no tocar ningún campo del formulario.
+      // CERRAR NO BORRA LOS DATOS DEL FORMULARIO.
     }
 
     function capturarFotoDni() {
-      const video = document.getElementById('camera-video-dni');
-
-      if (!video || !video.videoWidth || !video.videoHeight) {
-        mostrarErrorPersonal('La cámara todavía no está lista. Esperá un segundo y volvé a tocar TOMAR FOTO.');
+      var video = document.getElementById('camera-video-dni');
+      if (!video || !video.videoWidth) {
+        mostrarErrorPersonal('La cámara todavía no está lista. Esperá un segundo.');
         return;
       }
 
-      const canvas = document.createElement('canvas');
-      const max = 1280;
-      const escala = Math.min(1, max / Math.max(video.videoWidth, video.videoHeight));
-      canvas.width = Math.round(video.videoWidth * escala);
-      canvas.height = Math.round(video.videoHeight * escala);
+      var canvas = document.createElement('canvas');
+      var max = 1280;
+      var k = Math.min(1, max / Math.max(video.videoWidth, video.videoHeight));
+      canvas.width = Math.round(video.videoWidth * k);
+      canvas.height = Math.round(video.videoHeight * k);
+      canvas.getContext('2d').drawImage(video, 0, 0, canvas.width, canvas.height);
 
-      const ctx = canvas.getContext('2d', { alpha: false });
-      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-
-      const dataUrl = canvas.toDataURL('image/jpeg', 0.80);
+      var dataUrl = canvas.toDataURL('image/jpeg', 0.78);
       fotosDni[ladoCamaraDni] = {
         fileName: 'dni_' + ladoCamaraDni + '_' + Date.now() + '.jpg',
         mimeType: 'image/jpeg',
         bytes: dataUrl.split(',')[1]
       };
 
-      const nombre = document.getElementById('nombre-' + ladoCamaraDni);
+      var nombre = document.getElementById('nombre-' + ladoCamaraDni);
       if (nombre) nombre.textContent = 'Foto tomada con cámara correctamente.';
 
       cerrarCamaraDni();
