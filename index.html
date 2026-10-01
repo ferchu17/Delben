@@ -600,7 +600,7 @@ function apiGuardar(tipo, fila, fotos, supervisor, empresa, ok, fail) {
     method: 'POST', redirect: 'follow',
     headers: { 'Content-Type': 'text/plain;charset=utf-8' },
     body: JSON.stringify({ action: 'guardar', tipo: tipo, filaDatos: fila, fotosArray: fotos, supervisor: supervisor, empresa: empresa })
-  }, 180000).then(ok).catch(fail);
+  }, 45000).then(ok).catch(fail);
 }
 
 /* ---------- Arranque ---------- */
@@ -1127,9 +1127,13 @@ function mostrarModalExito(nombre, res) {
   $('modal-nombre-exito').textContent = nombre || 'Persona no identificada';
   var sub = $('modal-sub-exito');
   if (sub) {
-    sub.innerHTML = res && res.correoEnviado
-      ? 'Control guardado y <b>PDF enviado al supervisor</b>.'
-      : 'Control guardado. El PDF no pudo enviarse: <b>' + esc((res && res.errorCorreo) || 'revise la configuración de correo') + '</b>';
+    if (res && res.correoPendiente) {
+      sub.innerHTML = 'Control guardado correctamente. <b>El PDF será enviado al supervisor.</b>';
+    } else if (res && res.correoEnviado) {
+      sub.innerHTML = 'Control guardado y <b>PDF enviado al supervisor</b>.';
+    } else {
+      sub.innerHTML = 'Control guardado. El PDF no pudo enviarse: <b>' + esc((res && res.errorCorreo) || 'revise la configuración de correo') + '</b>';
+    }
   }
   $('modal-backdrop-exito').style.display = 'flex';
 }
