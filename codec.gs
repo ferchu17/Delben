@@ -208,9 +208,16 @@ function guardarControlCompleto(tipo, filaDatos, fotosArray, supervisor, empresa
 
   supervisor = supervisor || {};
   empresa = String(empresa || '').trim();
+
   var supNombre = String(supervisor.nombre || '').trim();
   var supCorreo = String(supervisor.correo || '').trim();
-  if (!supNombre || !supCorreo) throw new Error('Debe seleccionar un supervisor con correo electrónico.');
+
+  // Compatibilidad con la interfaz Apps Script actualmente publicada:
+  // cuando la pantalla no envía supervisor, el PDF se manda a Fernando.
+  if (!supNombre || !supCorreo) {
+    supNombre = 'Fernando Jacyno';
+    supCorreo = 'fjacyno@ktl-seguridad.com';
+  }
 
   var fotoInfo = subirFotosControlDrive(fotosArray || []);
   var linksFotos = fotoInfo.urls.join(', ');
@@ -316,15 +323,25 @@ function encolarControlPDFCorreo_(job) {
 }
 
 function asegurarTriggerColaPDF_() {
+  // Intencionalmente vacío.
+  // NO se crean triggers durante el guardado web porque eso puede cortar
+  // la respuesta de google.script.run y producir NetworkError.
+}
+
+function instalarTriggerColaPDFControles() {
   var triggers = ScriptApp.getProjectTriggers();
   for (var i = 0; i < triggers.length; i++) {
-    if (triggers[i].getHandlerFunction() === 'procesarColaPDFControles_') return;
+    if (triggers[i].getHandlerFunction() === 'procesarColaPDFControles_') {
+      return 'TRIGGER_PDF_YA_INSTALADO';
+    }
   }
 
   ScriptApp.newTrigger('procesarColaPDFControles_')
     .timeBased()
-    .after(5000)
+    .everyMinutes(1)
     .create();
+
+  return 'TRIGGER_PDF_INSTALADO';
 }
 
 function procesarColaPDFControles_() {
@@ -959,6 +976,12 @@ function getAppHtml() {
         <div class="field"><label>Legajo</label><input type="text" id="form-legajo" readonly></div>
       </div>
       <div class="field"><label>Empresa</label><input type="text" id="form-empresa" readonly></div>
+      <div class="field">
+        <label>Supervisor que recibe el PDF</label>
+        <select id="form-supervisor">
+          <option value="">Cargando supervisores...</option>
+        </select>
+      </div>
     </div>
 
     <button class="btn btn-primary" onclick="irAInspeccion()">Continuar a Inspección →</button>
@@ -1020,7 +1043,7 @@ function getAppHtml() {
 </div>
 
 <script>
-  var DB_DATOS = { personal: [], objetivos: [], flota: [] };
+  var DB_DATOS = { personal: [], objetivos: [], flota: [], supervisores: [] };
   var FOTOS_BASE64 = [null, null, null, null];
   var TIPO_ACTUAL = '';
   var MAX_FOTO_MB = 5;
@@ -1065,6 +1088,21 @@ function getAppHtml() {
     dlObj.innerHTML = DB_DATOS.objetivos.map(function(o){ return '<option value="'+o+'">'; }).join('');
     var dlFlo = document.getElementById('dl-flota');
     dlFlo.innerHTML = DB_DATOS.flota.map(function(f){ return '<option value="'+f.patente+'">'+f.movil+'</option>'; }).join('');
+
+    var selSup = document.getElementById('form-supervisor');
+    if (selSup) {
+      var supList = DB_DATOS.supervisores || [];
+      selSup.innerHTML = '<option value="">Seleccione supervisor...</option>' +
+        supList.map(function(s){
+          return '<option value="' + encodeURIComponent(s.correo) + '" data-nombre="' +
+            String(s.nombre || '').replace(/"/g,'&quot;') + '">' +
+            String(s.nombre || '') + '</option>';
+        }).join('');
+
+      if (!supList.length) {
+        selSup.innerHTML = '<option value="fjacyno@ktl-seguridad.com" data-nombre="Fernando Jacyno">Fernando Jacyno</option>';
+      }
+    }
   }
 
   function autocompletarPersonal() {
@@ -1114,6 +1152,8 @@ function getAppHtml() {
     document.getElementById('form-dni').value = '';
     document.getElementById('form-legajo').value = '';
     document.getElementById('form-empresa').value = '';
+    var selSup = document.getElementById('form-supervisor');
+    if (selSup) selSup.selectedIndex = 0;
   }
 
   /* ---- Inspección ---- */
@@ -1280,7 +1320,19 @@ function getAppHtml() {
         btn.disabled = false;
         btn.textContent = '💾 Guardar Control';
       })
-      .guardarControlCompleto(TIPO_ACTUAL, fila, fotosEnvio);
+      .guardarControlCompleto(
+        TIPO_ACTUAL,
+        fila,
+        fotosEnvio,
+        (function(){
+          var sel = document.getElementById('form-supervisor');
+          var opt = sel ? sel.options[sel.selectedIndex] : null;
+          var correo = sel && sel.value ? decodeURIComponent(sel.value) : 'fjacyno@ktl-seguridad.com';
+          var nombre = opt && opt.getAttribute('data-nombre') ? opt.getAttribute('data-nombre') : 'Fernando Jacyno';
+          return {nombre:nombre, correo:correo};
+        })(),
+        document.getElementById('form-empresa').value
+      );
   }
 
   /* ---- Modal de éxito y reseteo sin recargar la página ---- */
