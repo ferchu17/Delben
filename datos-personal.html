@@ -156,7 +156,7 @@
     .btn-archivo { background:linear-gradient(90deg,#0878d1,#0056a6); }
     .nombre-foto { margin-top:8px; padding:8px 10px; border-radius:8px; background:#f4faff; color:#536273; font-size:14px; border:1px solid #d8e9f7; }
     .pantalla { display:none; min-height:420px; }
-    .pantalla.activa { display:block; }
+    .pantalla.activa { display:block !important; }
     .progreso { padding:12px 16px 10px; background:#f7fbff; border-bottom:1px solid #c9dff5; }
     .progreso-linea { display:flex; gap:5px; }
     .progreso-paso { flex:1; height:7px; border-radius:8px; background:#d8e8f5; }
@@ -252,7 +252,7 @@
           </div>
           <div class="campo">
             <label>DNI <span class="requerido">*</span></label>
-            <input type="text" name="dni" required>
+            <input type="text" name="dni" inputmode="numeric" pattern="[0-9]*" autocomplete="off" required>
           </div>
           <div class="campo">
             <label>Fecha de nacimiento</label>
@@ -517,19 +517,26 @@
 
     function mostrarPantalla(indice) {
       if (indice < 0 || indice >= pantallas.length) return;
-      pantallas.forEach((p, i) => p.classList.toggle('activa', i === indice));
-      indicadores.forEach((p, i) => p.classList.toggle('activo', i <= indice));
+      pantallas.forEach(function(p, i) {
+        var activa = (i === indice);
+        p.classList.toggle('activa', activa);
+        p.style.display = activa ? 'block' : 'none';
+      });
+      indicadores.forEach(function(p, i) {
+        p.classList.toggle('activo', i <= indice);
+      });
       pantallaActual = indice;
       document.getElementById('progreso-texto').textContent =
         'Pantalla ' + (indice + 1) + ' de 8 · ' + nombresPantalla[indice];
-      window.scrollTo({ top: 0, behavior: 'smooth' });
+      try { window.scrollTo(0, 0); } catch (e) {}
     }
 
     document.querySelectorAll('[data-next]').forEach(function(b) {
       b.type = 'button';
       b.onclick = function(e) {
         if (e) e.preventDefault();
-        if (pantallaActual < 7) mostrarPantalla(pantallaActual + 1);
+        var actual = Number(b.closest('.pantalla') && b.closest('.pantalla').getAttribute('data-pantalla'));
+        if (!isNaN(actual)) mostrarPantalla(actual);
         return false;
       };
     });
@@ -537,7 +544,8 @@
       b.type = 'button';
       b.onclick = function(e) {
         if (e) e.preventDefault();
-        if (pantallaActual > 0) mostrarPantalla(pantallaActual - 1);
+        var actual = Number(b.closest('.pantalla') && b.closest('.pantalla').getAttribute('data-pantalla'));
+        if (!isNaN(actual)) mostrarPantalla(actual - 2);
         return false;
       };
     });
