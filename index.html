@@ -812,7 +812,7 @@ function validarDatos() {
   if (!tipo) return 'Por favor seleccione el tipo de móvil.';
   if (!$('ctrl-fecha').value) return 'Debe indicar la fecha.';
   if (!$('ctrl-hora').value) return 'Debe indicar la hora.';
-  if (tipo !== 'Bicicleta' && !patente) return 'Debe seleccionar la patente / dominio.';
+  if (tipo !== 'Bicicleta' && tipo !== 'Eléctrico' && !patente) return 'Debe seleccionar la patente / dominio.';
   if (!objetivo) return 'Debe indicar el objetivo / cliente.';
   if (!turno) return 'Debe seleccionar el turno / guardia.';
   if (!personal) return 'Debe indicar el nombre del personal.';
