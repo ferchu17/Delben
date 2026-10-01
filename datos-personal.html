@@ -525,12 +525,22 @@
       window.scrollTo({ top: 0, behavior: 'smooth' });
     }
 
-    document.querySelectorAll('[data-next]').forEach(b => b.addEventListener('click', () => {
-      if (pantallaActual < 7) mostrarPantalla(pantallaActual + 1);
-    }));
-    document.querySelectorAll('[data-prev]').forEach(b => b.addEventListener('click', () => {
-      if (pantallaActual > 0) mostrarPantalla(pantallaActual - 1);
-    }));
+    document.querySelectorAll('[data-next]').forEach(function(b) {
+      b.type = 'button';
+      b.onclick = function(e) {
+        if (e) e.preventDefault();
+        if (pantallaActual < 7) mostrarPantalla(pantallaActual + 1);
+        return false;
+      };
+    });
+    document.querySelectorAll('[data-prev]').forEach(function(b) {
+      b.type = 'button';
+      b.onclick = function(e) {
+        if (e) e.preventDefault();
+        if (pantallaActual > 0) mostrarPantalla(pantallaActual - 1);
+        return false;
+      };
+    });
     mostrarPantalla(0);
 
     function mostrarErrorPersonal(texto) {
