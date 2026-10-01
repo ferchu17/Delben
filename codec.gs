@@ -546,6 +546,22 @@ function formatearHoraPDF_(valor) {
   return s;
 }
 
+function obtenerLogoBlob_() {
+  var nombres = [
+    'delben-logo.png',
+    'delben-logo.jpg',
+    'delben-logo.jpeg',
+    'delben-logo.webp'
+  ];
+
+  for (var i = 0; i < nombres.length; i++) {
+    var archivos = DriveApp.getFilesByName(nombres[i]);
+    if (archivos.hasNext()) return archivos.next().getBlob();
+  }
+
+  throw new Error('No se encontró el logo DELBEN en Google Drive. Debe existir un archivo llamado delben-logo.png, delben-logo.jpg, delben-logo.jpeg o delben-logo.webp.');
+}
+
 function enviarControlPorCorreo_(data) {
   var fila = data.fila || [];
   var doc = null;
@@ -562,10 +578,7 @@ function enviarControlPorCorreo_(data) {
     // El título queda en una línea independiente y centrado.
     // ---------------------------------------------------------
     try {
-      var logoBlob = UrlFetchApp.fetch(
-        'https://raw.githubusercontent.com/ferchu17/Delben/main/delben-logo.webp',
-        {muteHttpExceptions:false}
-      ).getBlob();
+      var logoBlob = obtenerLogoBlob_();
 
       var logoPar = body.appendParagraph('');
       logoPar.setAlignment(DocumentApp.HorizontalAlignment.LEFT);
@@ -761,10 +774,7 @@ function probarPDFControlMovilesSoloUsuario() {
   var filesTemp = [];
   try {
     var folder = DriveApp.getFolderById(FOLDER_ID_FOTOS_MOVILES);
-    var logoBlob = UrlFetchApp.fetch(
-      'https://raw.githubusercontent.com/ferchu17/Delben/main/delben-logo.webp',
-      {muteHttpExceptions:false}
-    ).getBlob();
+    var logoBlob = obtenerLogoBlob_();
 
     var f1 = folder.createFile(logoBlob.copyBlob().setName('PRUEBA_PDF_VISTA_1.jpg'));
     var f2 = folder.createFile(logoBlob.copyBlob().setName('PRUEBA_PDF_VISTA_2.jpg'));
