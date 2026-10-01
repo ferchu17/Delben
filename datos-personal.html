@@ -199,7 +199,17 @@
       .checkbox-item { min-height:50px; }
       button { width:100%; }
     }
-  </style>
+  
+<style id="camera-dni-css">
+.camera-modal-dni{display:none;position:fixed;inset:0;z-index:99999;background:rgba(0,0,0,.85);align-items:center;justify-content:center;padding:16px;box-sizing:border-box}
+.camera-box-dni{width:min(100%,520px);background:#101827;border-radius:18px;padding:12px;box-shadow:0 18px 50px rgba(0,0,0,.4)}
+.camera-video-dni{display:block;width:100%;aspect-ratio:4/3;object-fit:cover;border-radius:12px;background:#000}
+.camera-actions-dni{display:flex;gap:10px;margin-top:12px}
+.camera-actions-dni button{flex:1;min-height:48px;border:0;border-radius:12px;font-weight:800;font-size:15px;cursor:pointer}
+.camera-cancel-dni{background:#475569;color:#fff}.camera-shot-dni{background:#159447;color:#fff}
+@media(max-width:520px){.camera-actions-dni{flex-direction:column}.camera-actions-dni button{width:100%}}
+</style>
+</style>
 </head>
 <body>
   <div class="contenedor">
@@ -442,7 +452,6 @@
               <button type="button" class="btn-foto" onclick="abrirCamara('anverso')">📷 SACAR FOTO DEL ANVERSO</button>
               <button type="button" class="btn-archivo" onclick="abrirArchivo('anverso')">📁 ELEGIR ANVERSO</button>
             </div>
-            <input type="file" id="camara-anverso" accept="image/*" capture="environment" hidden>
             <input type="file" id="archivo-anverso" accept="image/*,.pdf" hidden>
             <div id="nombre-anverso" class="nombre-foto">No se seleccionó ninguna foto.</div>
           </div></div>
@@ -453,7 +462,6 @@
               <button type="button" class="btn-foto" onclick="abrirCamara('reverso')">📷 SACAR FOTO DEL REVERSO</button>
               <button type="button" class="btn-archivo" onclick="abrirArchivo('reverso')">📁 ELEGIR REVERSO</button>
             </div>
-            <input type="file" id="camara-reverso" accept="image/*" capture="environment" hidden>
             <input type="file" id="archivo-reverso" accept="image/*,.pdf" hidden>
             <div id="nombre-reverso" class="nombre-foto">No se seleccionó ninguna foto.</div>
           </div></div>
@@ -493,6 +501,7 @@
   </div>
 
   <script>
+    const PERSONAL_BACKEND_URL = 'https://script.google.com/macros/s/AKfycbz-e7wo1_vj8xgex84teWOJctZfh3bfyFW_90cnBq-xf3P85RMXzCD96Md0FOSsxu_w/exec';
     const form = document.getElementById('form-personal');
     const btn = document.getElementById('btn-enviar');
     const mensaje = document.getElementById('mensaje');
@@ -520,28 +529,107 @@
     }));
     mostrarPantalla(0);
 
+    const fotosDni = { anverso: null, reverso: null };
+    let ladoCamaraDni = '';
+    let streamCamaraDni = null;
+
     function abrirCamara(lado) {
-      document.getElementById('camara-' + lado).click();
+      ladoCamaraDni = lado;
+      const modal = document.getElementById('camera-modal-dni');
+      const video = document.getElementById('camera-video-dni');
+      if (!modal || !video) {
+        mensaje.className = 'mensaje error';
+        mensaje.textContent = 'No se pudo abrir la cámara.';
+        return;
+      }
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        mensaje.className = 'mensaje error';
+        mensaje.textContent = 'Este navegador no permite usar la cámara desde esta página.';
+        return;
+      }
+
+      modal.style.display = 'flex';
+      navigator.mediaDevices.getUserMedia({
+        video: {
+          facingMode: { ideal: 'environment' },
+          width: { ideal: 1280 },
+          height: { ideal: 960 }
+        },
+        audio: false
+      }).then(function(stream) {
+        streamCamaraDni = stream;
+        video.srcObject = stream;
+        return video.play();
+      }).catch(function(err) {
+        modal.style.display = 'none';
+        let msg = 'No se pudo acceder a la cámara.';
+        if (err && err.name === 'NotAllowedError') msg += ' Revisá el permiso de cámara del navegador.';
+        if (err && err.name === 'NotFoundError') msg += ' No se encontró una cámara disponible.';
+        mensaje.className = 'mensaje error';
+        mensaje.textContent = msg;
+      });
+    }
+
+    function cerrarCamaraDni() {
+      const video = document.getElementById('camera-video-dni');
+      if (streamCamaraDni) {
+        streamCamaraDni.getTracks().forEach(function(t) { t.stop(); });
+        streamCamaraDni = null;
+      }
+      if (video) video.srcObject = null;
+      const modal = document.getElementById('camera-modal-dni');
+      if (modal) modal.style.display = 'none';
+    }
+
+    function capturarFotoDni() {
+      const video = document.getElementById('camera-video-dni');
+      if (!video || !video.videoWidth) {
+        mensaje.className = 'mensaje error';
+        mensaje.textContent = 'La cámara todavía no está lista. Esperá un segundo.';
+        return;
+      }
+
+      const canvas = document.createElement('canvas');
+      const max = 1280;
+      const k = Math.min(1, max / Math.max(video.videoWidth, video.videoHeight));
+      canvas.width = Math.round(video.videoWidth * k);
+      canvas.height = Math.round(video.videoHeight * k);
+      canvas.getContext('2d').drawImage(video, 0, 0, canvas.width, canvas.height);
+      const dataUrl = canvas.toDataURL('image/jpeg', 0.78);
+
+      fotosDni[ladoCamaraDni] = {
+        fileName: 'dni_' + ladoCamaraDni + '_' + Date.now() + '.jpg',
+        mimeType: 'image/jpeg',
+        bytes: dataUrl.split(',')[1]
+      };
+
+      document.getElementById('nombre-' + ladoCamaraDni).textContent =
+        'Foto tomada con cámara correctamente.';
+      cerrarCamaraDni();
     }
 
     function abrirArchivo(lado) {
       document.getElementById('archivo-' + lado).click();
     }
 
-    function actualizarNombreFoto(lado, input) {
-      const file = input.files && input.files[0];
-      const destino = document.getElementById('nombre-' + lado);
-      destino.textContent = file ? file.name : 'No se seleccionó ninguna foto.';
-    }
-
     ['anverso','reverso'].forEach(function(lado) {
-      document.getElementById('camara-' + lado).addEventListener('change', function() {
-        document.getElementById('archivo-' + lado).value = '';
-        actualizarNombreFoto(lado, this);
-      });
       document.getElementById('archivo-' + lado).addEventListener('change', function() {
-        document.getElementById('camara-' + lado).value = '';
-        actualizarNombreFoto(lado, this);
+        const file = this.files && this.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = function(e) {
+          fotosDni[lado] = {
+            fileName: file.name,
+            mimeType: file.type || 'application/octet-stream',
+            bytes: e.target.result.split(',')[1]
+          };
+          document.getElementById('nombre-' + lado).textContent = file.name;
+        };
+        reader.onerror = function() {
+          fotosDni[lado] = null;
+          document.getElementById('nombre-' + lado).textContent = 'No se pudo leer el archivo.';
+        };
+        reader.readAsDataURL(file);
       });
     });
 
@@ -594,39 +682,60 @@
       data.declaracionJurada1 = form.querySelector('[name="declaracionJurada1"]').checked;
       data.declaracionJurada2 = form.querySelector('[name="declaracionJurada2"]').checked;
 
-      // Archivos DNI
-      data.fotoDniAnverso = await leerArchivo(
-        document.getElementById('camara-anverso').files[0]
-          ? document.getElementById('camara-anverso')
-          : document.getElementById('archivo-anverso')
-      );
-      data.fotoDniReverso = await leerArchivo(
-        document.getElementById('camara-reverso').files[0]
-          ? document.getElementById('camara-reverso')
-          : document.getElementById('archivo-reverso')
-      );
+      // Archivos DNI: pueden venir de la cámara o del selector de archivos.
+      data.fotoDniAnverso = fotosDni.anverso;
+      data.fotoDniReverso = fotosDni.reverso;
 
-      google.script.run
-        .withSuccessHandler(function(res) {
-          btn.disabled = false;
-          btn.textContent = '✓ ENVIAR DATOS';
-          if (res.ok) {
-            mensaje.className = 'mensaje ok';
-            mensaje.textContent = 'Datos guardados correctamente (ID ' + res.id + ').';
-            form.reset();
-          } else {
-            mensaje.className = 'mensaje error';
-            mensaje.textContent = 'Error al guardar: ' + res.error;
-          }
-        })
-        .withFailureHandler(function(err) {
-          btn.disabled = false;
-          btn.textContent = 'Enviar';
+      btn.disabled = true;
+      btn.textContent = 'Guardando...';
+
+      fetch(PERSONAL_BACKEND_URL, {
+        method: 'POST',
+        redirect: 'follow',
+        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+        body: JSON.stringify({ action: 'guardarDatos', data: data })
+      })
+      .then(function(res) {
+        return res.text().then(function(txt) {
+          var out;
+          try { out = JSON.parse(txt); }
+          catch (e) { throw new Error('Respuesta inválida del servidor.'); }
+          if (!res.ok) throw new Error('HTTP ' + res.status);
+          return out;
+        });
+      })
+      .then(function(res) {
+        btn.disabled = false;
+        btn.textContent = '✓ ENVIAR DATOS';
+        if (res.ok) {
+          mensaje.className = 'mensaje ok';
+          mensaje.textContent = 'Datos guardados correctamente (ID ' + res.id + ').';
+          form.reset();
+          fotosDni.anverso = null;
+          fotosDni.reverso = null;
+          document.getElementById('nombre-anverso').textContent = 'No se seleccionó ninguna foto.';
+          document.getElementById('nombre-reverso').textContent = 'No se seleccionó ninguna foto.';
+        } else {
           mensaje.className = 'mensaje error';
-          mensaje.textContent = 'Error: ' + err.message;
-        })
-        .guardarDatos(data);
+          mensaje.textContent = 'Error al guardar: ' + (res.error || 'Error desconocido.');
+        }
+      })
+      .catch(function(err) {
+        btn.disabled = false;
+        btn.textContent = '✓ ENVIAR DATOS';
+        mensaje.className = 'mensaje error';
+        mensaje.textContent = 'Error al guardar: ' + (err.message || String(err));
+      });
     });
   </script>
+    <div id="camera-modal-dni" class="camera-modal-dni" onclick="if(event.target===this)cerrarCamaraDni()">
+      <div class="camera-box-dni">
+        <video id="camera-video-dni" class="camera-video-dni" autoplay playsinline muted></video>
+        <div class="camera-actions-dni">
+          <button type="button" class="camera-cancel-dni" onclick="cerrarCamaraDni()">CANCELAR</button>
+          <button type="button" class="camera-shot-dni" onclick="capturarFotoDni()">📷 TOMAR FOTO</button>
+        </div>
+      </div>
+    </div>
 </body>
 </html>
