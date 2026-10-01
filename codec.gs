@@ -443,16 +443,29 @@ function enviarControlPorCorreo_(data) {
       throw new Error('La implementación debe ejecutarse como fjacyno@gmail.com. Cuenta efectiva detectada: ' + (cuentaEjecutora || 'no identificada') + '.');
     }
 
-    MailApp.sendEmail({
-      to: data.supervisor.correo,
-      cc: CC_CONTROL_MOVILES,
-      subject: subject,
-      body: 'Se adjunta el informe PDF del control #' + data.id + '.',
-      htmlBody: html,
+    var destinatario = data.modoPrueba
+      ? String(data.destinatarioPrueba || 'fjacyno@ktl-seguridad.com').trim()
+      : String(data.supervisor.correo || '').trim();
+
+    if (!destinatario) throw new Error('No se definió destinatario del correo.');
+
+    var mailOptions = {
+      to: destinatario,
+      subject: data.modoPrueba ? '[PRUEBA PDF] ' + subject : subject,
+      body: data.modoPrueba
+        ? 'Correo de prueba del PDF del control #' + data.id + '. Solo para verificar el formato.'
+        : 'Se adjunta el informe PDF del control #' + data.id + '.',
+      htmlBody: data.modoPrueba
+        ? '<div style="font-family:Arial,sans-serif;color:#37414A"><h2 style="color:#0065BC">PRUEBA DE PDF · Control de Móviles</h2><p>Este correo es únicamente para verificar el diseño del PDF.</p><p><b>Control de prueba:</b> #' + data.id + '</p><p>El informe adjunto usa el formato definitivo del Control de Móviles.</p></div>'
+        : html,
       attachments: [pdf],
       name: 'DELBEN SGI',
       replyTo: 'fjacyno@gmail.com'
-    });
+    };
+
+    if (!data.modoPrueba) mailOptions.cc = CC_CONTROL_MOVILES;
+
+    MailApp.sendEmail(mailOptions);
 
     DriveApp.getFileById(doc.getId()).setTrashed(true);
     return {ok:true, cuentaEjecutora:cuentaEjecutora};
@@ -463,6 +476,89 @@ function enviarControlPorCorreo_(data) {
     return {ok:false,error:String(e && e.message ? e.message : e)};
   }
 }
+
+function probarPDFControlMovilesSoloUsuario() {
+  var filesTemp = [];
+  try {
+    var folder = DriveApp.getFolderById(FOLDER_ID_FOTOS_MOVILES);
+
+    function crearImagenPrueba_(titulo, subtitulo) {
+      var dt = Charts.newDataTable()
+        .addColumn(Charts.ColumnType.STRING, 'Elemento')
+        .addColumn(Charts.ColumnType.NUMBER, 'Valor')
+        .addRow([titulo, 100])
+        .addRow([subtitulo, 50])
+        .build();
+
+      var chart = Charts.newBarChart()
+        .setDataTable(dt)
+        .setDimensions(900, 600)
+        .setOption('title', titulo + ' · ' + subtitulo)
+        .setOption('legend', {position: 'none'})
+        .setOption('hAxis', {minValue: 0, maxValue: 120})
+        .setOption('vAxis', {textPosition: 'none'})
+        .build();
+
+      var blob = chart.getBlob().setName(titulo.replace(/\s+/g, '_') + '.png');
+      var file = folder.createFile(blob);
+      filesTemp.push(file);
+      return file.getId();
+    }
+
+    var foto1 = crearImagenPrueba_('FOTO DE PRUEBA 1', 'ANVERSO');
+    var foto2 = crearImagenPrueba_('FOTO DE PRUEBA 2', 'REVERSO');
+
+    var fila = [
+      'PRUEBA-001',
+      '01/10/2026',
+      'JUEVES',
+      '08:30',
+      'PERSONA DE PRUEBA',
+      '30.123.456',
+      '9999',
+      'GUARDIA ENTRANTE',
+      'OBJETIVO DE PRUEBA',
+      'Combustible',
+      'ABC-123 (Toyota Hilux)',
+      '125430',
+      'Sin Novedad','Sin Novedad','Sin Novedad','Sin Novedad',
+      'Sin Novedad','Sin Novedad','Sin Novedad','Sin Novedad',
+      'Sin Novedad','Sin Novedad','Sin Novedad','Sin Novedad',
+      'Sin Novedad','Sin Novedad','Sin Novedad','Sin Novedad',
+      'Sin Novedad','Sin Novedad','Sin Novedad','Sin Novedad',
+      'Sin Novedad'
+    ];
+
+    var resultado = enviarControlPorCorreo_({
+      id: 'PRUEBA-PDF',
+      hoja: 'PRUEBA',
+      tipo: 'Combustible',
+      fila: fila,
+      supervisor: {
+        nombre: 'Fernando Jacyno',
+        correo: 'fjacyno@ktl-seguridad.com'
+      },
+      empresa: 'KTL Seguridad',
+      fotosIds: [foto1, foto2],
+      fotosUrls: [],
+      linksFotos: '',
+      modoPrueba: true,
+      destinatarioPrueba: 'fjacyno@ktl-seguridad.com'
+    });
+
+    filesTemp.forEach(function(file) {
+      try { file.setTrashed(true); } catch (_) {}
+    });
+
+    return resultado;
+  } catch (e) {
+    filesTemp.forEach(function(file) {
+      try { file.setTrashed(true); } catch (_) {}
+    });
+    return {ok:false,error:String(e && e.message ? e.message : e)};
+  }
+}
+
 function probarCorreo() {
   var cuenta = String(Session.getEffectiveUser().getEmail() || '').trim();
   if (cuenta.toLowerCase() !== 'fjacyno@gmail.com') {
