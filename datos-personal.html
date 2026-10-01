@@ -1489,40 +1489,6 @@
       });
     });
 
-    ['anverso','reverso'].forEach(function(lado) {
-      document.getElementById('archivo-' + lado).addEventListener('change', function() {
-        const file = this.files && this.files[0];
-        if (!file) return;
-        const reader = new FileReader();
-        reader.onload = function(e) {
-          fotosDni[lado] = {
-            fileName: file.name,
-            mimeType: file.type || 'application/octet-stream',
-            bytes: e.target.result.split(',')[1]
-          };
-          document.getElementById('nombre-' + lado).textContent = file.name;
-        };
-        reader.onerror = function() {
-          fotosDni[lado] = null;
-          document.getElementById('nombre-' + lado).textContent = 'No se pudo leer el archivo.';
-        };
-        reader.readAsDataURL(file);
-      });
-    });
-
-    function leerArchivo(input) {
-      return new Promise((resolve) => {
-        const file = input.files && input.files[0];
-        if (!file) { resolve(null); return; }
-        const reader = new FileReader();
-        reader.onload = function() {
-          const base64 = reader.result.split(',')[1];
-          resolve({ fileName: file.name, mimeType: file.type, bytes: base64 });
-        };
-        reader.readAsDataURL(file);
-      });
-    }
-
     form.addEventListener('submit', async function(e) {
       e.preventDefault();
       btn.disabled = true;
