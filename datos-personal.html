@@ -889,11 +889,34 @@
 
     function formatearFechaPersonal(valor) {
       var s = String(valor || '').trim();
-      var m = s.match(/^(\\d{4})[-/](\\d{2})[-/](\\d{2})$/);
-      if (m) return m[3] + '/' + m[2] + '/' + m[1];
+
+      var iso = s.match(/^(\d{4})[-/](\d{1,2})[-/](\d{1,2})$/);
+      if (iso) {
+        return String(iso[3]).padStart(2, '0') + '/' +
+               String(iso[2]).padStart(2, '0') + '/' +
+               iso[1];
+      }
+
+      var normal = s.match(/^(\d{1,2})[-/](\d{1,2})[-/](\d{4})$/);
+      if (normal) {
+        return String(normal[1]).padStart(2, '0') + '/' +
+               String(normal[2]).padStart(2, '0') + '/' +
+               normal[3];
+      }
+
+      var ocho = s.replace(/\D/g, '');
+      if (/^\d{8}$/.test(ocho)) {
+        return ocho.slice(0, 2) + '/' +
+               ocho.slice(2, 4) + '/' +
+               ocho.slice(4);
+      }
+
       return s;
     }
 
+    function normalizarFechaParaFormulario(valor) {
+      return formatearFechaPersonal(valor);
+    }
     function aplicarDatosPersonal(persona) {
       if (!persona) return;
       var legajo = document.querySelector('[name="legajo"]');
@@ -902,7 +925,7 @@
 
       if (legajo) legajo.value = persona.legajo || '';
       if (dni) dni.value = persona.dni || '';
-      if (fecha) fecha.value = formatearFechaPersonal(persona.fechaNacimiento);
+      if (fecha) fecha.value = normalizarFechaParaFormulario(persona.fechaNacimiento);
 
       if (estadoPersonal) {
         estadoPersonal.textContent = 'Datos cargados automáticamente desde Personal activo.';
@@ -1494,6 +1517,10 @@
 
       const fechas = Array.from(document.querySelectorAll('.fecha-manual'));
       for (const input of fechas) {
+        if (input.value) {
+          input.value = normalizarFechaParaFormulario(input.value);
+        }
+
         if (input.value && !/^\d{2}\/\d{2}\/\d{4}$/.test(input.value)) {
           btn.disabled = false;
           btn.textContent = '✓ ENVIAR DATOS';
