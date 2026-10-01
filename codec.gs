@@ -189,10 +189,19 @@ function subirFotosControlDrive(fotosArray) {
 function guardarControlCompleto(tipo, filaDatos, fotosArray, supervisor, empresa) {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var sheetName = '';
-  var t = String(tipo || '').toLowerCase();
-  if (t.indexOf('bici') >= 0) sheetName = 'bicicleta';
-  else if (t.indexOf('el') >= 0) sheetName = 'carroelectrico';
-  else sheetName = 'combustible';
+  var t = String(tipo || '').toLowerCase().trim();
+  var tNorm = t;
+  try {
+    tNorm = t.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+  } catch (_) {}
+
+  if (tNorm.indexOf('bici') >= 0) {
+    sheetName = 'bicicleta';
+  } else if (tNorm.indexOf('electrico') >= 0 || tNorm.indexOf('carro electrico') >= 0) {
+    sheetName = 'carroelectrico';
+  } else {
+    sheetName = 'combustible';
+  }
 
   var sh = ss.getSheetByName(sheetName);
   if (!sh) throw new Error('No se encontró la pestaña destino: "' + sheetName + '"');
@@ -236,7 +245,9 @@ function guardarControlCompleto(tipo, filaDatos, fotosArray, supervisor, empresa
   rowOut.push(supNombre);
   sh.appendRow(rowOut);
 
-  var pdfResult = enviarControlPorCorreo_( {
+  // El guardado no espera a DocumentApp/Drive/MailApp.
+  // El correo con PDF se procesa en segundo plano mediante una cola.
+  encolarControlPDFCorreo_({
     id: nextId,
     hoja: sheetName,
     tipo: String(tipo || ''),
@@ -249,11 +260,160 @@ function guardarControlCompleto(tipo, filaDatos, fotosArray, supervisor, empresa
   });
 
   return {
-    ok: true, id: nextId, hoja: sheetName, fotos: linksFotos,
-    persona: String(filaDatos[4] || ''), supervisor: supNombre,
-    correoEnviado: pdfResult.ok, correo: supCorreo,
-    errorCorreo: pdfResult.ok ? '' : pdfResult.error
+    ok: true,
+    id: nextId,
+    hoja: sheetName,
+    fotos: linksFotos,
+    persona: String(filaDatos[4] || ''),
+    supervisor: supNombre,
+    correoEnviado: false,
+    correoPendiente: true,
+    correo: supCorreo,
+    errorCorreo: ''
   };
+}
+
+
+var COLA_PDF_CONTROL_KEY_ = 'DELBEN_COLA_PDF_CONTROLES';
+
+function encolarControlPDFCorreo_(job) {
+  var lock = LockService.getScriptLock();
+  lock.waitLock(10000);
+  try {
+    var props = PropertiesService.getScriptProperties();
+    var cola = [];
+    var raw = props.getProperty(COLA_PDF_CONTROL_KEY_);
+    if (raw) {
+      try {
+        var parsed = JSON.parse(raw);
+        if (Array.isArray(parsed)) cola = parsed;
+      } catch (_) {}
+    }
+
+    cola.push({
+      id: job.id,
+      hoja: job.hoja,
+      tipo: job.tipo,
+      fila: job.fila,
+      supervisor: job.supervisor,
+      empresa: job.empresa,
+      fotosIds: job.fotosIds || [],
+      fotosUrls: job.fotosUrls || [],
+      linksFotos: job.linksFotos || '',
+      intentos: 0,
+      creado: new Date().toISOString()
+    });
+
+    // Evita que una cola dañada crezca indefinidamente.
+    if (cola.length > 50) cola = cola.slice(-50);
+
+    props.setProperty(COLA_PDF_CONTROL_KEY_, JSON.stringify(cola));
+  } finally {
+    lock.releaseLock();
+  }
+
+  asegurarTriggerColaPDF_();
+}
+
+function asegurarTriggerColaPDF_() {
+  var triggers = ScriptApp.getProjectTriggers();
+  for (var i = 0; i < triggers.length; i++) {
+    if (triggers[i].getHandlerFunction() === 'procesarColaPDFControles_') return;
+  }
+
+  ScriptApp.newTrigger('procesarColaPDFControles_')
+    .timeBased()
+    .after(5000)
+    .create();
+}
+
+function procesarColaPDFControles_() {
+  var lock = LockService.getScriptLock();
+  if (!lock.tryLock(5000)) return;
+
+  var job = null;
+  try {
+    var props = PropertiesService.getScriptProperties();
+    var raw = props.getProperty(COLA_PDF_CONTROL_KEY_);
+    var cola = [];
+    if (raw) {
+      try {
+        var parsed = JSON.parse(raw);
+        if (Array.isArray(parsed)) cola = parsed;
+      } catch (_) {}
+    }
+
+    if (!cola.length) {
+      props.deleteProperty(COLA_PDF_CONTROL_KEY_);
+      return;
+    }
+
+    job = cola.shift();
+    props.setProperty(COLA_PDF_CONTROL_KEY_, JSON.stringify(cola));
+  } finally {
+    lock.releaseLock();
+  }
+
+  try {
+    var result = enviarControlPorCorreo_(job);
+
+    if (!result || !result.ok) {
+      job.intentos = Number(job.intentos || 0) + 1;
+      if (job.intentos < 3) {
+        var lockRe = LockService.getScriptLock();
+        lockRe.waitLock(10000);
+        try {
+          var propsRe = PropertiesService.getScriptProperties();
+          var rawRe = propsRe.getProperty(COLA_PDF_CONTROL_KEY_);
+          var colaRe = [];
+          if (rawRe) {
+            try {
+              var parsedRe = JSON.parse(rawRe);
+              if (Array.isArray(parsedRe)) colaRe = parsedRe;
+            } catch (_) {}
+          }
+          colaRe.push(job);
+          propsRe.setProperty(COLA_PDF_CONTROL_KEY_, JSON.stringify(colaRe));
+        } finally {
+          lockRe.releaseLock();
+        }
+      } else {
+        console.error('PDF de Control #' + job.id + ' falló después de 3 intentos: ' + (result && result.error));
+      }
+    }
+  } catch (err) {
+    job.intentos = Number(job.intentos || 0) + 1;
+    if (job.intentos < 3) {
+      var lockErr = LockService.getScriptLock();
+      lockErr.waitLock(10000);
+      try {
+        var propsErr = PropertiesService.getScriptProperties();
+        var rawErr = propsErr.getProperty(COLA_PDF_CONTROL_KEY_);
+        var colaErr = [];
+        if (rawErr) {
+          try {
+            var parsedErr = JSON.parse(rawErr);
+            if (Array.isArray(parsedErr)) colaErr = parsedErr;
+          } catch (_) {}
+        }
+        colaErr.push(job);
+        propsErr.setProperty(COLA_PDF_CONTROL_KEY_, JSON.stringify(colaErr));
+      } finally {
+        lockErr.releaseLock();
+      }
+    } else {
+      console.error('PDF de Control #' + job.id + ' lanzó error después de 3 intentos: ' + String(err));
+    }
+  }
+
+  // Si quedan controles pendientes, programar el siguiente procesamiento.
+  var rawFin = PropertiesService.getScriptProperties().getProperty(COLA_PDF_CONTROL_KEY_);
+  if (rawFin) {
+    try {
+      var colaFin = JSON.parse(rawFin);
+      if (Array.isArray(colaFin) && colaFin.length) asegurarTriggerColaPDF_();
+    } catch (_) {}
+  }
 }
 
 function formatearFechaPDF_(valor) {
@@ -491,32 +651,14 @@ function probarPDFControlMovilesSoloUsuario() {
   var filesTemp = [];
   try {
     var folder = DriveApp.getFolderById(FOLDER_ID_FOTOS_MOVILES);
+    var logoBlob = UrlFetchApp.fetch(
+      'https://raw.githubusercontent.com/ferchu17/Delben/main/delben-logo.webp',
+      {muteHttpExceptions:false}
+    ).getBlob();
 
-    function crearImagenPrueba_(titulo, subtitulo) {
-      var dt = Charts.newDataTable()
-        .addColumn(Charts.ColumnType.STRING, 'Elemento')
-        .addColumn(Charts.ColumnType.NUMBER, 'Valor')
-        .addRow([titulo, 100])
-        .addRow([subtitulo, 50])
-        .build();
-
-      var chart = Charts.newBarChart()
-        .setDataTable(dt)
-        .setDimensions(900, 600)
-        .setOption('title', titulo + ' · ' + subtitulo)
-        .setOption('legend', {position: 'none'})
-        .setOption('hAxis', {minValue: 0, maxValue: 120})
-        .setOption('vAxis', {textPosition: 'none'})
-        .build();
-
-      var blob = chart.getBlob().setName(titulo.replace(/\s+/g, '_') + '.png');
-      var file = folder.createFile(blob);
-      filesTemp.push(file);
-      return file.getId();
-    }
-
-    var foto1 = crearImagenPrueba_('FOTO DE PRUEBA 1', 'ANVERSO');
-    var foto2 = crearImagenPrueba_('FOTO DE PRUEBA 2', 'REVERSO');
+    var f1 = folder.createFile(logoBlob.copyBlob().setName('PRUEBA_PDF_VISTA_1.jpg'));
+    var f2 = folder.createFile(logoBlob.copyBlob().setName('PRUEBA_PDF_VISTA_2.jpg'));
+    filesTemp.push(f1, f2);
 
     var fila = [
       'PRUEBA-001',
@@ -536,7 +678,7 @@ function probarPDFControlMovilesSoloUsuario() {
       'Sin Novedad','Sin Novedad','Sin Novedad','Sin Novedad',
       'Sin Novedad','Sin Novedad','Sin Novedad','Sin Novedad',
       'Sin Novedad','Sin Novedad','Sin Novedad','Sin Novedad',
-      'Sin Novedad'
+      'Prueba de PDF'
     ];
 
     var resultado = enviarControlPorCorreo_({
@@ -544,14 +686,11 @@ function probarPDFControlMovilesSoloUsuario() {
       hoja: 'PRUEBA',
       tipo: 'Combustible',
       fila: fila,
-      supervisor: {
-        nombre: 'Fernando Jacyno',
-        correo: 'fjacyno@ktl-seguridad.com'
-      },
+      supervisor: {nombre:'Fernando Jacyno',correo:'fjacyno@ktl-seguridad.com'},
       empresa: 'KTL Seguridad',
-      fotosIds: [foto1, foto2],
-      fotosUrls: [],
-      linksFotos: '',
+      fotosIds: [f1.getId(), f2.getId()],
+      fotosUrls: [f1.getUrl(), f2.getUrl()],
+      linksFotos: f1.getUrl() + ', ' + f2.getUrl(),
       modoPrueba: true,
       destinatarioPrueba: 'fjacyno@ktl-seguridad.com'
     });
