@@ -784,8 +784,9 @@ function seleccionarTipo(tipo) {
   $('tipo-movil').value = tipo;
   var lbl = $('form-tipo-label'); if (lbl) lbl.textContent = tipo.toUpperCase();
   var esBici = (tipo === 'Bicicleta');
-  mostrar('vehicle-fields', !esBici, 'flex');
-  mostrar('mobile-field', !esBici, 'flex');
+  var esElectrico = (tipo === 'Eléctrico');
+  mostrar('vehicle-fields', !esBici && !esElectrico, 'flex');
+  mostrar('mobile-field', !esBici && !esElectrico, 'flex');
   mostrar('km-field', !esBici, 'flex');
   mostrar('block-ctrl-vehiculo', !esBici);
   mostrar('block-ctrl-bicicleta', esBici);
