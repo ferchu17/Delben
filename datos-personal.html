@@ -177,6 +177,41 @@
     .reverso-label { color:#176b48; background:#eaf8f0; border-left:5px solid #18a558; }
     .dni-card { border:2px solid #8fc4f0; border-radius:12px; padding:14px; margin-bottom:16px; background:#eef8ff; }
     .ayuda-personal { display:block; margin-top:6px; color:#245579; font-size:13px; min-height:18px; }
+    .campo-personal { position:relative; }
+    .lista-personal {
+      position:absolute;
+      left:0;
+      right:0;
+      top:calc(100% - 2px);
+      z-index:10000;
+      display:none;
+      max-height:280px;
+      overflow-y:auto;
+      background:#ffffff !important;
+      border:1px solid #b9d7ef;
+      border-radius:0 0 10px 10px;
+      box-shadow:0 8px 22px rgba(0,73,140,.22);
+      padding:4px;
+    }
+    .lista-personal-item {
+      width:100%;
+      display:block;
+      text-align:left;
+      background:#ffffff !important;
+      color:#202124;
+      border:0;
+      border-bottom:1px solid #e4eef7;
+      border-radius:7px;
+      padding:10px 12px;
+      margin:0;
+      cursor:pointer;
+    }
+    .lista-personal-item:last-child { border-bottom:0; }
+    .lista-personal-item:hover,
+    .lista-personal-item:focus { background:#eef7ff !important; outline:none; }
+    .lista-personal-nombre { display:block; font-weight:700; color:#174f78; font-size:15px; line-height:1.25; }
+    .lista-personal-dni { display:block; margin-top:3px; color:#536273; font-size:13px; line-height:1.2; }
+    .lista-personal-vacia { padding:10px 12px; color:#64748b; font-size:14px; background:#ffffff; }
   @media (max-width: 600px) {
       body { padding: 0 0 24px; }
       .contenedor { border-radius: 0; box-shadow:none; }
@@ -242,10 +277,10 @@
           <label>Dirección de correo <span class="requerido">*</span></label>
           <input type="email" name="direccionCorreo" required>
         </div>
-        <div class="campo">
+        <div class="campo campo-personal">
           <label>Apellido y Nombre <span class="requerido">*</span></label>
-          <input type="text" id="apellidoNombre" name="apellidoNombre" list="lista-personal" autocomplete="off" required>
-          <datalist id="lista-personal"></datalist>
+          <input type="text" id="apellidoNombre" name="apellidoNombre" autocomplete="off" required>
+          <div id="lista-personal" class="lista-personal"></div>
           <small id="estado-personal" class="ayuda-personal"></small>
         </div>
         <div class="fila">
@@ -616,15 +651,71 @@
     function cargarPersonalActivo() {
       if (!listaPersonal) return;
 
-      function pintar(data) {
-        personalActivo = (data && Array.isArray(data.personal)) ? data.personal : [];
+      function mostrarLista() {
+        listaPersonal.style.display = 'block';
+      }
+
+      function ocultarLista() {
+        listaPersonal.style.display = 'none';
+      }
+
+      function renderLista(filtro) {
         listaPersonal.innerHTML = '';
 
-        personalActivo.forEach(function(persona) {
-          var option = document.createElement('option');
-          option.value = persona.nombre;
-          listaPersonal.appendChild(option);
+        var buscado = normalizarPersonal(filtro || '');
+        var encontrados = personalActivo.filter(function(persona) {
+          return !buscado || normalizarPersonal(persona.nombre).indexOf(buscado) >= 0;
         });
+
+        if (!encontrados.length) {
+          var vacio = document.createElement('div');
+          vacio.className = 'lista-personal-vacia';
+          vacio.textContent = personalActivo.length
+            ? 'No se encontraron coincidencias.'
+            : 'No hay personas cargadas.';
+          listaPersonal.appendChild(vacio);
+          mostrarLista();
+          return;
+        }
+
+        encontrados.forEach(function(persona) {
+          var item = document.createElement('button');
+          item.type = 'button';
+          item.className = 'lista-personal-item';
+
+          var nombre = document.createElement('span');
+          nombre.className = 'lista-personal-nombre';
+          nombre.textContent = persona.nombre || '';
+
+          var dni = document.createElement('span');
+          dni.className = 'lista-personal-dni';
+          dni.textContent = 'DNI: ' + (persona.dni || '—');
+
+          item.appendChild(nombre);
+          item.appendChild(dni);
+
+          item.addEventListener('mousedown', function(e) {
+            e.preventDefault();
+
+            inputApellidoNombre.value = persona.nombre || '';
+            aplicarDatosPersonal(persona);
+            ocultarLista();
+            try { inputApellidoNombre.blur(); } catch (_) {}
+          });
+
+          listaPersonal.appendChild(item);
+        });
+
+        mostrarLista();
+      }
+
+      function pintar(data) {
+        personalActivo =
+          (data && Array.isArray(data.personal))
+            ? data.personal
+            : [];
+
+        listaPersonal.innerHTML = '';
 
         if (estadoPersonal) {
           estadoPersonal.textContent = personalActivo.length
@@ -635,45 +726,108 @@
 
       function cargarJSONP() {
         var callbackName = 'delbenPersonal_' + Date.now();
+
         window[callbackName] = function(data) {
-          try { pintar(data); }
-          finally {
-            try { delete window[callbackName]; } catch (_) { window[callbackName] = undefined; }
-            if (script.parentNode) script.parentNode.removeChild(script);
+          try {
+            pintar(data);
+          } finally {
+            try {
+              delete window[callbackName];
+            } catch (_) {
+              window[callbackName] = undefined;
+            }
+
+            if (script.parentNode) {
+              script.parentNode.removeChild(script);
+            }
           }
         };
+
         var script = document.createElement('script');
-        script.src = PERSONAL_BACKEND_URL +
-          '?action=getPersonalActivo&callback=' + encodeURIComponent(callbackName) +
-          '&_=' + Date.now();
+
+        script.src =
+          PERSONAL_BACKEND_URL +
+          '?action=getPersonalActivo&callback=' +
+          encodeURIComponent(callbackName) +
+          '&_=' +
+          Date.now();
+
         script.onerror = function() {
-          if (estadoPersonal) estadoPersonal.textContent = 'No se pudo cargar el listado de personal.';
-          try { delete window[callbackName]; } catch (_) { window[callbackName] = undefined; }
-          if (script.parentNode) script.parentNode.removeChild(script);
+          if (estadoPersonal) {
+            estadoPersonal.textContent =
+              'No se pudo cargar el listado de personal.';
+          }
+
+          try {
+            delete window[callbackName];
+          } catch (_) {
+            window[callbackName] = undefined;
+          }
+
+          if (script.parentNode) {
+            script.parentNode.removeChild(script);
+          }
         };
+
         document.body.appendChild(script);
       }
 
-      fetch(PERSONAL_BACKEND_URL + '?action=getPersonalActivo&_=' + Date.now(), {
-        method: 'GET',
-        redirect: 'follow',
-        cache: 'no-store'
+      fetch(
+        PERSONAL_BACKEND_URL +
+        '?action=getPersonalActivo&_=' +
+        Date.now(),
+        {
+          method: 'GET',
+          redirect: 'follow',
+          cache: 'no-store'
+        }
+      )
+      .then(function(res) {
+        return res.text();
       })
-      .then(function(res) { return res.text(); })
       .then(function(txt) {
         var data;
-        try { data = JSON.parse(txt); }
-        catch (e) { throw e; }
+        try {
+          data = JSON.parse(txt);
+        } catch (e) {
+          throw e;
+        }
         pintar(data);
       })
       .catch(function() {
         cargarJSONP();
       });
-    }
 
-    if (inputApellidoNombre) {
-      inputApellidoNombre.addEventListener('change', seleccionarPersonalPorNombre);
-      inputApellidoNombre.addEventListener('blur', seleccionarPersonalPorNombre);
+      if (inputApellidoNombre) {
+        inputApellidoNombre.addEventListener('focus', function() {
+          renderLista(this.value);
+        });
+
+        inputApellidoNombre.addEventListener('click', function() {
+          renderLista(this.value);
+        });
+
+        inputApellidoNombre.addEventListener('input', function() {
+          renderLista(this.value);
+        });
+
+        inputApellidoNombre.addEventListener('blur', function() {
+          var self = this;
+          setTimeout(function() {
+            seleccionarPersonalPorNombre();
+            ocultarLista();
+          }, 150);
+        });
+      }
+
+      document.addEventListener('mousedown', function(e) {
+        if (
+          e.target !== inputApellidoNombre &&
+          !listaPersonal.contains(e.target)
+        ) {
+          ocultarLista();
+        }
+      });
     }
 
     cargarPersonalActivo();
