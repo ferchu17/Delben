@@ -176,6 +176,7 @@
     .anverso-label { color:#075f9f; background:#e8f4ff; border-left:5px solid #0878d1; }
     .reverso-label { color:#176b48; background:#eaf8f0; border-left:5px solid #18a558; }
     .dni-card { border:2px solid #8fc4f0; border-radius:12px; padding:14px; margin-bottom:16px; background:#eef8ff; }
+    .ayuda-personal { display:block; margin-top:6px; color:#245579; font-size:13px; min-height:18px; }
   @media (max-width: 600px) {
       body { padding: 0 0 24px; }
       .contenedor { border-radius: 0; box-shadow:none; }
@@ -243,7 +244,9 @@
         </div>
         <div class="campo">
           <label>Apellido y Nombre <span class="requerido">*</span></label>
-          <input type="text" name="apellidoNombre" required>
+          <input type="text" id="apellidoNombre" name="apellidoNombre" list="lista-personal" autocomplete="off" required>
+          <datalist id="lista-personal"></datalist>
+          <small id="estado-personal" class="ayuda-personal"></small>
         </div>
         <div class="fila">
           <div class="campo">
@@ -551,6 +554,130 @@
     });
     mostrarPantalla(0);
 
+    var personalActivo = [];
+    var inputApellidoNombre = document.getElementById('apellidoNombre');
+    var listaPersonal = document.getElementById('lista-personal');
+    var estadoPersonal = document.getElementById('estado-personal');
+
+    function normalizarPersonal(valor) {
+      return String(valor || '')
+        .toLowerCase()
+        .trim()
+        .normalize('NFD')
+        .replace(/[\\u0300-\\u036f]/g, '')
+        .replace(/\\s+/g, ' ');
+    }
+
+    function formatearFechaPersonal(valor) {
+      var s = String(valor || '').trim();
+      var m = s.match(/^(\\d{4})[-/](\\d{2})[-/](\\d{2})$/);
+      if (m) return m[3] + '/' + m[2] + '/' + m[1];
+      return s;
+    }
+
+    function aplicarDatosPersonal(persona) {
+      if (!persona) return;
+      var legajo = document.querySelector('[name="legajo"]');
+      var dni = document.querySelector('[name="dni"]');
+      var fecha = document.querySelector('[name="fechaNacimiento"]');
+
+      if (legajo) legajo.value = persona.legajo || '';
+      if (dni) dni.value = persona.dni || '';
+      if (fecha) fecha.value = formatearFechaPersonal(persona.fechaNacimiento);
+
+      if (estadoPersonal) {
+        estadoPersonal.textContent = 'Datos cargados automáticamente desde Personal activo.';
+      }
+    }
+
+    function seleccionarPersonalPorNombre() {
+      if (!inputApellidoNombre) return;
+      var buscado = normalizarPersonal(inputApellidoNombre.value);
+      if (!buscado) {
+        if (estadoPersonal) estadoPersonal.textContent = '';
+        return;
+      }
+
+      var encontrado = null;
+      for (var i = 0; i < personalActivo.length; i++) {
+        if (normalizarPersonal(personalActivo[i].nombre) === buscado) {
+          encontrado = personalActivo[i];
+          break;
+        }
+      }
+
+      if (encontrado) {
+        aplicarDatosPersonal(encontrado);
+      } else if (estadoPersonal) {
+        estadoPersonal.textContent = 'Seleccioná una persona del listado.';
+      }
+    }
+
+    function cargarPersonalActivo() {
+      if (!listaPersonal) return;
+
+      function pintar(data) {
+        personalActivo = (data && Array.isArray(data.personal)) ? data.personal : [];
+        listaPersonal.innerHTML = '';
+
+        personalActivo.forEach(function(persona) {
+          var option = document.createElement('option');
+          option.value = persona.nombre;
+          listaPersonal.appendChild(option);
+        });
+
+        if (estadoPersonal) {
+          estadoPersonal.textContent = personalActivo.length
+            ? 'Personal activo disponible para seleccionar.'
+            : 'No se encontraron personas activas.';
+        }
+      }
+
+      function cargarJSONP() {
+        var callbackName = 'delbenPersonal_' + Date.now();
+        window[callbackName] = function(data) {
+          try { pintar(data); }
+          finally {
+            try { delete window[callbackName]; } catch (_) { window[callbackName] = undefined; }
+            if (script.parentNode) script.parentNode.removeChild(script);
+          }
+        };
+        var script = document.createElement('script');
+        script.src = PERSONAL_BACKEND_URL +
+          '?action=getPersonalActivo&callback=' + encodeURIComponent(callbackName) +
+          '&_=' + Date.now();
+        script.onerror = function() {
+          if (estadoPersonal) estadoPersonal.textContent = 'No se pudo cargar el listado de personal.';
+          try { delete window[callbackName]; } catch (_) { window[callbackName] = undefined; }
+          if (script.parentNode) script.parentNode.removeChild(script);
+        };
+        document.body.appendChild(script);
+      }
+
+      fetch(PERSONAL_BACKEND_URL + '?action=getPersonalActivo&_=' + Date.now(), {
+        method: 'GET',
+        redirect: 'follow',
+        cache: 'no-store'
+      })
+      .then(function(res) { return res.text(); })
+      .then(function(txt) {
+        var data;
+        try { data = JSON.parse(txt); }
+        catch (e) { throw e; }
+        pintar(data);
+      })
+      .catch(function() {
+        cargarJSONP();
+      });
+    }
+
+    if (inputApellidoNombre) {
+      inputApellidoNombre.addEventListener('change', seleccionarPersonalPorNombre);
+      inputApellidoNombre.addEventListener('blur', seleccionarPersonalPorNombre);
+    }
+
+    cargarPersonalActivo();
+
     function mostrarErrorPersonal(texto) {
       if (typeof mensaje !== 'undefined' && mensaje) {
         mensaje.className = 'mensaje error';
@@ -701,6 +828,19 @@
           input.focus();
           return;
         }
+      }
+
+      seleccionarPersonalPorNombre();
+      const personaSeleccionada = personalActivo.find(function(p) {
+        return normalizarPersonal(p.nombre) === normalizarPersonal(inputApellidoNombre ? inputApellidoNombre.value : '');
+      });
+      if (!personaSeleccionada) {
+        btn.disabled = false;
+        btn.textContent = '✓ ENVIAR DATOS';
+        mensaje.className = 'mensaje error';
+        mensaje.textContent = 'Seleccioná el Apellido y Nombre desde el listado de personal activo.';
+        if (inputApellidoNombre) inputApellidoNombre.focus();
+        return;
       }
 
       const fd = new FormData(form);
