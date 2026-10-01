@@ -458,7 +458,16 @@ button,.type-card,.photo-slot,.dd-item{-webkit-tap-highlight-color:transparent;t
 // URL por defecto (se puede cambiar desde la app: pie de pantalla > "Servidor")
 var BACKEND_URL_DEFECTO = 'https://script.google.com/macros/s/AKfycbxdBItqLGmffFxFQHJ8X3wnlvOh10cP4bUupAk-6RwtCVMzAX5f25D0BvC0h4FJaNaINA/exec';
 var BACKEND_URL = BACKEND_URL_DEFECTO;
-try { var _u = localStorage.getItem('delben_url'); if (_u) BACKEND_URL = _u; } catch (e) {}
+try {
+  var _u = localStorage.getItem('delben_url');
+  var _backendAnterior = 'https://script.google.com/macros/s/AKfycbyBi-tu0DQoN9f1jFOcMtYzyyEs6wsCY6W5P9I-HxjQ_N2Gyv5Ih-P3FodJBr8vnIowzA/exec';
+  if (_u && _u !== _backendAnterior) {
+    BACKEND_URL = _u;
+  } else {
+    BACKEND_URL = BACKEND_URL_DEFECTO;
+    localStorage.setItem('delben_url', BACKEND_URL_DEFECTO);
+  }
+} catch (e) {}
 
 var DB_LOADED = { personal: [], objetivos: [], flota: [] };
 var activeSlotIdx = 0;
