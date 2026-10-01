@@ -151,7 +151,7 @@
     small.ayuda { display:block; color: #176b48; margin-top: 8px; background:#e8f8ef; padding:10px 12px; border-radius:10px; font-size:14px; }
     input[type=file] { width:100%; padding:12px; border:2px dashed #8fc4f0; border-radius:12px; background:#f4faff; color:#1d4f7a; }
     .foto-botones { display:flex; gap:10px; flex-wrap:wrap; }
-    .foto-botones button { flex:1; min-width:130px; padding:11px 14px; font-size:14px; border-radius:10px; }
+    .foto-botones button, .foto-botones .btn-foto { flex:1; min-width:130px; padding:11px 14px; font-size:14px; border-radius:10px; }
     .btn-foto { background:linear-gradient(90deg,#18a558,#128746); }
     .btn-archivo { background:linear-gradient(90deg,#0878d1,#0056a6); }
     .nombre-foto { margin-top:8px; padding:8px 10px; border-radius:8px; background:#f4faff; color:#536273; font-size:14px; border:1px solid #d8e9f7; }
@@ -489,7 +489,7 @@
           <div class="dni-card"><div class="campo">
             <label class="dni-label anverso-label">1️⃣ DNI — ANVERSO (frente)</label>
             <div class="foto-botones">
-              <button type="button" class="btn-foto" onclick="abrirCamara('anverso')">📷 SACAR FOTO DEL ANVERSO</button>
+              <label for="camara-anverso" class="btn-foto">📷 SACAR FOTO DEL ANVERSO</label>
               <button type="button" class="btn-archivo" onclick="abrirArchivo('anverso')">📁 ELEGIR ANVERSO</button>
             </div>
             <input type="file" id="camara-anverso" accept="image/*" capture="environment" hidden>
@@ -500,7 +500,7 @@
           <div class="dni-card"><div class="campo">
             <label class="dni-label reverso-label">2️⃣ DNI — REVERSO (dorso)</label>
             <div class="foto-botones">
-              <button type="button" class="btn-foto" onclick="abrirCamara('reverso')">📷 SACAR FOTO DEL REVERSO</button>
+              <label for="camara-reverso" class="btn-foto">📷 SACAR FOTO DEL REVERSO</label>
               <button type="button" class="btn-archivo" onclick="abrirArchivo('reverso')">📁 ELEGIR REVERSO</button>
             </div>
             <input type="file" id="camara-reverso" accept="image/*" capture="environment" hidden>
