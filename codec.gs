@@ -677,7 +677,7 @@ function probarPDFControlMovilesSoloUsuario() {
       'Sin Novedad','Sin Novedad','Sin Novedad','Sin Novedad',
       'Sin Novedad','Sin Novedad','Sin Novedad','Sin Novedad',
       'Sin Novedad','Sin Novedad','Sin Novedad','Sin Novedad',
-      'Sin Novedad','Sin Novedad','Sin Novedad','Sin Novedad',
+      'Sin Novedad','Sin Novedad',
       'Prueba de PDF'
     ];
 
