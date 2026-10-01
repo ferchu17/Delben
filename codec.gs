@@ -6,6 +6,16 @@ var CC_CONTROL_MOVILES = 'fjacyno@ktl-seguridad.com,gsanmartin@ktl-seguridad.com
 // 1. SERVIDOR WEB (doGet - Entrega directamente la app móvil interactiva)
 // -----------------------------------------------------------------------------
 function doGet(e) {
+  // Prueba controlada del PDF: solo envía a fjacyno@ktl-seguridad.com.
+  // Se activa mediante la URL con el token de prueba.
+  if (e && e.parameter && e.parameter.action === 'pruebaPDF' &&
+      e.parameter.token === 'DELBEN-PDF-TEST-2026') {
+    try {
+      return jsonOut_(probarPDFControlMovilesSoloUsuario());
+    } catch (err) {
+      return jsonOut_({ok:false,error:String(err && err.message ? err.message : err)});
+    }
+  }
   // --- API JSON para la APK (index.html fuera de Apps Script) ---
   if (e && e.parameter && (e.parameter.action === 'getDatos' || e.parameter.action === 'getSupervisores')) {
     var datosOut;
