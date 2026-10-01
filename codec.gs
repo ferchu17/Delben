@@ -157,6 +157,99 @@ function getDatosControlMoviles() {
   return { personal: personalActivo, objetivos: listaObjetivos, flota: flotaActiva, supervisores: supervisores };
 }
 
+
+/**
+ * Devuelve el listado de supervisores/destinatarios de la hoja "quienRetira".
+ * Mantiene dos destinatarios de respaldo para que el selector nunca quede vacío.
+ */
+function getSupervisores() {
+  var respaldo = [
+    {nombre:'Fernando Jacyno', correo:'fjacyno@ktl-seguridad.com'},
+    {nombre:'Gustavo San Martin', correo:'gsanmartin@ktl-seguridad.com'}
+  ];
+
+  function normalizar(v) {
+    return String(v || '').toLowerCase().trim()
+      .normalize('NFD').replace(/[\\u0300-\\u036f]/g, '');
+  }
+
+  function agregar(out, nombre, correo) {
+    nombre = String(nombre || '').trim();
+    correo = String(correo || '').trim();
+    if (!nombre) return;
+    var key = normalizar(nombre);
+    for (var i = 0; i < out.length; i++) {
+      if (normalizar(out[i].nombre) === key) {
+        if (!out[i].correo && correo) out[i].correo = correo;
+        return;
+      }
+    }
+    out.push({nombre:nombre, correo:correo});
+  }
+
+  var out = [];
+  try {
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    if (!ss) return respaldo.slice();
+
+    var sh = ss.getSheetByName('quienRetira');
+    if (!sh) return respaldo.slice();
+
+    var values = sh.getDataRange().getDisplayValues();
+    if (!values || values.length < 2) return respaldo.slice();
+
+    var headers = values[0].map(normalizar);
+
+    function buscarIndice(nombres, fallback) {
+      for (var i = 0; i < nombres.length; i++) {
+        var idx = headers.indexOf(normalizar(nombres[i]));
+        if (idx >= 0) return idx;
+      }
+      return fallback;
+    }
+
+    var iNom = buscarIndice([
+      'nombre','nombre y apellido','apellido y nombre','apellidos y nombre',
+      'supervisor','responsable','nombre supervisor','responsable nombre'
+    ], 1);
+
+    var iMail = buscarIndice([
+      'correo','correo electronico','correo electrónico','email','e-mail',
+      'mail','correo supervisor','email supervisor'
+    ], 2);
+
+    var emailRe = /^[^\s@]+@[^\s@]+\.[^\s@]+$/i;
+
+    for (var r = 1; r < values.length; r++) {
+      var row = values[r] || [];
+      var nombre = String(row[iNom] || '').trim();
+      var correo = String(row[iMail] || '').trim();
+
+      if (!emailRe.test(correo)) {
+        for (var c = 0; c < row.length; c++) {
+          var posible = String(row[c] || '').trim();
+          if (emailRe.test(posible)) {
+            correo = posible;
+            break;
+          }
+        }
+      }
+
+      if (!nombre) nombre = String(row[1] || row[0] || '').trim();
+
+      if (nombre && !emailRe.test(nombre)) agregar(out, nombre, correo);
+    }
+  } catch (err) {
+    out = [];
+  }
+
+  for (var j = 0; j < respaldo.length; j++) {
+    agregar(out, respaldo[j].nombre, respaldo[j].correo);
+  }
+
+  return out;
+}
+
 // -----------------------------------------------------------------------------
 // 3. SUBIDA DE FOTOS A GOOGLE DRIVE
 // -----------------------------------------------------------------------------
