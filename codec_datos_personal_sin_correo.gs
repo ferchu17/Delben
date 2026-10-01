@@ -32,7 +32,7 @@ function doGet(e) {
     }
 
     var callback = e.parameter.callback;
-    if (callback && /^[A-Za-z_$][\\w$.]*$/.test(callback)) {
+    if (callback && /^[A-Za-z_$][\w$.]*$/.test(callback)) {
       return ContentService
         .createTextOutput(callback + '(' + JSON.stringify(salida) + ');')
         .setMimeType(ContentService.MimeType.JAVASCRIPT);
@@ -80,9 +80,9 @@ function _normalizarCabeceraPersonal_(valor) {
     .toLowerCase()
     .trim()
     .normalize('NFD')
-    .replace(/[\\u0300-\\u036f]/g, '')
+    .replace(/[\u0300-\u036f]/g, '')
     .replace(/[._-]+/g, ' ')
-    .replace(/\\s+/g, ' ');
+    .replace(/\s+/g, ' ');
 }
 
 function _buscarIndicePersonal_(cabeceras, nombres, fallback) {
