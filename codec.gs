@@ -686,11 +686,11 @@ function enviarControlPorCorreo_(data) {
               DriveApp.getFileById(idsFotos[p + q]).getBlob()
             );
 
-            var maxW = 470;
-            var maxH = 275;
+            var maxW = 500;
+            var maxH = 305;
             var iw = img.getWidth();
             var ih = img.getHeight();
-            var scale = Math.min(maxW / iw, maxH / ih, 1);
+            var scale = Math.min(maxW / iw, maxH / ih);
             img.setWidth(Math.round(iw * scale));
             img.setHeight(Math.round(ih * scale));
 
