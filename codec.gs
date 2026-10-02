@@ -2,7 +2,7 @@
 var FOLDER_ID_FOTOS_MOVILES = '1m81-m3AAiZXGarP9xoq3ZSh-7qJQ5i6I';
 var CC_CONTROL_MOVILES = 'fjacyno@ktl-seguridad.com,gsanmartin@ktl-seguridad.com';
 
-// -----------------------------------------------------------------------------
+// Logo DELBEN: se usa el PNG embebido en la propia aplicación.\n// Así la generación del PDF no depende de UrlFetchApp ni de GitHub.\nfunction obtenerLogoBlob_() {\n  var html = getAppHtml();\n  var m = html.match(/data:image\\/png;base64,([A-Za-z0-9+/=]+)/);\n  if (!m || !m[1]) {\n    throw new Error('No se encontró el logo DELBEN embebido en getAppHtml().');\n  }\n  return Utilities.newBlob(Utilities.base64Decode(m[1]), 'image/png', 'delben-logo.png');\n}\n\n// -----------------------------------------------------------------------------
 // 1. SERVIDOR WEB (doGet - Entrega directamente la app móvil interactiva)
 // -----------------------------------------------------------------------------
 function doGet(e) {
@@ -562,10 +562,7 @@ function enviarControlPorCorreo_(data) {
     // El título queda en una línea independiente y centrado.
     // ---------------------------------------------------------
     try {
-      var logoBlob = UrlFetchApp.fetch(
-        'https://raw.githubusercontent.com/ferchu17/Delben/main/delben-logo.webp',
-        {muteHttpExceptions:false}
-      ).getBlob();
+      var logoBlob = obtenerLogoBlob_();
 
       var logoPar = body.appendParagraph('');
       logoPar.setAlignment(DocumentApp.HorizontalAlignment.LEFT);
@@ -758,10 +755,7 @@ function probarPDFControlMovilesSoloUsuario() {
   var filesTemp = [];
   try {
     var folder = DriveApp.getFolderById(FOLDER_ID_FOTOS_MOVILES);
-    var logoBlob = UrlFetchApp.fetch(
-      'https://raw.githubusercontent.com/ferchu17/Delben/main/delben-logo.webp',
-      {muteHttpExceptions:false}
-    ).getBlob();
+    var logoBlob = obtenerLogoBlob_();
 
     var f1 = folder.createFile(logoBlob.copyBlob().setName('PRUEBA_PDF_VISTA_1.jpg'));
     var f2 = folder.createFile(logoBlob.copyBlob().setName('PRUEBA_PDF_VISTA_2.jpg'));
