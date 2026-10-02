@@ -686,8 +686,8 @@ function enviarControlPorCorreo_(data) {
               DriveApp.getFileById(idsFotos[p + q]).getBlob()
             );
 
-            var maxW = 500;
-            var maxH = 305;
+            var maxW = 700;
+            var maxH = 450;
             var iw = img.getWidth();
             var ih = img.getHeight();
             var scale = Math.min(maxW / iw, maxH / ih);
@@ -719,9 +719,6 @@ function enviarControlPorCorreo_(data) {
     var html = '<div style="font-family:Arial,sans-serif;color:#37414A"><h2 style="color:#0065BC">Control de móvil registrado</h2><p>Se adjunta el informe PDF del control <b>#' + data.id + '</b>.</p><p><b>Movilero:</b> ' + escHtml_(fila[4]) + '<br><b>Vehículo:</b> ' + escHtml_(fila[10] || '') + '<br><b>Fecha:</b> ' + escHtml_(fechaFormato) + ' · <b>Hora:</b> ' + escHtml_(horaFormato) + '</p><p>Este correo fue generado automáticamente por DELBEN SGI.</p></div>';
 
     var cuentaEjecutora = String(Session.getEffectiveUser().getEmail() || '').trim().toLowerCase();
-    if (cuentaEjecutora !== 'fjacyno@gmail.com') {
-      throw new Error('La implementación debe ejecutarse como fjacyno@gmail.com. Cuenta efectiva detectada: ' + (cuentaEjecutora || 'no identificada') + '.');
-    }
 
     var destinatario = data.modoPrueba
       ? String(data.destinatarioPrueba || 'fjacyno@ktl-seguridad.com').trim()
