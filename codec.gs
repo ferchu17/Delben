@@ -564,36 +564,49 @@ function enviarControlPorCorreo_(data) {
     doc = DocumentApp.create(docName);
     var body = doc.getBody();
 
-    body.setMarginTop(28).setMarginBottom(28).setMarginLeft(36).setMarginRight(36);
+    // Márgenes compactos para que el informe sea visualmente equilibrado.
+    body.setMarginTop(24).setMarginBottom(24).setMarginLeft(34).setMarginRight(34);
 
-    // ---------------------------------------------------------
-    // ENCABEZADO DEFINITIVO:
-    // logo real, pequeño, arriba a la izquierda.
-    // El título queda en una línea independiente y centrado.
-    // ---------------------------------------------------------
-    try {
-      var logoBlob = obtenerLogoBlob_();
+    // =========================================================
+    // ENCABEZADO
+    // Logo DELBEN más pequeño, título y subtítulo.
+    // La fecha/hora aparecen solamente en la tabla de datos.
+    // =========================================================
+    var logoBlob = obtenerLogoBlob_();
+    var header = body.appendTable();
+    header.setBorderWidth(0);
 
-      var logoPar = body.appendParagraph('');
-      logoPar.setAlignment(DocumentApp.HorizontalAlignment.LEFT);
-      var logoImg = logoPar.appendInlineImage(logoBlob);
+    var headerRow = header.appendTableRow();
+    var logoCell = headerRow.appendTableCell();
+    var titleCell = headerRow.appendTableCell();
 
-      // Aproximadamente 30 mm de ancho.
-      var logoW = 85;
-      var logoH = Math.round(logoImg.getHeight() * logoW / logoImg.getWidth());
-      logoImg.setWidth(logoW).setHeight(logoH);
-    } catch (logoErr) {
-      throw new Error('No se pudo cargar el logo DELBEN desde GitHub: ' + logoErr.message);
-    }
+    logoCell.setPaddingTop(0).setPaddingBottom(0).setPaddingLeft(0).setPaddingRight(8);
+    titleCell.setPaddingTop(0).setPaddingBottom(0).setPaddingLeft(8).setPaddingRight(0);
+    logoCell.setVerticalAlignment(DocumentApp.VerticalAlignment.CENTER);
+    titleCell.setVerticalAlignment(DocumentApp.VerticalAlignment.CENTER);
 
-    body.appendParagraph('CONTROL DE MÓVIL · INFORME DE INSPECCIÓN')
-      .setAlignment(DocumentApp.HorizontalAlignment.CENTER)
-      .setBold(true)
-      .setForegroundColor('#0065BC')
-      .setFontSize(15);
+    var logoPar = logoCell.appendParagraph('');
+    logoPar.setAlignment(DocumentApp.HorizontalAlignment.LEFT);
+    var logoImg = logoPar.appendInlineImage(logoBlob);
+
+    // Logo deliberadamente más pequeño que en la muestra anterior.
+    var logoW = 68;
+    var logoH = Math.round(logoImg.getHeight() * logoW / logoImg.getWidth());
+    logoImg.setWidth(logoW).setHeight(logoH);
+
+    var titlePar = titleCell.appendParagraph('CONTROL DE MÓVIL');
+    titlePar.setAlignment(DocumentApp.HorizontalAlignment.RIGHT)
+      .setBold(true).setForegroundColor('#24415A').setFontSize(16);
+
+    var subPar = titleCell.appendParagraph('INFORME DE INSPECCIÓN · N.º ' + String(data.id));
+    subPar.setAlignment(DocumentApp.HorizontalAlignment.RIGHT)
+      .setBold(true).setForegroundColor('#0878C9').setFontSize(9);
 
     body.appendHorizontalRule();
 
+    // =========================================================
+    // DATOS DEL CONTROL
+    // =========================================================
     var fechaFormato = formatearFechaPDF_(fila[1]);
     var horaFormato = formatearHoraPDF_(fila[3]);
 
@@ -608,22 +621,30 @@ function enviarControlPorCorreo_(data) {
     ]);
 
     for (var r = 0; r < meta.getNumRows(); r++) {
-      for (var cc = 0; cc < meta.getRow(r).getNumCells(); cc++) {
-        var cell = meta.getRow(r).getCell(cc);
-        cell.setPaddingTop(5).setPaddingBottom(5).setPaddingLeft(7).setPaddingRight(7);
+      var metaRow = meta.getRow(r);
+      for (var cc = 0; cc < metaRow.getNumCells(); cc++) {
+        var cell = metaRow.getCell(cc);
+        cell.setPaddingTop(3).setPaddingBottom(3).setPaddingLeft(5).setPaddingRight(5);
+        cell.setVerticalAlignment(DocumentApp.VerticalAlignment.CENTER);
+
+        var pMeta = cell.getChild(0).asParagraph();
+        pMeta.setFontSize(8.5).setForegroundColor('#24415A');
+
         if (cc === 0 || cc === 2) {
-          cell.setBackgroundColor('#EEF7FD');
-          cell.getChild(0).asParagraph().setBold(true);
+          cell.setBackgroundColor('#EEF6FC');
+          pMeta.setBold(true).setForegroundColor('#0878C9');
         }
       }
     }
 
-    body.appendParagraph('');
-    body.appendParagraph('INSPECCIÓN TÉCNICA')
-      .setAlignment(DocumentApp.HorizontalAlignment.LEFT)
-      .setBold(true)
-      .setForegroundColor('#159447')
-      .setFontSize(13);
+    body.appendParagraph('')
+      .setFontSize(3);
+
+    // =========================================================
+    // INSPECCIÓN TÉCNICA
+    // =========================================================
+    var tituloIns = body.appendParagraph('INSPECCIÓN TÉCNICA');
+    tituloIns.setBold(true).setForegroundColor('#24415A').setFontSize(11);
 
     var esBici = String(data.tipo || '').toLowerCase().indexOf('bici') >= 0;
     var controles = esBici
@@ -632,92 +653,124 @@ function enviarControlPorCorreo_(data) {
 
     var startIdx = esBici ? 9 : 12;
     var tbl = body.appendTable();
-    var headerRow = tbl.appendTableRow();
-    var h1 = headerRow.appendTableCell('CONTROL');
-    var h2 = headerRow.appendTableCell('RESULTADO');
-    h1.setBackgroundColor('#0065BC').setForegroundColor('#FFFFFF').setPaddingTop(5).setPaddingBottom(5);
-    h2.setBackgroundColor('#0065BC').setForegroundColor('#FFFFFF').setPaddingTop(5).setPaddingBottom(5);
-    h1.getChild(0).asParagraph().setBold(true);
-    h2.getChild(0).asParagraph().setBold(true);
+    var headerRow2 = tbl.appendTableRow();
+    var h1 = headerRow2.appendTableCell('CONTROL');
+    var h2 = headerRow2.appendTableCell('RESULTADO');
+
+    h1.setBackgroundColor('#D9ECFA').setPaddingTop(3).setPaddingBottom(3).setPaddingLeft(5).setPaddingRight(5);
+    h2.setBackgroundColor('#D9ECFA').setPaddingTop(3).setPaddingBottom(3).setPaddingLeft(5).setPaddingRight(5);
+    h1.getChild(0).asParagraph().setBold(true).setForegroundColor('#24415A').setFontSize(8.5);
+    h2.getChild(0).asParagraph().setBold(true).setForegroundColor('#24415A').setFontSize(8.5);
+    h2.getChild(0).asParagraph().setAlignment(DocumentApp.HorizontalAlignment.CENTER);
 
     for (var i = 0; i < controles.length; i++) {
       var row = tbl.appendTableRow();
       var c1 = row.appendTableCell(String(i + 1) + '. ' + controles[i]);
       var valor = String(fila[startIdx + i] || '');
       var c2 = row.appendTableCell(valor);
-      c1.setBackgroundColor('#F5FAFD').setPaddingTop(4).setPaddingBottom(4);
-      c2.setPaddingTop(4).setPaddingBottom(4);
-      c2.getChild(0).asParagraph().setAlignment(DocumentApp.HorizontalAlignment.CENTER);
-      if (valor === 'Con Novedad') c2.setBackgroundColor('#FDE8E8');
-      else if (valor === 'Sin Novedad') c2.setBackgroundColor('#EEF8F2');
-    }
 
-    var novIdx = startIdx + controles.length;
-    body.appendParagraph('');
-    body.appendParagraph('NOVEDAD / OBSERVACIÓN GENERAL')
-      .setBold(true)
-      .setForegroundColor('#159447')
-      .setFontSize(11);
-    body.appendParagraph(String(fila[novIdx] || 'Sin Novedad'));
+      c1.setBackgroundColor('#F8FBFD').setPaddingTop(2).setPaddingBottom(2).setPaddingLeft(5).setPaddingRight(5);
+      c2.setPaddingTop(2).setPaddingBottom(2).setPaddingLeft(5).setPaddingRight(5);
+      c1.getChild(0).asParagraph().setFontSize(8.2).setForegroundColor('#24415A');
+      c2.getChild(0).asParagraph().setFontSize(8.2).setAlignment(DocumentApp.HorizontalAlignment.CENTER);
 
-    // ---------------------------------------------------------
-    // FOTOS: 2 POR HOJA.
-    // Cada foto está dentro de un marco y centrada horizontal
-    // y verticalmente en su mitad de la página.
-    // ---------------------------------------------------------
-    var idsFotos = data.fotosIds || [];
-    if (idsFotos.length) {
-      body.appendPageBreak();
-      body.appendParagraph('REGISTRO FOTOGRÁFICO')
-        .setAlignment(DocumentApp.HorizontalAlignment.CENTER)
-        .setBold(true)
-        .setForegroundColor('#0065BC')
-        .setFontSize(15);
-
-      for (var p = 0; p < idsFotos.length; p += 2) {
-        var fotosPagina = body.appendTable();
-        fotosPagina.setBorderWidth(1).setBorderColor('#159447');
-
-        for (var q = 0; q < 2; q++) {
-          var filaFoto = fotosPagina.appendTableRow();
-          filaFoto.setMinimumHeight(330);
-          var celda = filaFoto.appendTableCell();
-          celda.setBackgroundColor('#F7FBFD');
-          celda.setPaddingTop(8).setPaddingBottom(8).setPaddingLeft(8).setPaddingRight(8);
-          celda.setVerticalAlignment(DocumentApp.VerticalAlignment.CENTER);
-
-          if (idsFotos[p + q]) {
-            var imgPar = celda.appendParagraph('');
-            imgPar.setAlignment(DocumentApp.HorizontalAlignment.CENTER);
-            var img = imgPar.appendInlineImage(
-              DriveApp.getFileById(idsFotos[p + q]).getBlob()
-            );
-
-            var maxW = 700;
-            var maxH = 450;
-            var iw = img.getWidth();
-            var ih = img.getHeight();
-            var scale = Math.min(maxW / iw, maxH / ih);
-            img.setWidth(Math.round(iw * scale));
-            img.setHeight(Math.round(ih * scale));
-
-            celda.appendParagraph('Vista ' + (p + q + 1))
-              .setAlignment(DocumentApp.HorizontalAlignment.CENTER)
-              .setBold(true)
-              .setForegroundColor('#315E94')
-              .setFontSize(9);
-          }
-        }
-
-        if (p + 2 < idsFotos.length) body.appendPageBreak();
+      if (valor === 'Con Novedad') {
+        c2.setBackgroundColor('#FCECEC');
+        c2.getChild(0).asParagraph().setBold(true).setForegroundColor('#C62828');
+      } else if (valor === 'Sin Novedad') {
+        c2.setBackgroundColor('#F3F8F5');
+        c2.getChild(0).asParagraph().setForegroundColor('#344054');
       }
     }
 
-    body.appendParagraph('');
+    var novIdx = startIdx + controles.length;
+    body.appendParagraph('').setFontSize(3);
+
+    var novTitle = body.appendParagraph('NOVEDAD / OBSERVACIÓN GENERAL');
+    novTitle.setBold(true).setForegroundColor('#24415A').setFontSize(10.5);
+
+    var novPar = body.appendParagraph(String(fila[novIdx] || 'Sin Novedad'));
+    novPar.setFontSize(8.5).setForegroundColor('#24415A');
+
+    // Resumen visual: las novedades deben resaltar claramente.
+    var novedades = [];
+    for (var ni = 0; ni < controles.length; ni++) {
+      if (String(fila[startIdx + ni] || '') === 'Con Novedad') {
+        novedades.push(controles[ni]);
+      }
+    }
+
+    if (novedades.length) {
+      var resumen = body.appendTable();
+      var rr = resumen.appendTableRow();
+      var rc1 = rr.appendTableCell('CON NOVEDAD');
+      var rc2 = rr.appendTableCell(novedades.join(' · '));
+      rc1.setBackgroundColor('#FCECEC').setPaddingTop(3).setPaddingBottom(3).setPaddingLeft(5).setPaddingRight(5);
+      rc2.setBackgroundColor('#FFF9F9').setPaddingTop(3).setPaddingBottom(3).setPaddingLeft(5).setPaddingRight(5);
+      rc1.getChild(0).asParagraph().setBold(true).setForegroundColor('#C62828').setFontSize(8.5);
+      rc2.getChild(0).asParagraph().setFontSize(8.5).setForegroundColor('#24415A');
+    }
+
+    // =========================================================
+    // REGISTRO FOTOGRÁFICO
+    // Las 4 fotos se presentan juntas en una cuadrícula 2 x 2.
+    // =========================================================
+    var idsFotos = data.fotosIds || [];
+    if (idsFotos.length) {
+      body.appendPageBreak();
+
+      var fotoTitulo = body.appendParagraph('REGISTRO FOTOGRÁFICO');
+      fotoTitulo.setAlignment(DocumentApp.HorizontalAlignment.CENTER)
+        .setBold(true).setForegroundColor('#24415A').setFontSize(15);
+
+      var fotoSub = body.appendParagraph('CONTROL N.º ' + String(data.id) + ' · EVIDENCIA VISUAL');
+      fotoSub.setAlignment(DocumentApp.HorizontalAlignment.CENTER)
+        .setBold(true).setForegroundColor('#0878C9').setFontSize(8.5);
+
+      body.appendParagraph('').setFontSize(3);
+
+      var fotosTabla = body.appendTable();
+      fotosTabla.setBorderWidth(1).setBorderColor('#AAB8C5');
+
+      for (var p = 0; p < idsFotos.length; p += 2) {
+        var filaFotos = fotosTabla.appendTableRow();
+        filaFotos.setMinimumHeight(245);
+
+        for (var q = 0; q < 2; q++) {
+          var celdaFoto = filaFotos.appendTableCell();
+          celdaFoto.setBackgroundColor('#F8FBFD');
+          celdaFoto.setPaddingTop(6).setPaddingBottom(5).setPaddingLeft(6).setPaddingRight(6);
+          celdaFoto.setVerticalAlignment(DocumentApp.VerticalAlignment.CENTER);
+
+          if (idsFotos[p + q]) {
+            var imgPar2 = celdaFoto.appendParagraph('');
+            imgPar2.setAlignment(DocumentApp.HorizontalAlignment.CENTER);
+
+            var img2 = imgPar2.appendInlineImage(
+              DriveApp.getFileById(idsFotos[p + q]).getBlob()
+            );
+
+            var maxW2 = 300;
+            var maxH2 = 225;
+            var iw2 = img2.getWidth();
+            var ih2 = img2.getHeight();
+            var scale2 = Math.min(maxW2 / iw2, maxH2 / ih2);
+            img2.setWidth(Math.round(iw2 * scale2));
+            img2.setHeight(Math.round(ih2 * scale2));
+
+            var cap2 = celdaFoto.appendParagraph('Vista ' + (p + q + 1));
+            cap2.setAlignment(DocumentApp.HorizontalAlignment.CENTER)
+              .setBold(true).setForegroundColor('#24415A').setFontSize(8.5);
+          }
+        }
+      }
+    }
+
+    body.appendParagraph('').setFontSize(3);
     body.appendParagraph('Informe generado automáticamente por DELBEN SGI')
       .setAlignment(DocumentApp.HorizontalAlignment.CENTER)
       .setForegroundColor('#7A8FA3')
-      .setFontSize(8);
+      .setFontSize(7.5);
 
     doc.saveAndClose();
 
@@ -757,64 +810,6 @@ function enviarControlPorCorreo_(data) {
     if (doc) {
       try { DriveApp.getFileById(doc.getId()).setTrashed(true); } catch (_) {}
     }
-    return {ok:false,error:String(e && e.message ? e.message : e)};
-  }
-}
-
-function probarPDFControlMovilesSoloUsuario() {
-  var filesTemp = [];
-  try {
-    var folder = DriveApp.getFolderById(FOLDER_ID_FOTOS_MOVILES);
-    var logoBlob = obtenerLogoBlob_();
-
-    var f1 = folder.createFile(logoBlob.copyBlob().setName('PRUEBA_PDF_VISTA_1.jpg'));
-    var f2 = folder.createFile(logoBlob.copyBlob().setName('PRUEBA_PDF_VISTA_2.jpg'));
-    filesTemp.push(f1, f2);
-
-    var fila = [
-      'PRUEBA-001',
-      '01/10/2026',
-      'JUEVES',
-      '08:30',
-      'PERSONA DE PRUEBA',
-      '30.123.456',
-      '9999',
-      'GUARDIA ENTRANTE',
-      'OBJETIVO DE PRUEBA',
-      'Combustible',
-      'ABC-123 (Toyota Hilux)',
-      '125430',
-      'Sin Novedad','Sin Novedad','Sin Novedad','Sin Novedad',
-      'Sin Novedad','Sin Novedad','Sin Novedad','Sin Novedad',
-      'Sin Novedad','Sin Novedad','Sin Novedad','Sin Novedad',
-      'Sin Novedad','Sin Novedad','Sin Novedad','Sin Novedad',
-      'Sin Novedad','Sin Novedad',
-      'Prueba de PDF'
-    ];
-
-    var resultado = enviarControlPorCorreo_({
-      id: 'PRUEBA-PDF',
-      hoja: 'PRUEBA',
-      tipo: 'Combustible',
-      fila: fila,
-      supervisor: {nombre:'Fernando Jacyno',correo:'fjacyno@ktl-seguridad.com'},
-      empresa: 'KTL Seguridad',
-      fotosIds: [f1.getId(), f2.getId()],
-      fotosUrls: [f1.getUrl(), f2.getUrl()],
-      linksFotos: f1.getUrl() + ', ' + f2.getUrl(),
-      modoPrueba: true,
-      destinatarioPrueba: 'fjacyno@ktl-seguridad.com'
-    });
-
-    filesTemp.forEach(function(file) {
-      try { file.setTrashed(true); } catch (_) {}
-    });
-
-    return resultado;
-  } catch (e) {
-    filesTemp.forEach(function(file) {
-      try { file.setTrashed(true); } catch (_) {}
-    });
     return {ok:false,error:String(e && e.message ? e.message : e)};
   }
 }
