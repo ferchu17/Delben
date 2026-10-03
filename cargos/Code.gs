@@ -973,7 +973,7 @@ function rpcHtmlResponse_(id, ok, value) {
   var html =
     '<!doctype html><html><head><meta charset="utf-8"></head><body>' +
     '<script>' +
-    'window.parent.postMessage(' + payload + ', "https://ferchu17.github.io");' +
+    'window.top.postMessage(' + payload + ', "https://ferchu17.github.io");' +
     '<\/script>' +
     '</body></html>';
 
