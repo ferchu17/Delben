@@ -904,6 +904,7 @@ function diagnosticoSistema() {
 /** Puente RPC para ejecutar este módulo desde GitHub Pages. */
 function doPost(e) {
   var id = '';
+
   try {
     var fn = '';
     var args = [];
@@ -911,16 +912,20 @@ function doPost(e) {
     if (e && e.parameter && e.parameter.fn) {
       fn = String(e.parameter.fn || '');
       id = String(e.parameter.id || '');
-      var rawArgs = String(e.parameter.args || '[]');
-      args = JSON.parse(rawArgs);
+      args = JSON.parse(String(e.parameter.args || '[]'));
     } else {
-      var body = e && e.postData && e.postData.contents ? JSON.parse(e.postData.contents) : {};
+      var body = e && e.postData && e.postData.contents
+        ? JSON.parse(e.postData.contents)
+        : {};
       fn = String(body.fn || '');
       id = String(body.id || '');
       args = Array.isArray(body.args) ? body.args : [];
     }
 
-    if (!fn || !/^[A-Za-z_$][A-Za-z0-9_$]*$/.test(fn)) throw new Error('Función RPC inválida.');
+    if (!fn || !/^[A-Za-z_$][A-Za-z0-9_$]*$/.test(fn)) {
+      throw new Error('Función RPC inválida.');
+    }
+
     var RPC = {
       loginUsuario: loginUsuario,
       validarSesion: validarSesion,
@@ -929,17 +934,50 @@ function doPost(e) {
       guardarCargoFirmado: guardarCargoFirmado,
       cargosFirmados: cargosFirmados
     };
+
     var target = RPC[fn];
-    if (typeof target !== 'function') throw new Error('Función no disponible: ' + fn);
+    if (typeof target !== 'function') {
+      throw new Error('Función no disponible: ' + fn);
+    }
+
     if (!Array.isArray(args)) args = [];
+
     var result = target.apply(null, args);
 
-    var payload = JSON.stringify({__delbenCargosRpc:true,id:id,ok:true,result:result});
-    return ContentService.createTextOutput('window.parent.postMessage(' + payload + ', "https://ferchu17.github.io");')
-      .setMimeType(ContentService.MimeType.JAVASCRIPT);
+    return rpcHtmlResponse_(id, true, result);
+
   } catch (err) {
-    var payloadErr = JSON.stringify({__delbenCargosRpc:true,id:id,ok:false,error:String(err && err.message || err)});
-    return ContentService.createTextOutput('window.parent.postMessage(' + payloadErr + ', "https://ferchu17.github.io");')
-      .setMimeType(ContentService.MimeType.JAVASCRIPT);
+    return rpcHtmlResponse_(
+      id,
+      false,
+      String(err && err.message || err)
+    );
   }
+}
+
+/**
+ * Devuelve una página HTML dentro del iframe oculto de GitHub Pages.
+ * Se usa HtmlService en lugar de ContentService/JAVASCRIPT para que
+ * el navegador ejecute el postMessage aun después de la redirección
+ * propia de las web apps de Apps Script.
+ */
+function rpcHtmlResponse_(id, ok, value) {
+  var payload = JSON.stringify({
+    __delbenCargosRpc: true,
+    id: String(id || ''),
+    ok: ok === true,
+    result: ok === true ? value : undefined,
+    error: ok === true ? undefined : String(value || 'Error del backend de Cargos.')
+  });
+
+  var html =
+    '<!doctype html><html><head><meta charset="utf-8"></head><body>' +
+    '<script>' +
+    'window.parent.postMessage(' + payload + ', "https://ferchu17.github.io");' +
+    '<\/script>' +
+    '</body></html>';
+
+  return HtmlService
+    .createHtmlOutput(html)
+    .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
 }
