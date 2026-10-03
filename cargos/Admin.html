@@ -312,7 +312,6 @@ tr.dev td{background:#d3d7dc;font-weight:700}
       if(success){if(ok)ok(value);}else{if(ko)ko(new Error(String(value||'Error del backend de Cargos.')));}
     }
     function onMessage(ev){
-      if(ev.source!==iframe.contentWindow)return;
       var d=ev.data||{};
       if(d && d.__delbenCargosRpc===true && d.id===id){
         finish(d.ok===true,d.ok===true?d.result:d.error);
