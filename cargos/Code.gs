@@ -725,12 +725,16 @@ function enviarCopiaMail_(cargo, pdfBlob, usuario, destino) {
   return 'PDF enviado a ' + para + (ccLista.length ? ' con copia a ' + ccLista.join(', ') : '') + '.';
 }
 
-/** Convierte un enlace de Drive (…/file/d/ID/view) en uno que abre el PDF directo, sin pedir cuenta ni app. */
+/** Convierte un enlace de Drive en el visor de PDF.
+ * Se usa /file/d/ID/view en lugar de /uc?export=view porque en celulares
+ * el endpoint /uc puede ser tratado como descarga. El visor permite
+ * abrir el PDF y utilizar la función nativa Compartir del dispositivo.
+ */
 function pdfDirecto_(url) {
   const u = String(url || '').trim();
   if (!u) return '';
   const m = u.match(/\/d\/([\w-]{15,})/) || u.match(/[?&]id=([\w-]{15,})/);
-  return m ? 'https://drive.google.com/uc?export=view&id=' + m[1] : u;
+  return m ? 'https://drive.google.com/file/d/' + m[1] + '/view' : u;
 }
 
 function driveFolder_() {
