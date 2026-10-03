@@ -292,7 +292,7 @@ tr.dev td{background:#d3d7dc;font-weight:700}
 /* Puente GitHub Pages -> Apps Script para Cargos del Personal. */
 (function(){
   var KEY='delben_cargos_backend';
-  var BACKEND='';
+  var BACKEND='https://script.google.com/macros/s/AKfycbyxjF3eEs9ij94wqSNC-oJTPMdjzLJtRjwM1MYu-T7X-Bwp9iBhHKkyNdqmc-r8f9w/exec';
   try{ BACKEND=localStorage.getItem(KEY)||''; }catch(e){}
   function rpc(fn,args,ok,ko){
     if(!BACKEND){ if(ko)ko(new Error('Falta configurar la URL del backend de Cargos del Personal.')); return; }
