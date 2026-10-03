@@ -901,3 +901,20 @@ function diagnosticoSistema() {
   Logger.log(out.join('\n'));
   return out.join('\n');
 }
+/** Puente RPC para ejecutar este módulo desde GitHub Pages. */
+function doPost(e) {
+  try {
+    var body = e && e.postData && e.postData.contents ? JSON.parse(e.postData.contents) : {};
+    var fn = String(body.fn || '');
+    var args = Array.isArray(body.args) ? body.args : [];
+    if (!fn || !/^[A-Za-z_$][A-Za-z0-9_$]*$/.test(fn)) throw new Error('Función RPC inválida.');
+    var target = this[fn];
+    if (typeof target !== 'function') throw new Error('Función no disponible: ' + fn);
+    var result = target.apply(null, args);
+    return ContentService.createTextOutput(JSON.stringify({ok:true,result:result}))
+      .setMimeType(ContentService.MimeType.JSON);
+  } catch (err) {
+    return ContentService.createTextOutput(JSON.stringify({ok:false,error:String(err && err.message || err)}))
+      .setMimeType(ContentService.MimeType.JSON);
+  }
+}
