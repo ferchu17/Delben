@@ -903,18 +903,43 @@ function diagnosticoSistema() {
 }
 /** Puente RPC para ejecutar este módulo desde GitHub Pages. */
 function doPost(e) {
+  var id = '';
   try {
-    var body = e && e.postData && e.postData.contents ? JSON.parse(e.postData.contents) : {};
-    var fn = String(body.fn || '');
-    var args = Array.isArray(body.args) ? body.args : [];
+    var fn = '';
+    var args = [];
+
+    if (e && e.parameter && e.parameter.fn) {
+      fn = String(e.parameter.fn || '');
+      id = String(e.parameter.id || '');
+      var rawArgs = String(e.parameter.args || '[]');
+      args = JSON.parse(rawArgs);
+    } else {
+      var body = e && e.postData && e.postData.contents ? JSON.parse(e.postData.contents) : {};
+      fn = String(body.fn || '');
+      id = String(body.id || '');
+      args = Array.isArray(body.args) ? body.args : [];
+    }
+
     if (!fn || !/^[A-Za-z_$][A-Za-z0-9_$]*$/.test(fn)) throw new Error('Función RPC inválida.');
-    var target = this[fn];
+    var RPC = {
+      loginUsuario: loginUsuario,
+      validarSesion: validarSesion,
+      cerrarSesion: cerrarSesion,
+      getCatalogos: getCatalogos,
+      guardarCargoFirmado: guardarCargoFirmado,
+      cargosFirmados: cargosFirmados
+    };
+    var target = RPC[fn];
     if (typeof target !== 'function') throw new Error('Función no disponible: ' + fn);
+    if (!Array.isArray(args)) args = [];
     var result = target.apply(null, args);
-    return ContentService.createTextOutput(JSON.stringify({ok:true,result:result}))
-      .setMimeType(ContentService.MimeType.JSON);
+
+    var payload = JSON.stringify({__delbenCargosRpc:true,id:id,ok:true,result:result});
+    return ContentService.createTextOutput('window.parent.postMessage(' + payload + ', "https://ferchu17.github.io");')
+      .setMimeType(ContentService.MimeType.JAVASCRIPT);
   } catch (err) {
-    return ContentService.createTextOutput(JSON.stringify({ok:false,error:String(err && err.message || err)}))
-      .setMimeType(ContentService.MimeType.JSON);
+    var payloadErr = JSON.stringify({__delbenCargosRpc:true,id:id,ok:false,error:String(err && err.message || err)});
+    return ContentService.createTextOutput('window.parent.postMessage(' + payloadErr + ', "https://ferchu17.github.io");')
+      .setMimeType(ContentService.MimeType.JAVASCRIPT);
   }
 }
