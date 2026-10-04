@@ -295,7 +295,7 @@ tr.dev td{background:#d3d7dc;font-weight:700}
 (function(){
   var KEY='delben_cargos_backend';
   var BACKEND='https://script.google.com/macros/s/AKfycbyxjF3eEs9ij94wqSNC-oJTPMdjzLJtRjwM1MYu-T7X-Bwp9iBhHKkyNdqmc-r8f9w/exec';
-  try{ var savedBackend=localStorage.getItem(KEY)||''; if(savedBackend) BACKEND=savedBackend; }catch(e){}
+  try{ localStorage.removeItem(KEY); }catch(e){}
   var seq=0;
 
   function rpc(fn,args,ok,ko){
