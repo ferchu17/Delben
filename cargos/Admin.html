@@ -828,7 +828,7 @@ async function enviar(){
 
 function abrirPdf(){
   if (!S.last || !S.last.pdf) return toast('No hay un PDF disponible.');
-  const m = String(S.last.pdf).match(/\/d\/([\\w-]{15,})/) || String(S.last.pdf).match(/[?&]id=([\\w-]{15,})/);
+  const m = String(S.last.pdf).match(/\/d\/([^/?#]+)/) || String(S.last.pdf).match(/[?&]id=([^&#]+)/);
   if (!m) return toast('No se pudo identificar el PDF.');
   const backend = (window.__CARGOS_BACKEND_URL__ || '').trim();
   if (!backend) return toast('No está configurado el backend de Cargos.');
