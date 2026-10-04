@@ -290,45 +290,63 @@ tr.dev td{background:#d3d7dc;font-weight:700}
 
 <script>
 /* Puente GitHub Pages -> Apps Script para Cargos del Personal.
-   Usa JSONP por GET para evitar CORS y no abrir la pantalla del Web App de Google. */
+   Usa POST en iframe oculto: la firma digital es grande y no debe enviarse por URL (GET/JSONP). */
 (function(){
   var KEY='delben_cargos_backend';
   var BACKEND='https://script.google.com/macros/s/AKfycbxMPvbI0GmgJzKTsjy1XJujE24JgotrWyTG617UcDgRUE2PjzAsnMD8lQY1-YFgx-fq/exec';
-  try{ localStorage.removeItem(KEY); }catch(e){}
-  var seq=0;
+  try {
+    var guardada=localStorage.getItem(KEY);
+    if(guardada) BACKEND=guardada;
+  } catch(e) {}
+  var seq=0, pendientes={};
 
   function rpc(fn,args,ok,ko){
     if(!BACKEND){ if(ko)ko(new Error('Falta configurar la URL del backend de Cargos del Personal.')); return; }
-    var id='cargo_rpc_'+Date.now()+'_'+(++seq);
-    var cb='__delbenCargoCb_'+Date.now()+'_'+seq;
-    var script=document.createElement('script');
-    var done=false;
+    var id='cargo_rpc_'+Date.now()+'_'+(++seq)+'_'+Math.random().toString(36).slice(2);
+    var iframe=document.createElement('iframe');
+    var form=document.createElement('form');
+    var finalizado=false;
+    iframe.name=id;
+    iframe.style.display='none';
+    iframe.setAttribute('aria-hidden','true');
+    form.method='POST';
+    form.action=BACKEND;
+    form.target=id;
+    form.style.display='none';
 
+    function campo(nombre,valor){
+      var input=document.createElement('input');
+      input.type='hidden'; input.name=nombre; input.value=String(valor==null?'':valor);
+      form.appendChild(input);
+    }
     function finish(success,value){
-      if(done)return; done=true;
-      try{ delete window[cb]; }catch(e){ window[cb]=undefined; }
-      if(script.parentNode) script.parentNode.removeChild(script);
-      if(success){ if(ok)ok(value); }
-      else { if(ko)ko(new Error(String(value||'Error del backend de Cargos.'))); }
+      if(finalizado)return;
+      finalizado=true;
+      clearTimeout(pendientes[id] && pendientes[id].timer);
+      delete pendientes[id];
+      try{window.removeEventListener('message',onMessage);}catch(e){}
+      if(form.parentNode)form.parentNode.removeChild(form);
+      if(iframe.parentNode)iframe.parentNode.removeChild(iframe);
+      if(success){if(ok)ok(value);}
+      else if(ko){ko(new Error(String(value||'Error del backend de Cargos.')));}
+    }
+    function onMessage(event){
+      var d=event && event.data;
+      if(!d || d.__delbenCargosRpc!==true || String(d.id)!==id)return;
+      finish(d.ok===true,d.ok===true?d.result:d.error);
     }
 
-    window[cb]=function(d){
-      if(!d || d.__delbenCargosRpc!==true || String(d.id)!==String(id)) return;
-      finish(d.ok===true,d.ok===true?d.result:d.error);
-    };
-
-    script.onerror=function(){ finish(false,'No se pudo comunicar con el backend de Cargos.'); };
-    script.src=BACKEND+
-      '?rpc=1&fn='+encodeURIComponent(fn)+
-      '&args='+encodeURIComponent(JSON.stringify(args||[]))+
-      '&id='+encodeURIComponent(id)+
-      '&callback='+encodeURIComponent(cb);
-    script.async=true;
-    document.head.appendChild(script);
-
-    setTimeout(function(){
-      finish(false,'Tiempo de espera agotado al comunicarse con el backend de Cargos.');
-    },30000);
+    window.addEventListener('message',onMessage);
+    pendientes[id]={timer:setTimeout(function(){
+      finish(false,'Tiempo de espera agotado al comunicarse con el backend de Cargos. Verificá que la implementación de Apps Script esté actualizada.');
+    },60000)};
+    campo('fn',fn);
+    campo('id',id);
+    campo('args',JSON.stringify(args||[]));
+    document.body.appendChild(iframe);
+    document.body.appendChild(form);
+    try{form.submit();}
+    catch(e){finish(false,e && e.message ? e.message : e);}
   }
 
   function runner(ok,ko){
@@ -346,7 +364,11 @@ tr.dev td{background:#d3d7dc;font-weight:700}
   window.google=window.google||{};
   window.google.script=window.google.script||{};
   window.google.script.run=runner(null,null);
-  window.setCargosBackendUrl=function(url){BACKEND=String(url||'').trim();try{localStorage.setItem(KEY,BACKEND);}catch(e){}return BACKEND;};
+  window.setCargosBackendUrl=function(url){
+    BACKEND=String(url||'').trim();
+    try{localStorage.setItem(KEY,BACKEND);}catch(e){}
+    return BACKEND;
+  };
   window.getCargosBackendUrl=function(){return BACKEND;};
 })();
 /* Si tenés el archivo del logo DELBEN, pegá acá su base64 completo (data:image/png;base64,...)
@@ -803,7 +825,17 @@ async function enviar(){
   }
 }
 
-function abrirPdf(){ if (S.last && S.last.pdf) window.open(S.last.pdf, '_blank'); }
+function abrirPdf(){
+  if (!S.last || !S.last.pdf) return;
+  const url = String(S.last.pdf);
+  const m = url.match(/\\/d\\/([\\w-]{15,})/) || url.match(/[?&]id=([\\w-]{15,})/);
+  const backend = (typeof getCargosBackendUrl === 'function') ? getCargosBackendUrl() : '';
+  if (m && backend) {
+    window.open(backend + '?pdf=' + encodeURIComponent(m[1]), '_blank');
+  } else {
+    window.open(url, '_blank');
+  }
+}
 function compartir(){
   if (!S.last) return;
   const dv = S.last.modo === 'devolucion';
