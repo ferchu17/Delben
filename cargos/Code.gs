@@ -929,10 +929,9 @@ function diagnosticoSistema() {
       observaciones: '', supervisor: 'diagnóstico', lpFirma: '1', items: [{ item: 'Ítem de prueba', codigo: 'X', cantidad: 1 }] }, png, 'Supervisor', '1234567');
     return 'PDF cargo de ' + bytes.length + ' bytes · página ' + pag + ' · PDF devolución de ' + bd.getBytes().length + ' bytes';
   });
-  paso('Permiso de email', function () { return 'cuota diaria restante: ' + MailApp.getRemainingDailyQuota(); });
   paso('Permiso de Gmail (Enviados)', function () {
     GmailApp.getAliases(); // fuerza la autorización de Gmail
-    return 'envía desde ' + Session.getEffectiveUser().getEmail() + ' y los correos quedan en Enviados';
+    return 'Gmail autorizado; envía desde ' + Session.getEffectiveUser().getEmail() + ' y los correos quedan en Enviados';
   });
   paso('Columna de email en Personal', function () {
     const t = leerTabla_(hoja_(fuenteSs_(), CFG.SHEET_PERSONAL), {
