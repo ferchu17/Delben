@@ -335,24 +335,6 @@ tr.dev td{background:#d3d7dc;font-weight:700}
   window.setCargosBackendUrl=function(url){BACKEND=String(url||'').trim();try{localStorage.setItem(KEY,BACKEND);}catch(e){}return BACKEND;};
   window.getCargosBackendUrl=function(){return BACKEND;};
 })();
-
-  function runner(ok,ko){
-    var base={
-      withSuccessHandler:function(f){return runner(f,ko);},
-      withFailureHandler:function(f){return runner(ok,f);},
-      withUserObject:function(){return runner(ok,ko);}
-    };
-    return new Proxy(base,{get:function(t,p){
-      if(p in t)return t[p];
-      if(p==='then')return undefined;
-      return function(){rpc(String(p),Array.prototype.slice.call(arguments),ok,ko);};
-    }});
-  }
-  window.google=window.google||{};
-  window.google.script=window.google.script||{};
-  window.google.script.run=runner(null,null);
-  window.setCargosBackendUrl=function(url){BACKEND=String(url||'').trim();try{localStorage.setItem(KEY,BACKEND);}catch(e){}return BACKEND;};
-  window.getCargosBackendUrl=function(){return BACKEND;};
 })();
 /* Si tenés el archivo del logo DELBEN, pegá acá su base64 completo (data:image/png;base64,...)
    y reemplaza al logo de texto de la pantalla inicial. */
