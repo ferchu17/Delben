@@ -302,7 +302,7 @@ tr.dev td{background:#d3d7dc;font-weight:700}
   try {
     var KEY='delben_cargos_backend';
     var DEFAULT='https://script.google.com/macros/s/AKfcybyxjF3Es9ij94wqSNC-oJTPMdjzLJtRjwM1MYu-T7X-Bwp9iBhHKkyNdqmc-r8f9w/exec';
-    window.__CARGOS_BACKEND_URL__ = localStorage.getItem(KEY) || DEFAULT;
+    window.__CARGOS_BACKEND_URL__ = DEFAULT; try { localStorage.setItem(KEY, DEFAULT); } catch(e) {}
   } catch(e) {
     window.__CARGOS_BACKEND_URL__ = 'https://script.google.com/macros/s/AKfcybyxjF3Es9ij94wqSNC-oJTPMdjzLJtRjwM1MYu-T7X-Bwp9iBhHKkyNdqmc-r8f9w/exec';
   }
@@ -315,7 +315,7 @@ tr.dev td{background:#d3d7dc;font-weight:700}
 (function(){
   var KEY='delben_cargos_backend';
   var BACKEND='https://script.google.com/macros/s/AKfcybyxjF3Es9ij94wqSNC-oJTPMdjzLJtRjwM1MYu-T7X-Bwp9iBhHKkyNdqmc-r8f9w/exec';
-  try{ var savedBackend=localStorage.getItem(KEY)||''; if(savedBackend) BACKEND=savedBackend; }catch(e){}
+  try{ localStorage.setItem(KEY,BACKEND); }catch(e){}
   var seq=0;
 
   function rpc(fn,args,ok,ko){
