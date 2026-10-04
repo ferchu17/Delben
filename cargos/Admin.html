@@ -299,10 +299,13 @@ tr.dev td{background:#d3d7dc;font-weight:700}
 <script>
 /* URL del backend usada también por el visor de PDF sin acceso directo a Drive. */
 (function(){
-  var KEY='delben_cargos_backend';
-  var BACKEND='https://script.google.com/macros/s/AKfcybyxjF3Es9ij94wqSNC-oJTPMdjzLJtRjwM1MYu-T7X-Bwp9iBhHKkyNdqmc-r8f9w/exec';
-  try { localStorage.setItem(KEY, BACKEND); } catch(e) {}
-  window.__CARGOS_BACKEND_URL__ = BACKEND;
+  try {
+    var KEY='delben_cargos_backend';
+    var DEFAULT='https://script.google.com/macros/s/AKfcybyxjF3Es9ij94wqSNC-oJTPMdjzLJtRjwM1MYu-T7X-Bwp9iBhHKkyNdqmc-r8f9w/exec';
+    window.__CARGOS_BACKEND_URL__ = localStorage.getItem(KEY) || DEFAULT;
+  } catch(e) {
+    window.__CARGOS_BACKEND_URL__ = 'https://script.google.com/macros/s/AKfcybyxjF3Es9ij94wqSNC-oJTPMdjzLJtRjwM1MYu-T7X-Bwp9iBhHKkyNdqmc-r8f9w/exec';
+  }
 })();
 </script>
 <script>
@@ -312,7 +315,7 @@ tr.dev td{background:#d3d7dc;font-weight:700}
 (function(){
   var KEY='delben_cargos_backend';
   var BACKEND='https://script.google.com/macros/s/AKfcybyxjF3Es9ij94wqSNC-oJTPMdjzLJtRjwM1MYu-T7X-Bwp9iBhHKkyNdqmc-r8f9w/exec';
-  try{ localStorage.setItem(KEY, BACKEND); }catch(e){}
+  try{ var savedBackend=localStorage.getItem(KEY)||''; if(savedBackend) BACKEND=savedBackend; }catch(e){}
   var seq=0;
 
   function rpc(fn,args,ok,ko){
