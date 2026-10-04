@@ -231,6 +231,14 @@ tr.dev td{background:#d3d7dc;font-weight:700}
     <button class="btn ghost" onclick="show('home')">Volver al inicio</button>
   </section>
 
+  <!-- VISOR PDF -->
+  <section id="v-pdf" class="card hidden">
+    <div class="bar"><h2>PDF firmado</h2><button class="btn ghost sm" onclick="cerrarPdfYVolver()">Volver al inicio</button></div>
+    <div class="muted" style="margin-bottom:8px">Desde aquí podés ver el PDF y usar las opciones de compartir del dispositivo.</div>
+    <iframe id="pdfFrame" title="PDF firmado" style="width:100%;height:70vh;min-height:520px;border:2px solid var(--green);border-radius:12px;background:#fff" allow="fullscreen"></iframe>
+    <button class="btn ghost" onclick="cerrarPdfYVolver()">VOLVER AL INICIO</button>
+  </section>
+
   <!-- CARGOS FIRMADOS -->
   <section id="v-firmados" class="card hidden">
     <div class="bar"><h2>Cargos firmados</h2><button class="btn ghost sm" onclick="show('home')">Volver</button></div>
@@ -806,7 +814,15 @@ async function enviar(){
   }
 }
 
-function abrirPdf(){ if (S.last && S.last.pdf) window.open(S.last.pdf, '_blank'); }
+function abrirPdf(){
+  if (!S.last || !S.last.pdf) return toast('No hay un PDF disponible.');
+  $('pdfFrame').src = S.last.pdf;
+  show('pdf');
+}
+function cerrarPdfYVolver(){
+  $('pdfFrame').src = 'about:blank';
+  show('home');
+}
 function compartir(){
   if (!S.last) return;
   const dv = S.last.modo === 'devolucion';
