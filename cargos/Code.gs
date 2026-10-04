@@ -75,25 +75,33 @@ const TXT_P2 = 'Se hace constar respecto a calzados acorde al CCT 501/07 última
 function doGet(e) {
   const id = String((e && e.parameter && e.parameter.pdf) || '').trim();
 
-  // Visor PDF: entrega el contenido del archivo desde Apps Script, sin pedir
-  // al usuario permisos sobre Drive.
+  // Visor PDF: entrega el PDF desde Apps Script, sin exponer el archivo de Drive
+  // ni pedir al usuario permisos sobre Drive.
   if (id) {
     try {
-      if (!/^[\\w-]{15,}$/.test(id)) throw new Error('PDF no válido.');
+      if (!/^[\w-]{15,}$/.test(id)) throw new Error('PDF no válido.');
 
-      const blob = DriveApp.getFileById(id).getBlob();
+      const file = DriveApp.getFileById(id);
+      const blob = file.getBlob();
       const b64 = Utilities.base64Encode(blob.getBytes());
+      const nombre = esc_(file.getName());
+
+      // Se incrusta directamente el PDF, sin un segundo iframe.
       const html =
-        '<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">' +
-        '<title>PDF firmado</title>' +
-        '<style>html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#fff}iframe{width:100%;height:100%;border:0}</style>' +
-        '</head><body><iframe title="PDF firmado" src="data:application/pdf;base64,' + b64 + '"></iframe></body></html>';
+        '<!doctype html><html><head><meta charset="utf-8">' +
+        '<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">' +
+        '<title>' + nombre + '</title>' +
+        '<style>html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#fff}' +
+        'embed{display:block;width:100%;height:100%;border:0}</style></head>' +
+        '<body><embed type="application/pdf" title="' + nombre + '" src="data:application/pdf;base64,' + b64 + '">' +
+        '</body></html>';
 
       return HtmlService.createHtmlOutput(html)
         .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
     } catch (err) {
       return HtmlService.createHtmlOutput(
-        '<!doctype html><html><body style="font-family:Arial;padding:30px;color:#a0001c">No se pudo mostrar el PDF.</body></html>'
+        '<!doctype html><html><body style="font-family:Arial;padding:30px;color:#a0001c">' +
+        'No se pudo mostrar el PDF: ' + esc_(err.message || err) + '</body></html>'
       ).setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
     }
   }
@@ -103,7 +111,6 @@ function doGet(e) {
     .addMetaTag('viewport', 'width=device-width, initial-scale=1, viewport-fit=cover')
     .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
 }
-
 /* =========================================================
    UTILIDADES
    ========================================================= */
@@ -819,19 +826,19 @@ function actaPdf_(cargo, firmaDataUrl, aclaracion, dniFirma) {
   const titulo = dev ? 'ACTA DE DEVOLUCIÓN DE INDUMENTARIA' : 'ACTA DE ENTREGA Y RECEPCIÓN DE INDUMENTARIA';
 
   const cuerpo = dev
-    ? '<p style="text-align:justify;margin:8px 0">' + esc_(TXT_DEV) + '</p>'
-    : '<p style="text-align:justify;margin:8px 0">' + esc_(TXT_P1) + '</p>' +
-      '<p style="text-align:justify;margin:8px 0">' + esc_(TXT_P2) + '</p>';
+    ? '<p style="font-size:12px;line-height:1.45;text-align:justify;margin:8px 0">' + esc_(TXT_DEV) + '</p>'
+    : '<p style="font-size:12px;line-height:1.45;text-align:justify;margin:8px 0">' + esc_(TXT_P1) + '</p>' +
+      '<p style="font-size:12px;line-height:1.45;text-align:justify;margin:8px 0">' + esc_(TXT_P2) + '</p>';
 
   const datos = dev
-    ? '<p style="font-size:11px;margin:16px 0 4px"><b>Recibí de:</b> ' + esc_(cargo.nombre) +
+    ? '<p style="font-size:13px;margin:16px 0 4px"><b>Recibí de:</b> ' + esc_(cargo.nombre) +
         '&nbsp;&nbsp;&nbsp;&nbsp;<b>DNI:</b> ' + esc_(cargo.dni) +
         '&nbsp;&nbsp;&nbsp;&nbsp;<b>LP:</b> ' + esc_(cargo.lp) +
         '&nbsp;&nbsp;&nbsp;&nbsp;<b>Empresa:</b> ' + esc_(cargo.empresa) + '</p>' +
-      '<p style="font-size:11px;margin:4px 0 6px"><b>Servicio:</b> ' + esc_(cargo.objetivo) + '</p>' +
-      '<p style="font-size:11px;margin:6px 0 8px"><b>Se recibe en devolución:</b></p>'
-    : '<p style="font-size:11px;margin:16px 0 6px"><b>Objetivo:</b> ' + esc_(cargo.objetivo) + '</p>' +
-      '<p style="font-size:11px;margin:6px 0 8px"><b>Se hace entrega de:</b></p>';
+      '<p style="font-size:13px;margin:4px 0 6px"><b>Servicio:</b> ' + esc_(cargo.objetivo) + '</p>' +
+      '<p style="font-size:13px;margin:6px 0 8px"><b>Se recibe en devolución:</b></p>'
+    : '<p style="font-size:13px;margin:16px 0 6px"><b>Objetivo:</b> ' + esc_(cargo.objetivo) + '</p>' +
+      '<p style="font-size:13px;margin:6px 0 8px"><b>Se hace entrega de:</b></p>';
 
   const pieFirma = dev
     ? '<p style="font-size:11px;margin:20px 0 2px"><b>Firma del supervisor:</b></p>' +
@@ -852,10 +859,10 @@ function actaPdf_(cargo, firmaDataUrl, aclaracion, dniFirma) {
 
     '<table style="width:100%"><tr>' +
       '<td style="vertical-align:top"><img src="' + logoKtlSrc_() + '" height="58"></td>' +
-      '<td style="text-align:right;vertical-align:bottom;font-weight:bold;font-size:11px">' + esc_(fechaTexto_(cargo.fecha)) + sello + '</td>' +
+      '<td style="text-align:right;vertical-align:bottom;font-weight:bold;font-size:13px">' + esc_(fechaTexto_(cargo.fecha)) + sello + '</td>' +
     '</tr></table>' +
 
-    '<div style="text-align:center;font-size:14px;font-weight:bold;margin:18px 0 14px">' + titulo + '</div>' +
+    '<div style="text-align:center;font-size:16px;font-weight:bold;margin:18px 0 14px">' + titulo + '</div>' +
 
     cuerpo + datos +
 
