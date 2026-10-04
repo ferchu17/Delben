@@ -73,44 +73,36 @@ const TXT_P2 = 'Se hace constar respecto a calzados acorde al CCT 501/07 última
    ========================================================= */
 
 function doGet(e) {
-  const id = String((e && e.parameter && e.parameter.pdf) || '').trim();
-
-  // Visor PDF: entrega el PDF desde Apps Script, sin exponer el archivo de Drive
-  // ni pedir al usuario permisos sobre Drive.
-  if (id) {
+  const p = (e && e.parameter) || {};
+  if (String(p.rpc || '') === '1') {
+    const id=String(p.id||''), callback=String(p.callback||'');
     try {
-      if (!/^[\w-]{15,}$/.test(id)) throw new Error('PDF no válido.');
-
-      const file = DriveApp.getFileById(id);
-      const blob = file.getBlob();
-      const b64 = Utilities.base64Encode(blob.getBytes());
-      const nombre = esc_(file.getName());
-
-      // Se incrusta directamente el PDF, sin un segundo iframe.
-      const html =
-        '<!doctype html><html><head><meta charset="utf-8">' +
-        '<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">' +
-        '<title>' + nombre + '</title>' +
-        '<style>html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#fff}' +
-        'embed{display:block;width:100%;height:100%;border:0}</style></head>' +
-        '<body><embed type="application/pdf" title="' + nombre + '" src="data:application/pdf;base64,' + b64 + '">' +
-        '</body></html>';
-
-      return HtmlService.createHtmlOutput(html)
-        .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
-    } catch (err) {
-      return HtmlService.createHtmlOutput(
-        '<!doctype html><html><body style="font-family:Arial;padding:30px;color:#a0001c">' +
-        'No se pudo mostrar el PDF: ' + esc_(err.message || err) + '</body></html>'
-      ).setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
+      const fn=String(p.fn||''), args=JSON.parse(String(p.args||'[]'));
+      if(!/^[A-Za-z_$][A-Za-z0-9_$]*$/.test(fn)) throw new Error('Función RPC inválida.');
+      if(!/^[A-Za-z_$][A-Za-z0-9_$]*$/.test(callback)) throw new Error('Callback RPC inválido.');
+      if(!Array.isArray(args)) throw new Error('Argumentos RPC inválidos.');
+      const RPC={loginUsuario:loginUsuario,validarSesion:validarSesion,cerrarSesion:cerrarSesion,getCatalogos:getCatalogos,guardarCargoFirmado:guardarCargoFirmado,cargosFirmados:cargosFirmados};
+      const target=RPC[fn]; if(typeof target!=='function') throw new Error('Función no disponible: '+fn);
+      const payload=JSON.stringify({__delbenCargosRpc:true,id:id,ok:true,result:target.apply(null,args)});
+      return ContentService.createTextOutput(callback+'('+payload+');').setMimeType(ContentService.MimeType.JAVASCRIPT);
+    } catch(err) {
+      if(!/^[A-Za-z_$][A-Za-z0-9_$]*$/.test(callback)) return ContentService.createTextOutput('/* RPC inválido */').setMimeType(ContentService.MimeType.JAVASCRIPT);
+      const payload=JSON.stringify({__delbenCargosRpc:true,id:id,ok:false,error:String(err&&err.message||err)});
+      return ContentService.createTextOutput(callback+'('+payload+');').setMimeType(ContentService.MimeType.JAVASCRIPT);
     }
   }
-
-  return HtmlService.createHtmlOutputFromFile('Admin')
-    .setTitle(CFG.APP_TITLE)
-    .addMetaTag('viewport', 'width=device-width, initial-scale=1, viewport-fit=cover')
-    .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
+  const id=String(p.pdf||'').trim();
+  if(id){
+    try{
+      if(!/^[\w-]{15,}$/.test(id)) throw new Error('PDF no válido.');
+      const file=DriveApp.getFileById(id), blob=file.getBlob(), b64=Utilities.base64Encode(blob.getBytes()), nombre=esc_(file.getName());
+      const html='<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><title>'+nombre+'</title><style>html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#fff}embed{display:block;width:100%;height:100%;border:0}</style></head><body><embed type="application/pdf" title="'+nombre+'" src="data:application/pdf;base64,'+b64+'"></body></html>';
+      return HtmlService.createHtmlOutput(html).setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
+    }catch(err){return HtmlService.createHtmlOutput('<!doctype html><html><body style="font-family:Arial;padding:30px;color:#a0001c">No se pudo mostrar el PDF: '+esc_(err.message||err)+'</body></html>').setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);}
+  }
+  return HtmlService.createHtmlOutputFromFile('Admin').setTitle(CFG.APP_TITLE).addMetaTag('viewport','width=device-width, initial-scale=1, viewport-fit=cover').setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
 }
+
 /* =========================================================
    UTILIDADES
    ========================================================= */
