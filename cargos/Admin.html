@@ -828,7 +828,7 @@ async function enviar(){
 function abrirPdf(){
   if (!S.last || !S.last.pdf) return;
   const url = String(S.last.pdf);
-  const m = url.match(/\\/d\\/([\\w-]{15,})/) || url.match(/[?&]id=([\\w-]{15,})/);
+  const m = url.match(/\/d\/([\w-]{15,})/) || url.match(/[?&]id=([\w-]{15,})/);
   const backend = (typeof getCargosBackendUrl === 'function') ? getCargosBackendUrl() : '';
   if (m && backend) {
     window.open(backend + '?pdf=' + encodeURIComponent(m[1]), '_blank');
