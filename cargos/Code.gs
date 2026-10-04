@@ -905,6 +905,32 @@ function diagnosticoSistema() {
   Logger.log(out.join('\n'));
   return out.join('\n');
 }
+/** Visor de PDF sin exponer el archivo de Drive al usuario. */
+function doGet(e) {
+  try {
+    var id = String((e && e.parameter && e.parameter.pdf) || '').trim();
+    if (!/^[\\w-]{15,}$/.test(id)) {
+      return HtmlService.createHtmlOutput('<!doctype html><html><body style="font-family:Arial;padding:30px">PDF no válido.</body></html>')
+        .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
+    }
+
+    var blob = DriveApp.getFileById(id).getBlob();
+    var b64 = Utilities.base64Encode(blob.getBytes());
+    var html =
+      '<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">' +
+      '<title>PDF firmado</title>' +
+      '<style>html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#fff}iframe{width:100%;height:100%;border:0}</style>' +
+      '</head><body><iframe title="PDF firmado" src="data:application/pdf;base64,' + b64 + '"></iframe></body></html>';
+
+    return HtmlService.createHtmlOutput(html)
+      .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
+  } catch (err) {
+    return HtmlService.createHtmlOutput(
+      '<!doctype html><html><body style="font-family:Arial;padding:30px;color:#a0001c">No se pudo mostrar el PDF.</body></html>'
+    ).setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
+  }
+}
+
 /** Puente RPC para ejecutar este módulo desde GitHub Pages. */
 function doPost(e) {
   var id = '';
