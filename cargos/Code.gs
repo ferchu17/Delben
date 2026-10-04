@@ -72,7 +72,32 @@ const TXT_P2 = 'Se hace constar respecto a calzados acorde al CCT 501/07 última
    ENTRADA
    ========================================================= */
 
-function doGet() {
+function doGet(e) {
+  const id = String((e && e.parameter && e.parameter.pdf) || '').trim();
+
+  // Visor PDF: entrega el contenido del archivo desde Apps Script, sin pedir
+  // al usuario permisos sobre Drive.
+  if (id) {
+    try {
+      if (!/^[\\w-]{15,}$/.test(id)) throw new Error('PDF no válido.');
+
+      const blob = DriveApp.getFileById(id).getBlob();
+      const b64 = Utilities.base64Encode(blob.getBytes());
+      const html =
+        '<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">' +
+        '<title>PDF firmado</title>' +
+        '<style>html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#fff}iframe{width:100%;height:100%;border:0}</style>' +
+        '</head><body><iframe title="PDF firmado" src="data:application/pdf;base64,' + b64 + '"></iframe></body></html>';
+
+      return HtmlService.createHtmlOutput(html)
+        .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
+    } catch (err) {
+      return HtmlService.createHtmlOutput(
+        '<!doctype html><html><body style="font-family:Arial;padding:30px;color:#a0001c">No se pudo mostrar el PDF.</body></html>'
+      ).setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
+    }
+  }
+
   return HtmlService.createHtmlOutputFromFile('Admin')
     .setTitle(CFG.APP_TITLE)
     .addMetaTag('viewport', 'width=device-width, initial-scale=1, viewport-fit=cover')
@@ -679,7 +704,9 @@ function enviarCopiaMail_(cargo, pdfBlob, usuario, destino) {
   const RE = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
   const dev = cargo.tipo === 'devolucion';
   const dest = String(destino || '').trim();
-  if (dest && !RE.test(dest)) return 'El email del destinatario no es válido: no se envió el PDF.';
+  if (dest && !RE.test(dest)) {
+    throw new Error('El email del destinatario no es válido: ' + dest);
+  }
 
   const copia = String(CFG.EMAIL_COPIA || '').trim();
   const usados = {};
@@ -690,10 +717,15 @@ function enviarCopiaMail_(cargo, pdfBlob, usuario, destino) {
     usados[k] = true;
     return m;
   };
-  const para = unico(dest) || unico(copia);      // sin destinatario, el documento igual llega a la copia fija
+
+  const para = unico(dest) || unico(copia);
   const ccLista = [];
-  [usuario.email, copia].forEach(function (m) { const u = unico(m); if (u) ccLista.push(u); });
-  if (!para) return '';
+  [usuario.email, copia].forEach(function (m) {
+    const u = unico(m);
+    if (u) ccLista.push(u);
+  });
+
+  if (!para) throw new Error('No hay ningún destinatario de email válido.');
 
   const opts = {
     htmlBody: dev
@@ -709,6 +741,7 @@ function enviarCopiaMail_(cargo, pdfBlob, usuario, destino) {
     name: CFG.APP_TITLE
   };
   if (ccLista.length) opts.cc = ccLista.join(',');
+
   const asunto = dev
     ? 'DEVOLUCIÓN de indumentaria N° ' + cargo.id + ' – ' + cargo.nombre
     : 'Cargo de entrega de indumentaria N° ' + cargo.id + ' – ' + cargo.nombre;
@@ -716,12 +749,21 @@ function enviarCopiaMail_(cargo, pdfBlob, usuario, destino) {
     ? 'Se adjunta la devolución de indumentaria firmada N° ' + cargo.id + ' de ' + cargo.nombre + '.'
     : 'Se adjunta el cargo firmado N° ' + cargo.id + ' de ' + cargo.nombre + '.';
 
+  // IMPORTANTE: usar GmailApp y no ocultar el error con MailApp.
+  // Así el correo queda en "Enviados" de la cuenta que ejecuta la aplicación
+  // y, si falla, el usuario recibe el motivo real en lugar de un falso "enviado".
   try {
-    GmailApp.sendEmail(para, asunto, texto, opts);   // queda en "Enviados" de la cuenta que ejecuta
+    GmailApp.getAliases(); // fuerza/valida el permiso de Gmail antes del envío.
+    GmailApp.sendEmail(para, asunto, texto, opts);
   } catch (e) {
-    MailApp.sendEmail({ to: para, subject: asunto, body: texto, htmlBody: opts.htmlBody,
-      attachments: opts.attachments, name: opts.name, cc: opts.cc });
+    const detalle = String(e && e.message || e);
+    throw new Error(
+      'Gmail no pudo enviar el PDF. Destinatario: ' + para +
+      (ccLista.length ? ' | CC: ' + ccLista.join(', ') : '') +
+      ' | Motivo: ' + detalle
+    );
   }
+
   return 'PDF enviado a ' + para + (ccLista.length ? ' con copia a ' + ccLista.join(', ') : '') + '.';
 }
 
@@ -905,32 +947,6 @@ function diagnosticoSistema() {
   Logger.log(out.join('\n'));
   return out.join('\n');
 }
-/** Visor de PDF sin exponer el archivo de Drive al usuario. */
-function doGet(e) {
-  try {
-    var id = String((e && e.parameter && e.parameter.pdf) || '').trim();
-    if (!/^[\\w-]{15,}$/.test(id)) {
-      return HtmlService.createHtmlOutput('<!doctype html><html><body style="font-family:Arial;padding:30px">PDF no válido.</body></html>')
-        .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
-    }
-
-    var blob = DriveApp.getFileById(id).getBlob();
-    var b64 = Utilities.base64Encode(blob.getBytes());
-    var html =
-      '<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">' +
-      '<title>PDF firmado</title>' +
-      '<style>html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#fff}iframe{width:100%;height:100%;border:0}</style>' +
-      '</head><body><iframe title="PDF firmado" src="data:application/pdf;base64,' + b64 + '"></iframe></body></html>';
-
-    return HtmlService.createHtmlOutput(html)
-      .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
-  } catch (err) {
-    return HtmlService.createHtmlOutput(
-      '<!doctype html><html><body style="font-family:Arial;padding:30px;color:#a0001c">No se pudo mostrar el PDF.</body></html>'
-    ).setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
-  }
-}
-
 /** Puente RPC para ejecutar este módulo desde GitHub Pages. */
 function doPost(e) {
   var id = '';
