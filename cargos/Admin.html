@@ -297,6 +297,18 @@ tr.dev td{background:#d3d7dc;font-weight:700}
 <div id="toast" class="hidden"></div>
 
 <script>
+/* URL del backend usada también por el visor de PDF sin acceso directo a Drive. */
+(function(){
+  try {
+    var KEY='delben_cargos_backend';
+    var DEFAULT='https://script.google.com/macros/s/AKfcybyxjF3eEs9ij94wqSNC-oJTPMdjzLJtRjwM1MYu-T7X-Bwp9iBhHKkyNdqmc-r8f9w/exec';
+    window.__CARGOS_BACKEND_URL__ = localStorage.getItem(KEY) || DEFAULT;
+  } catch(e) {
+    window.__CARGOS_BACKEND_URL__ = 'https://script.google.com/macros/s/AKfcybyxjF3eEs9ij94wqSNC-oJTPMdjzLJtRjwM1MYu-T7X-Bwp9iBhHKkyNdqmc-r8f9w/exec';
+  }
+})();
+</script>
+<script>
 /* Puente GitHub Pages -> Apps Script para Cargos del Personal.
    Se usa POST mediante formulario + iframe porque fetch/XHR desde GitHub Pages
    no puede leer directamente la respuesta redirigida de ContentService por CORS. */
@@ -816,7 +828,11 @@ async function enviar(){
 
 function abrirPdf(){
   if (!S.last || !S.last.pdf) return toast('No hay un PDF disponible.');
-  $('pdfFrame').src = S.last.pdf;
+  const m = String(S.last.pdf).match(/\/d\/([\\w-]{15,})/) || String(S.last.pdf).match(/[?&]id=([\\w-]{15,})/);
+  if (!m) return toast('No se pudo identificar el PDF.');
+  const backend = (window.__CARGOS_BACKEND_URL__ || '').trim();
+  if (!backend) return toast('No está configurado el backend de Cargos.');
+  $('pdfFrame').src = backend + '?pdf=' + encodeURIComponent(m[1]);
   show('pdf');
 }
 function cerrarPdfYVolver(){
