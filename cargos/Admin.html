@@ -299,6 +299,36 @@ tr.dev td{background:#d3d7dc;font-weight:700}
   function rpc(fn,args,ok,ko){
     if(!BACKEND){ if(ko)ko(new Error('Falta configurar la URL del backend de Cargos del Personal.')); return; }
     var id='cargo_rpc_'+Date.now()+'_'+(++seq)+'_'+Math.random().toString(36).slice(2);
+
+    /* Las operaciones livianas usan JSONP, que no requiere actualizar doPost.
+       Solo el guardado firmado usa POST porque puede contener una firma grande. */
+    if(fn !== 'guardarCargoFirmado'){
+      var script=document.createElement('script');
+      var cb='__delbenCargoCb_'+Date.now()+'_'+seq;
+      var terminado=false;
+      var timer=setTimeout(function(){finishGet(false,'Tiempo de espera agotado al comunicarse con el backend de Cargos.');},30000);
+      function finishGet(success,value){
+        if(terminado)return;
+        terminado=true;
+        clearTimeout(timer);
+        try{delete window[cb];}catch(e){window[cb]=undefined;}
+        if(script.parentNode)script.parentNode.removeChild(script);
+        if(success){if(ok)ok(value);}
+        else if(ko)ko(new Error(String(value||'Error del backend de Cargos.')));
+      }
+      window[cb]=function(d){
+        if(!d || d.__delbenCargosRpc!==true || String(d.id)!==String(id))return;
+        finishGet(d.ok===true,d.ok===true?d.result:d.error);
+      };
+      script.onerror=function(){finishGet(false,'No se pudo comunicar con el backend de Cargos.');};
+      script.src=BACKEND+'?rpc=1&fn='+encodeURIComponent(fn)+
+        '&args='+encodeURIComponent(JSON.stringify(args||[]))+
+        '&id='+encodeURIComponent(id)+'&callback='+encodeURIComponent(cb);
+      script.async=true;
+      document.head.appendChild(script);
+      return;
+    }
+
     var iframe=document.createElement('iframe');
     var form=document.createElement('form');
     var finalizado=false;
