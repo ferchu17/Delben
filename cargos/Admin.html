@@ -826,14 +826,26 @@ async function enviar(){
   }
 }
 
+function pdfIdFromUrl(url){
+  const s = String(url || '');
+  const m = s.match(/\/d\/([^/?#]+)/) || s.match(/[?&]id=([^&#]+)/);
+  return m ? m[1] : '';
+}
+function urlVisorPdf(url){
+  const id = pdfIdFromUrl(url);
+  const backend = (window.__CARGOS_BACKEND_URL__ || '').trim();
+  if (!id || !backend) return '';
+  return backend + '?pdf=' + encodeURIComponent(id);
+}
+function abrirPdfUrl(url){
+  const visor = urlVisorPdf(url);
+  if (!visor) return toast('No se pudo identificar el PDF.');
+  $('pdfFrame').src = visor;
+  show('pdf');
+}
 function abrirPdf(){
   if (!S.last || !S.last.pdf) return toast('No hay un PDF disponible.');
-  const m = String(S.last.pdf).match(/\/d\/([^/?#]+)/) || String(S.last.pdf).match(/[?&]id=([^&#]+)/);
-  if (!m) return toast('No se pudo identificar el PDF.');
-  const backend = (window.__CARGOS_BACKEND_URL__ || '').trim();
-  if (!backend) return toast('No está configurado el backend de Cargos.');
-  $('pdfFrame').src = backend + '?pdf=' + encodeURIComponent(m[1]);
-  show('pdf');
+  abrirPdfUrl(S.last.pdf);
 }
 function cerrarPdfYVolver(){
   $('pdfFrame').src = 'about:blank';
@@ -843,8 +855,13 @@ function compartir(){
   if (!S.last) return;
   const dv = S.last.modo === 'devolucion';
   const txt = (dv ? 'Devolución N° ' + S.last.id + ' firmada – ' : 'Cargo N° ' + S.last.id + ' firmado – ') + S.last.nombre;
-  if (navigator.share) { navigator.share({ title: dv ? 'Devolución firmada' : 'Cargo firmado', text: txt, url: S.last.pdf }).catch(() => {}); return; }
-  window.open('https://wa.me/?text=' + encodeURIComponent(txt + ' ' + S.last.pdf), '_blank');
+  const visor = urlVisorPdf(S.last.pdf);
+  if (!visor) return toast('No se pudo identificar el PDF.');
+  if (navigator.share) {
+    navigator.share({ title: dv ? 'Devolución firmada' : 'Cargo firmado', text: txt, url: visor }).catch(() => {});
+    return;
+  }
+  window.open('https://wa.me/?text=' + encodeURIComponent(txt + ' ' + visor), '_blank');
 }
 
 /* ---------- pantalla de firma ---------- */
@@ -1047,7 +1064,7 @@ function verCargo(key){
     (c.pdf ? '<div class="okmsg" style="margin-top:12px">✔ ' + (dv ? 'Devolución firmada' : 'Cargo firmado') + '</div>' +
     '<button class="btn green" id="mPdf">ABRIR PDF FIRMADO</button>'
     : '<div class="err" style="margin-top:12px">Este registro no tiene PDF guardado en la planilla.</div>');
-  if (c.pdf) $('mPdf').addEventListener('click', () => window.open(c.pdf, '_blank'));
+  if (c.pdf) $('mPdf').addEventListener('click', () => abrirPdfUrl(c.pdf));
   $('modal').classList.remove('hidden');
 }
 function cerrarModal(){ $('modal').classList.add('hidden'); }
