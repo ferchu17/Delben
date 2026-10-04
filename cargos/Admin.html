@@ -290,8 +290,7 @@ tr.dev td{background:#d3d7dc;font-weight:700}
 
 <script>
 /* Puente GitHub Pages -> Apps Script para Cargos del Personal.
-   Se usa POST mediante formulario + iframe porque fetch/XHR desde GitHub Pages
-   no puede leer directamente la respuesta redirigida de ContentService por CORS. */
+   Usa JSONP por GET para evitar CORS y no abrir la pantalla del Web App de Google. */
 (function(){
   var KEY='delben_cargos_backend';
   var BACKEND='https://script.google.com/macros/s/AKfycbxMPvbI0GmgJzKTsjy1XJujE24JgotrWyTG617UcDgRUE2PjzAsnMD8lQY1-YFgx-fq/exec';
@@ -301,38 +300,35 @@ tr.dev td{background:#d3d7dc;font-weight:700}
   function rpc(fn,args,ok,ko){
     if(!BACKEND){ if(ko)ko(new Error('Falta configurar la URL del backend de Cargos del Personal.')); return; }
     var id='cargo_rpc_'+Date.now()+'_'+(++seq);
-    var iframe=document.createElement('iframe');
-    iframe.name=id; iframe.style.display='none'; document.body.appendChild(iframe);
-
+    var cb='__delbenCargoCb_'+Date.now()+'_'+seq;
+    var script=document.createElement('script');
     var done=false;
+
     function finish(success,value){
       if(done)return; done=true;
-      window.removeEventListener('message',onMessage);
-      setTimeout(function(){try{iframe.remove();}catch(e){}},0);
-      if(success){if(ok)ok(value);}else{if(ko)ko(new Error(String(value||'Error del backend de Cargos.')));}
+      try{ delete window[cb]; }catch(e){ window[cb]=undefined; }
+      if(script.parentNode) script.parentNode.removeChild(script);
+      if(success){ if(ok)ok(value); }
+      else { if(ko)ko(new Error(String(value||'Error del backend de Cargos.'))); }
     }
-    function onMessage(ev){
-      if(ev.source!==iframe.contentWindow)return;
-      var d=ev.data||{};
-      if(d && d.__delbenCargosRpc===true && d.id===id){
-        finish(d.ok===true,d.ok===true?d.result:d.error);
-      }
-    }
-    window.addEventListener('message',onMessage);
 
-    var form=document.createElement('form');
-    form.method='POST'; form.action=BACKEND; form.target=id; form.style.display='none';
-    function field(name,value){
-      var input=document.createElement('input');
-      input.type='hidden'; input.name=name; input.value=String(value==null?'':value);
-      form.appendChild(input);
-    }
-    field('fn',fn);
-    field('args',JSON.stringify(args||[]));
-    field('id',id);
-    document.body.appendChild(form);
-    try{form.submit();}catch(err){finish(false,err.message||err);}
-    setTimeout(function(){finish(false,'Tiempo de espera agotado al comunicarse con el backend de Cargos.');},30000);
+    window[cb]=function(d){
+      if(!d || d.__delbenCargosRpc!==true || String(d.id)!==String(id)) return;
+      finish(d.ok===true,d.ok===true?d.result:d.error);
+    };
+
+    script.onerror=function(){ finish(false,'No se pudo comunicar con el backend de Cargos.'); };
+    script.src=BACKEND+
+      '?rpc=1&fn='+encodeURIComponent(fn)+
+      '&args='+encodeURIComponent(JSON.stringify(args||[]))+
+      '&id='+encodeURIComponent(id)+
+      '&callback='+encodeURIComponent(cb);
+    script.async=true;
+    document.head.appendChild(script);
+
+    setTimeout(function(){
+      finish(false,'Tiempo de espera agotado al comunicarse con el backend de Cargos.');
+    },30000);
   }
 
   function runner(ok,ko){
