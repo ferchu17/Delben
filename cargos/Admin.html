@@ -515,6 +515,9 @@ async function cargarCatalogos(){
     const r = await gs('getCatalogos', S.token);
     S.emp = (r.empleados || []).map(x => Object.assign(x, { _n: nrm(x.nombre + ' ' + x.dni + ' ' + x.lp) }));
     S.inv = (r.inventario || []).map(x => Object.assign(x, { _n: nrm(x.item + ' ' + x.codigo) }));
+    // Todo lo que tenga la palabra "tintorería" va al final del listado (el resto conserva su orden)
+    const esTint = x => nrm(x.item).indexOf('tintoreria') >= 0;
+    S.inv = S.inv.filter(x => !esTint(x)).concat(S.inv.filter(esTint));
     S.obj = (r.objetivos || []).map(x => ({ t: x, _n: nrm(x) }));
     S.loaded = true;
     $('catMsg').className = 'hidden'; $('catMsg').textContent = '';
