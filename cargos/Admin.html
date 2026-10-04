@@ -310,49 +310,31 @@ tr.dev td{background:#d3d7dc;font-weight:700}
 </script>
 <script>
 /* Puente GitHub Pages -> Apps Script para Cargos del Personal.
-   Se usa POST mediante formulario + iframe porque fetch/XHR desde GitHub Pages
-   no puede leer directamente la respuesta redirigida de ContentService por CORS. */
+   Usa JSONP mediante <script src> para evitar CORS/redirects de Apps Script.
+   No depende de iframe, fetch ni cookies de terceros. */
 (function(){
   var KEY='delben_cargos_backend';
   var BACKEND='https://script.google.com/macros/s/AKfcybyxjF3Es9ij94wqSNC-oJTPMdjzLJtRjwM1MYu-T7X-Bwp9iBhHKkyNdqmc-r8f9w/exec';
   try{ localStorage.setItem(KEY,BACKEND); }catch(e){}
   var seq=0;
-
   function rpc(fn,args,ok,ko){
     if(!BACKEND){ if(ko)ko(new Error('Falta configurar la URL del backend de Cargos del Personal.')); return; }
-    var id='cargo_rpc_'+Date.now()+'_'+(++seq);
-    var iframe=document.createElement('iframe');
-    iframe.name=id; iframe.style.display='none'; document.body.appendChild(iframe);
-
-    var done=false;
-    function finish(success,value){
-      if(done)return; done=true;
-      window.removeEventListener('message',onMessage);
-      setTimeout(function(){try{iframe.remove();}catch(e){}},0);
-      if(success){if(ok)ok(value);}else{if(ko)ko(new Error(String(value||'Error del backend de Cargos.')));}
-    }
-    function onMessage(ev){
-      var d=ev.data||{};
-      if(d && d.__delbenCargosRpc===true && d.id===id){
-        finish(d.ok===true,d.ok===true?d.result:d.error);
-      }
-    }
-    window.addEventListener('message',onMessage);
-
-    var form=document.createElement('form');
-    form.method='POST'; form.action=BACKEND; form.target=id; form.style.display='none';
-    function field(name,value){
-      var input=document.createElement('input');
-      input.type='hidden'; input.name=name; input.value=String(value==null?'':value);
-      form.appendChild(input);
-    }
-    field('fn',fn);
-    field('args',JSON.stringify(args||[]));
-    field('id',id);
-    document.body.appendChild(form);
-    try{form.submit();}catch(err){finish(false,err.message||err);}
-    setTimeout(function(){finish(false,'Tiempo de espera agotado al comunicarse con el backend de Cargos.');},30000);
+    var id='cargo_rpc_'+Date.now()+'_'+(++seq), cb='__cargosRpc_'+id.replace(/[^A-Za-z0-9_$]/g,'_');
+    var script=document.createElement('script'), done=false;
+    var timer=setTimeout(function(){finish(false,'Tiempo de espera agotado al comunicarse con el backend de Cargos.');},30000);
+    function cleanup(){clearTimeout(timer);try{delete window[cb];}catch(e){window[cb]=undefined;}if(script.parentNode)script.parentNode.removeChild(script);}
+    function finish(success,value){if(done)return;done=true;cleanup();if(success){if(ok)ok(value);}else{if(ko)ko(new Error(String(value||'Error del backend de Cargos.')));}}
+    window[cb]=function(payload){if(!payload||payload.id!==id)return;finish(payload.ok===true,payload.ok===true?payload.result:payload.error);};
+    script.async=true;
+    script.src=BACKEND+'?rpc=1&fn='+encodeURIComponent(fn)+'&args='+encodeURIComponent(JSON.stringify(args||[]))+'&id='+encodeURIComponent(id)+'&callback='+encodeURIComponent(cb);
+    script.onerror=function(){finish(false,'No se pudo cargar la respuesta del backend de Cargos.');};
+    (document.head||document.documentElement).appendChild(script);
   }
+  function runner(ok,ko){var base={withSuccessHandler:function(f){return runner(f,ko);},withFailureHandler:function(f){return runner(ok,f);},withUserObject:function(){return runner(ok,ko);}};return new Proxy(base,{get:function(t,p){if(p in t)return t[p];if(p==='then')return undefined;return function(){rpc(String(p),Array.prototype.slice.call(arguments),ok,ko);};}});}
+  window.google=window.google||{};window.google.script=window.google.script||{};window.google.script.run=runner(null,null);
+  window.setCargosBackendUrl=function(url){BACKEND=String(url||'').trim();try{localStorage.setItem(KEY,BACKEND);}catch(e){}return BACKEND;};
+  window.getCargosBackendUrl=function(){return BACKEND;};
+})();
 
   function runner(ok,ko){
     var base={
