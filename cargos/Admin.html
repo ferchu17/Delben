@@ -390,6 +390,7 @@ tr.dev td{background:#d3d7dc;font-weight:700}
   window.google=window.google||{};
   window.google.script=window.google.script||{};
   window.google.script.run=runner(null,null);
+  window.__delbenCargoRpc=rpc;
   window.setCargosBackendUrl=function(url){
     BACKEND=String(url||'').trim();
     try{localStorage.setItem(KEY,BACKEND);}catch(e){}
@@ -425,7 +426,11 @@ function fechaTexto(iso){ const p = String(iso).split('-').map(Number); return '
 
 function gs(fn, ...args){
   return new Promise((ok, ko) => {
-    google.script.run.withSuccessHandler(ok).withFailureHandler(ko)[fn](...args);
+    if (typeof window.__delbenCargoRpc !== 'function') {
+      ko(new Error('No se pudo iniciar el puente con el backend de Cargos.'));
+      return;
+    }
+    window.__delbenCargoRpc(fn, args, ok, ko);
   });
 }
 function msgErr(e){ return (e && e.message ? e.message : String(e || 'Ocurrió un error.')).replace(/^Error:\s*/, ''); }
