@@ -945,6 +945,21 @@ function diagnosticoSistema() {
   Logger.log(out.join('\n'));
   return out.join('\n');
 }
+/** Obtiene el PDF guardado como base64 para visualizarlo dentro de Cargos.
+ * No cambia el archivo, el guardado ni el envío de correos.
+ */
+function obtenerPdfBase64(fileId) {
+  var id = String(fileId || '').trim();
+  if (!id) throw new Error('Falta el ID del PDF.');
+  var file = DriveApp.getFileById(id);
+  var blob = file.getBlob();
+  return {
+    nombre: file.getName(),
+    mime: blob.getContentType() || 'application/pdf',
+    base64: Utilities.base64Encode(blob.getBytes())
+  };
+}
+
 /** Visor PDF del módulo Cargos. No modifica la lógica de guardado ni de correo. */
 function doGet(e) {
   try {
@@ -996,7 +1011,8 @@ function doPost(e) {
       cerrarSesion: cerrarSesion,
       getCatalogos: getCatalogos,
       guardarCargoFirmado: guardarCargoFirmado,
-      cargosFirmados: cargosFirmados
+      cargosFirmados: cargosFirmados,
+      obtenerPdfBase64: obtenerPdfBase64
     };
 
     var target = RPC[fn];
