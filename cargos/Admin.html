@@ -854,11 +854,14 @@ async function enviar(){
   }
 }
 
-function abrirPdf(){
+var PDF_VIEW_URL = '';
+
+async function abrirPdf(){
   if (!S.last || !S.last.pdf) return;
   const url = String(S.last.pdf);
   const m = url.match(/\/d\/([\w-]{15,})/) || url.match(/[?&]id=([\w-]{15,})/);
   if (!m) return toast('No se pudo identificar el PDF.');
+
   var visor = document.getElementById('pdfVisor');
   if (!visor) {
     visor = document.createElement('div');
@@ -867,18 +870,48 @@ function abrirPdf(){
     visor.innerHTML =
       '<div class="modalCard" style="max-width:900px;height:92vh;display:flex;flex-direction:column;padding:10px">' +
         '<div class="bar" style="margin-bottom:8px"><h2>PDF firmado</h2><button class="btn ghost sm" type="button" onclick="cerrarPdf()">Cerrar PDF</button></div>' +
-        '<iframe id="pdfFrame" style="width:100%;height:100%;border:2px solid var(--green);border-radius:10px;background:#fff" title="PDF firmado"></iframe>' +
+        '<div id="pdfCargando" class="muted" style="padding:20px;text-align:center">Cargando PDF…</div>' +
+        '<iframe id="pdfFrame" style="width:100%;flex:1;border:2px solid var(--green);border-radius:10px;background:#fff;display:none" title="PDF firmado"></iframe>' +
       '</div>';
     document.body.appendChild(visor);
   }
-  document.getElementById('pdfFrame').src = 'https://drive.google.com/file/d/' + encodeURIComponent(m[1]) + '/preview';
+
   visor.classList.remove('hidden');
+  $('pdfCargando').style.display = 'block';
+  $('pdfFrame').style.display = 'none';
+
+  try {
+    const r = await gs('obtenerPdfBase64', m[1]);
+    if (!r || !r.base64) throw new Error('El backend no devolvió el PDF.');
+
+    if (PDF_VIEW_URL) {
+      try { URL.revokeObjectURL(PDF_VIEW_URL); } catch(e) {}
+      PDF_VIEW_URL = '';
+    }
+
+    const raw = atob(r.base64);
+    const bytes = new Uint8Array(raw.length);
+    for (let i = 0; i < raw.length; i++) bytes[i] = raw.charCodeAt(i);
+    const blob = new Blob([bytes], {type: 'application/pdf'});
+    PDF_VIEW_URL = URL.createObjectURL(blob);
+
+    $('pdfFrame').src = PDF_VIEW_URL;
+    $('pdfFrame').style.display = 'block';
+    $('pdfCargando').style.display = 'none';
+  } catch (e) {
+    $('pdfCargando').textContent = 'No se pudo cargar el PDF: ' + msgErr(e);
+  }
 }
+
 function cerrarPdf(){
   var visor = document.getElementById('pdfVisor');
   var frame = document.getElementById('pdfFrame');
   if (frame) frame.src = 'about:blank';
   if (visor) visor.classList.add('hidden');
+  if (PDF_VIEW_URL) {
+    try { URL.revokeObjectURL(PDF_VIEW_URL); } catch(e) {}
+    PDF_VIEW_URL = '';
+  }
 }
 function compartir(){
   if (!S.last) return;
