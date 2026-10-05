@@ -81,7 +81,7 @@ function doGet(e) {
       if(!/^[A-Za-z_$][A-Za-z0-9_$]*$/.test(fn)) throw new Error('Función RPC inválida.');
       if(!/^[A-Za-z_$][A-Za-z0-9_$]*$/.test(callback)) throw new Error('Callback RPC inválido.');
       if(!Array.isArray(args)) throw new Error('Argumentos RPC inválidos.');
-      const RPC={loginUsuario:loginUsuario,validarSesion:validarSesion,cerrarSesion:cerrarSesion,getCatalogos:getCatalogos,guardarCargoFirmado:guardarCargoFirmado,cargosFirmados:cargosFirmados};
+      const RPC={loginUsuario:loginUsuario,validarSesion:validarSesion,cerrarSesion:cerrarSesion,getCatalogos:getCatalogos,guardarCargoFirmado:guardarCargoFirmado,cargosFirmados:cargosFirmados,obtenerPdfBase64:obtenerPdfBase64};
       const target=RPC[fn]; if(typeof target!=='function') throw new Error('Función no disponible: '+fn);
       const payload=JSON.stringify({__delbenCargosRpc:true,id:id,ok:true,result:target.apply(null,args)});
       return ContentService.createTextOutput(callback+'('+payload+');').setMimeType(ContentService.MimeType.JAVASCRIPT);
@@ -1012,106 +1012,4 @@ function obtenerPdfBase64(fileId) {
     mime: blob.getContentType() || 'application/pdf',
     base64: Utilities.base64Encode(blob.getBytes())
   };
-}
-
-/** Visor PDF del módulo Cargos. No modifica la lógica de guardado ni de correo. */
-function doGet(e) {
-  try {
-    var id = String(e && e.parameter && e.parameter.pdf || '').trim();
-    if (!id) {
-      return HtmlService.createHtmlOutput('<!doctype html><html><body><p>Cargos del Personal</p></body></html>');
-    }
-    var file = DriveApp.getFileById(id);
-    var blob = file.getBlob();
-    var b64 = Utilities.base64Encode(blob.getBytes());
-    var html = '<!doctype html><html><head><meta charset="utf-8"><title>PDF firmado</title>' +
-      '<style>html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#222}iframe{width:100%;height:100%;border:0}</style>' +
-      '</head><body><iframe src="data:application/pdf;base64,' + b64 + '" title="PDF firmado"></iframe></body></html>';
-    return HtmlService.createHtmlOutput(html);
-  } catch (err) {
-    return HtmlService.createHtmlOutput('<!doctype html><html><body style="font-family:Arial;padding:20px">' +
-      '<h3>No se pudo mostrar el PDF</h3><p>' + String(err && err.message || err).replace(/&/g,'&amp;').replace(/</g,'&lt;') + '</p></body></html>');
-  }
-}
-
-/** Puente RPC para ejecutar este módulo desde GitHub Pages. */
-function doPost(e) {
-  var id = '';
-
-  try {
-    var fn = '';
-    var args = [];
-
-    if (e && e.parameter && e.parameter.fn) {
-      fn = String(e.parameter.fn || '');
-      id = String(e.parameter.id || '');
-      args = JSON.parse(String(e.parameter.args || '[]'));
-    } else {
-      var body = e && e.postData && e.postData.contents
-        ? JSON.parse(e.postData.contents)
-        : {};
-      fn = String(body.fn || '');
-      id = String(body.id || '');
-      args = Array.isArray(body.args) ? body.args : [];
-    }
-
-    if (!fn || !/^[A-Za-z_$][A-Za-z0-9_$]*$/.test(fn)) {
-      throw new Error('Función RPC inválida.');
-    }
-
-    var RPC = {
-      loginUsuario: loginUsuario,
-      validarSesion: validarSesion,
-      cerrarSesion: cerrarSesion,
-      getCatalogos: getCatalogos,
-      guardarCargoFirmado: guardarCargoFirmado,
-      cargosFirmados: cargosFirmados,
-      obtenerPdfBase64: obtenerPdfBase64
-    };
-
-    var target = RPC[fn];
-    if (typeof target !== 'function') {
-      throw new Error('Función no disponible: ' + fn);
-    }
-
-    if (!Array.isArray(args)) args = [];
-
-    var result = target.apply(null, args);
-
-    return rpcHtmlResponse_(id, true, result);
-
-  } catch (err) {
-    return rpcHtmlResponse_(
-      id,
-      false,
-      String(err && err.message || err)
-    );
-  }
-}
-
-/**
- * Devuelve una página HTML dentro del iframe oculto de GitHub Pages.
- * Se usa HtmlService en lugar de ContentService/JAVASCRIPT para que
- * el navegador ejecute el postMessage aun después de la redirección
- * propia de las web apps de Apps Script.
- */
-function rpcHtmlResponse_(id, ok, value) {
-  var payload = JSON.stringify({
-    __delbenCargosRpc: true,
-    id: String(id || ''),
-    ok: ok === true,
-    result: ok === true ? value : undefined,
-    error: ok === true ? undefined : String(value || 'Error del backend de Cargos.')
-  });
-
-  var html =
-    '<!doctype html><html><head><meta charset="utf-8"></head><body>' +
-    '<script>' +
-    'window.top.postMessage(' + payload + ', "https://ferchu17.github.io");' +
-    '<\/script>' +
-    '</body></html>';
-
-  return HtmlService
-    .createHtmlOutput(html)
-    .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
 }
