@@ -858,12 +858,27 @@ function abrirPdf(){
   if (!S.last || !S.last.pdf) return;
   const url = String(S.last.pdf);
   const m = url.match(/\/d\/([\w-]{15,})/) || url.match(/[?&]id=([\w-]{15,})/);
-  const backend = (typeof getCargosBackendUrl === 'function') ? getCargosBackendUrl() : '';
-  if (m && backend) {
-    window.open(backend + '?pdf=' + encodeURIComponent(m[1]), '_blank');
-  } else {
-    window.open(url, '_blank');
+  if (!m) return toast('No se pudo identificar el PDF.');
+  var visor = document.getElementById('pdfVisor');
+  if (!visor) {
+    visor = document.createElement('div');
+    visor.id = 'pdfVisor';
+    visor.className = 'modal hidden';
+    visor.innerHTML =
+      '<div class="modalCard" style="max-width:900px;height:92vh;display:flex;flex-direction:column;padding:10px">' +
+        '<div class="bar" style="margin-bottom:8px"><h2>PDF firmado</h2><button class="btn ghost sm" type="button" onclick="cerrarPdf()">Cerrar PDF</button></div>' +
+        '<iframe id="pdfFrame" style="width:100%;height:100%;border:2px solid var(--green);border-radius:10px;background:#fff" title="PDF firmado"></iframe>' +
+      '</div>';
+    document.body.appendChild(visor);
   }
+  document.getElementById('pdfFrame').src = 'https://drive.google.com/file/d/' + encodeURIComponent(m[1]) + '/preview';
+  visor.classList.remove('hidden');
+}
+function cerrarPdf(){
+  var visor = document.getElementById('pdfVisor');
+  var frame = document.getElementById('pdfFrame');
+  if (frame) frame.src = 'about:blank';
+  if (visor) visor.classList.add('hidden');
 }
 function compartir(){
   if (!S.last) return;
