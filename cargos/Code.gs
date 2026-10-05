@@ -104,6 +104,60 @@ function doGet(e) {
 }
 
 /* =========================================================
+   RPC POR POST
+   =========================================================
+   Permite que la versión alojada en GitHub Pages se comunique con Apps Script
+   sin depender de JSONP ni de CORS. La respuesta se envía al iframe oculto
+   mediante postMessage. */
+function salidaRpcPost_(payload) {
+  let s = JSON.stringify(payload)
+    .replace(/</g, '\\u003c')
+    .replace(/>/g, '\\u003e')
+    .replace(/&/g, '\\u0026');
+  const html = '<!doctype html><html><head><meta charset="utf-8"></head><body>' +
+    '<script>window.parent.postMessage(' + s + ',"*");</script>' +
+    '</body></html>';
+  return HtmlService.createHtmlOutput(html)
+    .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
+}
+
+function doPost(e) {
+  const p = (e && e.parameter) || {};
+  const id = String(p.id || '');
+  try {
+    const fn = String(p.fn || '');
+    const args = JSON.parse(String(p.args || '[]'));
+    if (!/^[A-Za-z_$][A-Za-z0-9_$]*$/.test(fn)) throw new Error('Función RPC inválida.');
+    if (!Array.isArray(args)) throw new Error('Argumentos RPC inválidos.');
+
+    const RPC = {
+      loginUsuario: loginUsuario,
+      validarSesion: validarSesion,
+      cerrarSesion: cerrarSesion,
+      getCatalogos: getCatalogos,
+      guardarCargoFirmado: guardarCargoFirmado,
+      cargosFirmados: cargosFirmados
+    };
+    const target = RPC[fn];
+    if (typeof target !== 'function') throw new Error('Función no disponible: ' + fn);
+
+    return salidaRpcPost_({
+      __delbenCargosRpc: true,
+      id: id,
+      ok: true,
+      result: target.apply(null, args)
+    });
+  } catch (err) {
+    return salidaRpcPost_({
+      __delbenCargosRpc: true,
+      id: id,
+      ok: false,
+      error: String(err && err.message || err)
+    });
+  }
+}
+
+/* =========================================================
    UTILIDADES
    ========================================================= */
 
