@@ -300,8 +300,35 @@ tr.dev td{background:#d3d7dc;font-weight:700}
     if(!BACKEND){ if(ko)ko(new Error('Falta configurar la URL del backend de Cargos del Personal.')); return; }
     var id='cargo_rpc_'+Date.now()+'_'+(++seq)+'_'+Math.random().toString(36).slice(2);
 
-    /* Todas las operaciones usan POST en un iframe oculto.
-       El backend de Cargos expone el RPC mediante doPost; no usamos JSONP. */
+    /* Las operaciones livianas usan JSONP, que no requiere actualizar doPost.
+       Solo el guardado firmado usa POST porque puede contener una firma grande. */
+    if(fn !== 'guardarCargoFirmado'){
+      var script=document.createElement('script');
+      var cb='__delbenCargoCb_'+Date.now()+'_'+seq;
+      var terminado=false;
+      var timer=setTimeout(function(){finishGet(false,'Tiempo de espera agotado al comunicarse con el backend de Cargos.');},30000);
+      function finishGet(success,value){
+        if(terminado)return;
+        terminado=true;
+        clearTimeout(timer);
+        try{delete window[cb];}catch(e){window[cb]=undefined;}
+        if(script.parentNode)script.parentNode.removeChild(script);
+        if(success){if(ok)ok(value);}
+        else if(ko)ko(new Error(String(value||'Error del backend de Cargos.')));
+      }
+      window[cb]=function(d){
+        if(!d || d.__delbenCargosRpc!==true || String(d.id)!==String(id))return;
+        finishGet(d.ok===true,d.ok===true?d.result:d.error);
+      };
+      script.onerror=function(){finishGet(false,'No se pudo comunicar con el backend de Cargos.');};
+      script.src=BACKEND+'?rpc=1&fn='+encodeURIComponent(fn)+
+        '&args='+encodeURIComponent(JSON.stringify(args||[]))+
+        '&id='+encodeURIComponent(id)+'&callback='+encodeURIComponent(cb);
+      script.async=true;
+      document.head.appendChild(script);
+      return;
+    }
+
     var iframe=document.createElement('iframe');
     var form=document.createElement('form');
     var finalizado=false;
@@ -971,3 +998,146 @@ function sigMark(p){
     if (!SIG.drawing) return;
     e.preventDefault();
     const p = sigPoint(e), c = pad.getContext('2d');
+    c.beginPath(); c.moveTo(SIG.last.x, SIG.last.y); c.lineTo(p.x, p.y); c.stroke();
+    SIG.last = p; sigMark(p);
+  });
+  ['pointerup', 'pointercancel', 'lostpointercapture'].forEach(ev => pad.addEventListener(ev, () => { SIG.drawing = false; }));
+  const relayout = () => { if (!$('signLayer').classList.contains('hidden')) sigLayout(); };
+  window.addEventListener('resize', relayout);
+  window.addEventListener('orientationchange', () => setTimeout(relayout, 250));
+})();
+
+function confirmSign(){
+  if (!SIG.ink || !SIG.bb) return toast('Primero firmá en el recuadro.');
+  const pad = $('pad'), d = SIG.d, m = 8;
+  const x0 = Math.max(0, Math.floor((SIG.bb.x0 - m) * d)), y0 = Math.max(0, Math.floor((SIG.bb.y0 - m) * d));
+  const x1 = Math.min(pad.width, Math.ceil((SIG.bb.x1 + m) * d)), y1 = Math.min(pad.height, Math.ceil((SIG.bb.y1 + m) * d));
+  const sw = x1 - x0, sh = y1 - y0;
+  if (sw < 12 || sh < 12) return toast('La firma es muy chica. Probá de nuevo.');
+  const k = Math.min(1, 700 / sw);
+  const out = document.createElement('canvas');
+  out.width = Math.round(sw * k); out.height = Math.round(sh * k);
+  const o = out.getContext('2d');
+  o.fillStyle = '#fff'; o.fillRect(0, 0, out.width, out.height);
+  o.drawImage(pad, x0, y0, sw, sh, 0, 0, out.width, out.height);
+  S.firma = out.toDataURL('image/png');
+  closeSign();
+  renderFirma();           // vuelve a la vista normal (vertical) mostrando la firma confirmada
+  toast('Firma confirmada.');
+}
+
+/* ---------- cargos firmados ---------- */
+async function loadFirmados(){
+  show('firmados');
+  $('fLista').className = 'muted'; $('fLista').textContent = 'Cargando…';
+  try {
+    S.cargos = await gs('cargosFirmados', S.token);
+    await cargarCatalogos();
+    armarPersonas();
+    renderFirmados();
+  } catch (e) {
+    $('fLista').className = ''; $('fLista').innerHTML = '';
+    manejarError(e, 'fLista');
+  }
+}
+
+function armarPersonas(){
+  const mapa = {};
+  S.emp.forEach(x => { const k = digits(x.dni) || ('n' + nrm(x.nombre)); mapa[k] = { nombre: x.nombre, dni: x.dni, lp: x.lp, empresa: x.empresa }; });
+  S.cargos.forEach(c => { const k = digits(c.dni) || ('n' + nrm(c.nombre)); if (!mapa[k]) mapa[k] = { nombre: c.nombre, dni: c.dni, lp: c.lp, empresa: c.empresa }; });
+  S.personas = Object.keys(mapa).map(k => Object.assign(mapa[k], { _n: nrm(mapa[k].nombre + ' ' + mapa[k].dni + ' ' + mapa[k].lp) }))
+    .sort((a, b) => a.nombre.localeCompare(b.nombre, 'es'));
+}
+
+$('fPer').addEventListener('input', () => {
+  if (S.fPersona && nrm($('fPer').value) !== nrm(S.fPersona.nombre)) S.fPersona = null;
+  const q = $('fPer').value.trim();
+  if (q) popShow($('fPer'), filtrar(S.personas, q, 40).map(x => ({ label: x.nombre + ' · LP ' + x.lp + ' · DNI ' + x.dni, data: x })), x => {
+    S.fPersona = x; $('fPer').value = x.nombre; renderFirmados();
+  }); else popHide();
+  renderFirmados();
+});
+onBlurHide($('fPer'));
+
+function objFirmSug(){
+  const objs = [...new Set(S.cargos.map(c => c.objetivo).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'es')).map(t => ({ t: t, _n: nrm(t) }));
+  const q = $('fObj').value.trim();
+  popShow($('fObj'), (q ? filtrar(objs, q, 40) : objs.slice(0, 40)).map(x => ({ label: x.t, data: x.t })), t => { $('fObj').value = t; renderFirmados(); });
+}
+$('fObj').addEventListener('input', () => { objFirmSug(); renderFirmados(); });
+$('fObj').addEventListener('focus', objFirmSug);
+onBlurHide($('fObj'));
+$('fFec').addEventListener('input', renderFirmados);
+
+function limpiarBusqueda(){
+  $('fPer').value = ''; $('fFec').value = ''; $('fObj').value = '';
+  S.fPersona = null; popHide(); renderFirmados();
+}
+
+function renderFirmados(){
+  const q = nrm($('fPer').value), fec = $('fFec').value, ob = nrm($('fObj').value);
+  const dniSel = S.fPersona ? digits(S.fPersona.dni) : '';
+  const lista = S.cargos.filter(c => {
+    if (S.fPersona) { if (dniSel ? digits(c.dni) !== dniSel : nrm(c.nombre) !== nrm(S.fPersona.nombre)) return false; }
+    else if (q && !nrm(c.nombre + ' ' + c.dni + ' ' + c.lp).includes(q)) return false;
+    if (fec && c.fechaIso !== fec) return false;
+    if (ob && !nrm(c.objetivo).includes(ob)) return false;
+    return true;
+  });
+
+  $('fPersona').innerHTML = S.fPersona
+    ? '<div class="personaCard"><b style="color:var(--blue);font-size:16px">' + esc(S.fPersona.nombre) + '</b>' +
+      '<div class="grid3" style="margin-top:6px;font-size:14px"><div><b>Empresa</b><br>' + esc(S.fPersona.empresa || '-') + '</div>' +
+      '<div><b>Legajo</b><br>' + esc(S.fPersona.lp || '-') + '</div><div><b>DNI</b><br>' + esc(S.fPersona.dni || '-') + '</div></div></div>'
+    : '';
+
+  const L = $('fLista'); L.className = '';
+  if (!lista.length) { L.innerHTML = '<div class="muted">No hay cargos firmados que coincidan con la búsqueda.</div>'; return; }
+  const nDev = lista.filter(c => c.tipo === 'devolucion').length, nCar = lista.length - nDev;
+  const resumen = nCar + (nCar === 1 ? ' cargo firmado' : ' cargos firmados') + (nDev ? ' · ' + nDev + (nDev === 1 ? ' devolución' : ' devoluciones') : '');
+  L.innerHTML = '<div class="muted" style="margin-bottom:6px">' + resumen + '</div>' +
+    '<div class="scroll"><table><tr><th class="c">N°</th><th class="c">FECHA</th><th>EMPLEADO</th><th>OBJETIVO</th><th class="c">ACCIÓN</th></tr>' +
+    lista.map(c => {
+      const dv = c.tipo === 'devolucion';
+      return '<tr' + (dv ? ' class="dev"' : '') + '><td class="c">' + (dv ? 'DEV. ' : '') + esc(c.id) + '</td><td class="c">' + esc(c.fecha) + '</td><td>' + esc(c.nombre) + '</td><td>' + esc(c.objetivo) +
+        '</td><td class="c"><button class="btn sm" style="padding:8px 10px;font-size:13px" data-key="' + esc(c.key) + '">' + (dv ? 'VER DEVOLUCIÓN' : 'VER CARGO') + '</button></td></tr>';
+    }).join('') +
+    '</table></div>';
+  L.querySelectorAll('button[data-key]').forEach(b => b.addEventListener('click', () => verCargo(b.getAttribute('data-key'))));
+}
+
+function verCargo(key){
+  const c = S.cargos.find(x => String(x.key) === String(key));
+  if (!c) return toast('No se encontró el registro.');
+  const dv = c.tipo === 'devolucion';
+  $('mTitulo').textContent = (dv ? 'Devolución N° ' : 'Cargo N° ') + c.id;
+  $('mBody').innerHTML =
+    '<div class="muted" style="text-align:right;font-weight:700">' + esc(c.fechaIso ? fechaTexto(c.fechaIso) : c.fecha) + '</div>' +
+    (dv ? '<div class="devBanner">DEVOLUCIÓN</div>' : '') +
+    '<h1 class="actaTitle">' + (dv ? 'ACTA DE DEVOLUCIÓN DE INDUMENTARIA' : 'ACTA DE ENTREGA Y RECEPCIÓN DE INDUMENTARIA') + '</h1>' +
+    '<div class="data"><div><b>' + (dv ? 'RECIBÍ DE' : 'EMPLEADO') + '</b>' + esc(c.nombre) + '</div><div><b>LP</b>' + esc(c.lp) + '</div>' +
+    '<div><b>DNI</b>' + esc(c.dni) + '</div><div><b>EMPRESA</b>' + esc(c.empresa) + '</div>' +
+    '<div class="full"><b>' + (dv ? 'SERVICIO' : 'OBJETIVO') + '</b>' + esc(c.objetivo) + '</div>' +
+    (dv && (c.supervisor || c.dniSup) ? '<div class="full"><b>FIRMA EL SUPERVISOR</b>' + esc(c.supervisor) + (c.dniSup ? ' · DNI ' + esc(c.dniSup) : '') + '</div>' : '') +
+    '</div>' +
+    '<h3>' + (dv ? 'Se recibe en devolución:' : 'Se hace entrega de:') + '</h3><div class="scroll"><table><tr><th class="c" style="width:34px">#</th><th class="c" style="width:90px">CÓDIGO</th><th>ÍTEM</th><th class="c" style="width:64px">CANT.</th></tr>' +
+    c.items.map((x, i) => '<tr><td class="c">' + (i + 1) + '</td><td class="c">' + esc(x.codigo) + '</td><td>' + esc(x.item) + '</td><td class="c">' + esc(x.cantidad) + '</td></tr>').join('') + '</table></div>' +
+    (c.observaciones ? '<p class="actaP"><b>Observaciones:</b> ' + esc(c.observaciones) + '</p>' : '') +
+    (c.pdf ? '<div class="okmsg" style="margin-top:12px">✔ ' + (dv ? 'Devolución firmada' : 'Cargo firmado') + '</div>' +
+    '<button class="btn green" id="mPdf">ABRIR PDF FIRMADO</button>'
+    : '<div class="err" style="margin-top:12px">Este registro no tiene PDF guardado en la planilla.</div>');
+  if (c.pdf) $('mPdf').addEventListener('click', () => window.open(c.pdf, '_blank'));
+  $('modal').classList.remove('hidden');
+}
+function cerrarModal(){ $('modal').classList.add('hidden'); }
+
+/* ---------- inicio ---------- */
+$('password').addEventListener('keydown', e => { if (e.key === 'Enter') doLogin(); });
+$('usuario').addEventListener('keydown', e => { if (e.key === 'Enter') $('password').focus(); });
+$('fecha').value = hoyIso();
+initRows();
+show('login');
+restaurarSesion();
+</script>
+</body>
+</html>
