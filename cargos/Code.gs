@@ -945,6 +945,26 @@ function diagnosticoSistema() {
   Logger.log(out.join('\n'));
   return out.join('\n');
 }
+/** Visor PDF del módulo Cargos. No modifica la lógica de guardado ni de correo. */
+function doGet(e) {
+  try {
+    var id = String(e && e.parameter && e.parameter.pdf || '').trim();
+    if (!id) {
+      return HtmlService.createHtmlOutput('<!doctype html><html><body><p>Cargos del Personal</p></body></html>');
+    }
+    var file = DriveApp.getFileById(id);
+    var blob = file.getBlob();
+    var b64 = Utilities.base64Encode(blob.getBytes());
+    var html = '<!doctype html><html><head><meta charset="utf-8"><title>PDF firmado</title>' +
+      '<style>html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#222}iframe{width:100%;height:100%;border:0}</style>' +
+      '</head><body><iframe src="data:application/pdf;base64,' + b64 + '" title="PDF firmado"></iframe></body></html>';
+    return HtmlService.createHtmlOutput(html);
+  } catch (err) {
+    return HtmlService.createHtmlOutput('<!doctype html><html><body style="font-family:Arial;padding:20px">' +
+      '<h3>No se pudo mostrar el PDF</h3><p>' + String(err && err.message || err).replace(/&/g,'&amp;').replace(/</g,'&lt;') + '</p></body></html>');
+  }
+}
+
 /** Puente RPC para ejecutar este módulo desde GitHub Pages. */
 function doPost(e) {
   var id = '';
