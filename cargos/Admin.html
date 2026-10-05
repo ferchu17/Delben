@@ -130,6 +130,16 @@ tr.dev td{background:#d3d7dc;font-weight:700}
 .devBanner{background:#d3d7dc;border:2px solid #7b848d;border-radius:10px;font-weight:800;text-align:center;padding:8px;margin:10px 0;letter-spacing:1px}
 .legend{font-size:12px;color:var(--muted);margin:2px 0 8px}
 .legend i{display:inline-block;width:14px;height:14px;background:#d3d7dc;border:1px solid #7b848d;border-radius:3px;vertical-align:-2px;margin-right:4px}
+
+/* visor de PDF dentro de la página */
+#pdfViewer{position:fixed;left:0;right:0;top:0;bottom:0;z-index:4500;background:#e9eef3;display:flex;flex-direction:column}
+#pdfViewer .pvBar{background:var(--blue);color:#fff;padding:10px 12px;display:flex;align-items:center;justify-content:space-between;gap:8px}
+#pdfViewer .pvBar b{font-size:15px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#pdfViewer .pvBar span{display:flex;gap:8px;flex-shrink:0}
+#pdfViewer .pvBar button{margin:0;padding:8px 12px;font-size:14px;background:#fff;color:var(--blue);border:2px solid var(--green)}
+#pvPages{flex:1;overflow:auto;-webkit-overflow-scrolling:touch;padding:10px 8px}
+#pvPages canvas{display:block;width:100%;height:auto;background:#fff;margin:0 auto 10px;box-shadow:0 2px 10px rgba(0,0,0,.25)}
+#pvMsg{padding:10px 14px}
 </style>
 </head>
 <body>
@@ -284,6 +294,11 @@ tr.dev td{background:#d3d7dc;font-weight:700}
       <button type="button" class="btn green" id="pickOk" onclick="aceptarPick()" disabled>ACEPTAR</button>
     </div>
   </div>
+</div>
+<div id="pdfViewer" class="hidden">
+  <div class="pvBar"><b id="pvTitulo">PDF</b><span><button type="button" id="pvDescargar">Descargar</button><button type="button" onclick="cerrarPdf()">Cerrar</button></span></div>
+  <div id="pvMsg"></div>
+  <div id="pvPages"></div>
 </div>
 <div id="pop" class="hidden"></div>
 <div id="toast" class="hidden"></div>
@@ -854,16 +869,120 @@ async function enviar(){
   }
 }
 
+/* ---------- visor de PDF (se dibuja dentro de esta página con PDF.js) ---------- */
+const PDFJS_URL = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js';
+const PDFJS_WORKER = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+const PV = { blob: null, nombre: '', url: '' };
+let pdfJsPromise = null;
+
+function driveIdDe(url){
+  const u = String(url || '');
+  const m = u.match(/\/d\/([\w-]{15,})/) || u.match(/[?&]id=([\w-]{15,})/);
+  return m ? m[1] : '';
+}
+function cargarPdfJs(){
+  if (window.pdfjsLib) return Promise.resolve(window.pdfjsLib);
+  if (pdfJsPromise) return pdfJsPromise;
+  pdfJsPromise = new Promise((ok, ko) => {
+    const sc = document.createElement('script');
+    sc.src = PDFJS_URL;
+    sc.onload = () => {
+      if (!window.pdfjsLib) { pdfJsPromise = null; return ko(new Error('No se pudo iniciar el visor de PDF.')); }
+      window.pdfjsLib.GlobalWorkerOptions.workerSrc = PDFJS_WORKER;
+      ok(window.pdfjsLib);
+    };
+    sc.onerror = () => { pdfJsPromise = null; ko(new Error('No se pudo cargar el visor de PDF.')); };
+    document.head.appendChild(sc);
+  });
+  return pdfJsPromise;
+}
+function b64ABytes(b64){
+  const bin = atob(b64), n = bin.length, arr = new Uint8Array(n);
+  for (let i = 0; i < n; i++) arr[i] = bin.charCodeAt(i);
+  return arr;
+}
+function pvEnlace(){
+  if (!PV.blob) return;
+  if (PV.url) { try { URL.revokeObjectURL(PV.url); } catch (e) {} }
+  PV.url = URL.createObjectURL(PV.blob);
+}
+function pvDescargar(){
+  if (!PV.blob) return;
+  pvEnlace();
+  const a = document.createElement('a');
+  a.href = PV.url; a.download = (PV.nombre || 'documento') .replace(/\.pdf$/i, '') + '.pdf';
+  document.body.appendChild(a); a.click(); a.remove();
+}
+$('pvDescargar').addEventListener('click', pvDescargar);
+
+function cerrarPdf(){
+  $('pdfViewer').classList.add('hidden');
+  $('pvPages').innerHTML = ''; setMsg('pvMsg', '');
+  document.body.style.overflow = '';
+  if (PV.url) { try { URL.revokeObjectURL(PV.url); } catch (e) {} }
+  PV.blob = null; PV.url = '';
+}
+
+async function dibujarPdf(bytes){
+  const lib = await cargarPdfJs();
+  const doc = await lib.getDocument({ data: bytes }).promise;
+  const cont = $('pvPages');
+  const ancho = Math.max(280, cont.clientWidth - 16);
+  const dpr = Math.min(window.devicePixelRatio || 1, 2.5);
+  cont.innerHTML = '';
+  for (let n = 1; n <= doc.numPages; n++) {
+    const page = await doc.getPage(n);
+    const base = page.getViewport({ scale: 1 });
+    const vp = page.getViewport({ scale: (ancho / base.width) * dpr });
+    const cv = document.createElement('canvas');
+    cv.width = Math.round(vp.width); cv.height = Math.round(vp.height);
+    cont.appendChild(cv);
+    await page.render({ canvasContext: cv.getContext('2d'), viewport: vp }).promise;
+  }
+}
+
+/** Abre un PDF guardado en Drive dentro de la página, sin salir a Google ni pedir cuenta. */
+async function verPdf(url, titulo){
+  const id = driveIdDe(url);
+  if (!id) { if (url) window.open(url, '_blank'); return; }
+  $('pvTitulo').textContent = titulo || 'PDF';
+  $('pvPages').innerHTML = '';
+  setMsg('pvMsg', 'Cargando PDF…', 'okmsg');
+  $('pdfViewer').classList.remove('hidden');
+  document.body.style.overflow = 'hidden';
+  PV.blob = null; PV.nombre = titulo || '';
+  try {
+    const r = await gs('pdfBase64', S.token, id);
+    if (!r || !r.base64) throw new Error('El PDF llegó vacío.');
+    const bytes = b64ABytes(r.base64);
+    PV.blob = new Blob([bytes], { type: 'application/pdf' });
+    PV.nombre = r.nombre || titulo || 'documento';
+    try {
+      await dibujarPdf(bytes);
+      setMsg('pvMsg', '');
+    } catch (e) {
+      // Si el visor no se pudo cargar, se ofrece abrirlo con el navegador
+      pvEnlace();
+      $('pvMsg').className = 'err';
+      $('pvMsg').innerHTML = esc(msgErr(e)) + ' <a href="' + PV.url + '" target="_blank" style="color:var(--blue);font-weight:700">Abrir el PDF</a> o tocá <b>Descargar</b>.';
+    }
+  } catch (e) {
+    const m = msgErr(e);
+    if (/sesi[oó]n/i.test(m)) { cerrarPdf(); manejarError(e); return; }
+    if (/no disponible/i.test(m)) {
+      // Backend de Apps Script sin actualizar: se usa el método anterior
+      cerrarPdf();
+      const backend = (typeof getCargosBackendUrl === 'function') ? getCargosBackendUrl() : '';
+      window.open(backend ? backend + '?pdf=' + encodeURIComponent(id) : url, '_blank');
+      return;
+    }
+    setMsg('pvMsg', m);
+  }
+}
+
 function abrirPdf(){
   if (!S.last || !S.last.pdf) return;
-  const url = String(S.last.pdf);
-  const m = url.match(/\/d\/([\w-]{15,})/) || url.match(/[?&]id=([\w-]{15,})/);
-  const backend = (typeof getCargosBackendUrl === 'function') ? getCargosBackendUrl() : '';
-  if (m && backend) {
-    window.open(backend + '?pdf=' + encodeURIComponent(m[1]), '_blank');
-  } else {
-    window.open(url, '_blank');
-  }
+  verPdf(S.last.pdf, (S.last.modo === 'devolucion' ? 'Devolución N° ' : 'Cargo N° ') + S.last.id);
 }
 function compartir(){
   if (!S.last) return;
@@ -1073,7 +1192,7 @@ function verCargo(key){
     (c.pdf ? '<div class="okmsg" style="margin-top:12px">✔ ' + (dv ? 'Devolución firmada' : 'Cargo firmado') + '</div>' +
     '<button class="btn green" id="mPdf">ABRIR PDF FIRMADO</button>'
     : '<div class="err" style="margin-top:12px">Este registro no tiene PDF guardado en la planilla.</div>');
-  if (c.pdf) $('mPdf').addEventListener('click', () => window.open(c.pdf, '_blank'));
+  if (c.pdf) $('mPdf').addEventListener('click', () => verPdf(c.pdf, (dv ? 'Devolución N° ' : 'Cargo N° ') + c.id));
   $('modal').classList.remove('hidden');
 }
 function cerrarModal(){ $('modal').classList.add('hidden'); }

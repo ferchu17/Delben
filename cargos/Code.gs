@@ -81,7 +81,7 @@ function doGet(e) {
       if(!/^[A-Za-z_$][A-Za-z0-9_$]*$/.test(fn)) throw new Error('Función RPC inválida.');
       if(!/^[A-Za-z_$][A-Za-z0-9_$]*$/.test(callback)) throw new Error('Callback RPC inválido.');
       if(!Array.isArray(args)) throw new Error('Argumentos RPC inválidos.');
-      const RPC={loginUsuario:loginUsuario,validarSesion:validarSesion,cerrarSesion:cerrarSesion,getCatalogos:getCatalogos,guardarCargoFirmado:guardarCargoFirmado,cargosFirmados:cargosFirmados};
+      const RPC={loginUsuario:loginUsuario,validarSesion:validarSesion,cerrarSesion:cerrarSesion,getCatalogos:getCatalogos,guardarCargoFirmado:guardarCargoFirmado,cargosFirmados:cargosFirmados,pdfBase64:pdfBase64};
       const target=RPC[fn]; if(typeof target!=='function') throw new Error('Función no disponible: '+fn);
       const payload=JSON.stringify({__delbenCargosRpc:true,id:id,ok:true,result:target.apply(null,args)});
       return ContentService.createTextOutput(callback+'('+payload+');').setMimeType(ContentService.MimeType.JAVASCRIPT);
@@ -95,7 +95,7 @@ function doGet(e) {
   if(id){
     try{
       if(!/^[\w-]{15,}$/.test(id)) throw new Error('PDF no válido.');
-      const file=DriveApp.getFileById(id), blob=file.getBlob(), b64=Utilities.base64Encode(blob.getBytes()), nombre=esc_(file.getName());
+      const file=pdfArchivoCargo_(id), blob=file.getBlob(), b64=Utilities.base64Encode(blob.getBytes()), nombre=esc_(file.getName());
       const html='<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><title>'+nombre+'</title><style>html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#fff}embed{display:block;width:100%;height:100%;border:0}</style></head><body><embed type="application/pdf" title="'+nombre+'" src="data:application/pdf;base64,'+b64+'"></body></html>';
       return HtmlService.createHtmlOutput(html).setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
     }catch(err){return HtmlService.createHtmlOutput('<!doctype html><html><body style="font-family:Arial;padding:30px;color:#a0001c">No se pudo mostrar el PDF: '+esc_(err.message||err)+'</body></html>').setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);}
@@ -778,6 +778,25 @@ function pdfDirecto_(url) {
   return m ? 'https://drive.google.com/file/d/' + m[1] + '/view' : u;
 }
 
+/** Devuelve el archivo PDF solo si está en la carpeta de PDF de cargos (nunca otros archivos de Drive). */
+function pdfArchivoCargo_(id) {
+  id = String(id || '').trim();
+  if (!/^[\w-]{15,}$/.test(id)) throw new Error('PDF no válido.');
+  const file = DriveApp.getFileById(id);
+  const padres = file.getParents();
+  while (padres.hasNext()) {
+    if (padres.next().getId() === CFG.DRIVE_FOLDER_ID) return file;
+  }
+  throw new Error('El archivo no pertenece a la carpeta de cargos.');
+}
+
+/** RPC: devuelve el PDF en base64 para mostrarlo dentro de la página (requiere sesión iniciada). */
+function pdfBase64(token, id) {
+  validarSesion_(token);
+  const file = pdfArchivoCargo_(id);
+  return { nombre: file.getName(), base64: Utilities.base64Encode(file.getBlob().getBytes()) };
+}
+
 function driveFolder_() {
   return DriveApp.getFolderById(CFG.DRIVE_FOLDER_ID);
 }
@@ -976,7 +995,8 @@ function doPost(e) {
       cerrarSesion: cerrarSesion,
       getCatalogos: getCatalogos,
       guardarCargoFirmado: guardarCargoFirmado,
-      cargosFirmados: cargosFirmados
+      cargosFirmados: cargosFirmados,
+      pdfBase64: pdfBase64
     };
 
     var target = RPC[fn];
