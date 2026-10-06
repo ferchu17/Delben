@@ -845,7 +845,24 @@ async function enviar(){
     const r = await gs('guardarCargoFirmado', S.token, Object.assign({}, S.draft, {
       firma: S.firma, aclaracion: acl, dniFirma: dniF, lpFirma: lpF, reqId: S.reqId
     }));
-    S.last = { id: r.id, pdf: r.pdf, mail: r.mail, nombre: nombre, modo: dv ? 'devolucion' : 'cargo' };
+    // Para ABRIR PDF usamos exactamente el mismo enlace que usa "Cargos Firmados".
+    // Esa pantalla vuelve a leer el registro guardado y abre c.pdf, que es el
+    // enlace de Drive comprobado. Así evitamos depender del enlace devuelto
+    // momentáneamente por guardarCargoFirmado().
+    let pdfVerificado = r.pdf;
+    try {
+      const registros = await gs('cargosFirmados', S.token);
+      const encontrado = (registros || []).find(c =>
+        String(c.id) === String(r.id) &&
+        String(c.tipo || '') === (dv ? 'devolucion' : 'cargo') &&
+        String(c.nombre || '') === String(nombre || '') &&
+        c.pdf
+      );
+      if (encontrado && encontrado.pdf) pdfVerificado = encontrado.pdf;
+    } catch (_) {
+      // Si la consulta de verificación falla, conservamos el enlace original.
+    }
+    S.last = { id: r.id, pdf: pdfVerificado, mail: r.mail, nombre: nombre, modo: dv ? 'devolucion' : 'cargo' };
     $('exTitulo').textContent = dv ? 'Devolución N° ' + r.id + ' firmada' : 'Cargo N° ' + r.id + ' firmado';
     $('exSub').textContent = dv ? 'La devolución firmada quedó registrada y el PDF guardado.' : 'El cargo firmado quedó registrado y el PDF guardado.';
     $('btnOtro').textContent = dv ? 'Nueva devolución' : 'Nuevo cargo';
