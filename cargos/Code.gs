@@ -81,7 +81,7 @@ function doGet(e) {
       if(!/^[A-Za-z_$][A-Za-z0-9_$]*$/.test(fn)) throw new Error('Función RPC inválida.');
       if(!/^[A-Za-z_$][A-Za-z0-9_$]*$/.test(callback)) throw new Error('Callback RPC inválido.');
       if(!Array.isArray(args)) throw new Error('Argumentos RPC inválidos.');
-      const RPC={loginUsuario:loginUsuario,validarSesion:validarSesion,cerrarSesion:cerrarSesion,getCatalogos:getCatalogos,guardarCargoFirmado:guardarCargoFirmado,cargosFirmados:cargosFirmados};
+      const RPC={loginUsuario:loginUsuario,validarSesion:validarSesion,cerrarSesion:cerrarSesion,getCatalogos:getCatalogos,guardarCargoFirmado:guardarCargoFirmado,cargosFirmados:cargosFirmados,obtenerPdfBase64:obtenerPdfBase64};
       const target=RPC[fn]; if(typeof target!=='function') throw new Error('Función no disponible: '+fn);
       const payload=JSON.stringify({__delbenCargosRpc:true,id:id,ok:true,result:target.apply(null,args)});
       return ContentService.createTextOutput(callback+'('+payload+');').setMimeType(ContentService.MimeType.JAVASCRIPT);
@@ -948,8 +948,9 @@ function diagnosticoSistema() {
 /** Obtiene el PDF guardado como base64 para visualizarlo dentro de Cargos.
  * No cambia el archivo, el guardado ni el envío de correos.
  */
-function obtenerPdfBase64(fileId) {
-  var id = String(fileId || '').trim();
+function obtenerPdfBase64(token, referencia) {
+  validarSesion_(token);
+  var id = String(referencia || '').trim();
   if (!id) throw new Error('Falta el ID del PDF.');
   var file = DriveApp.getFileById(id);
   var blob = file.getBlob();
