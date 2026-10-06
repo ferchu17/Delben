@@ -94,9 +94,11 @@ function doGet(e) {
   const id=String(p.pdf||'').trim();
   if(id){
     try{
-      if(!/^[\w-]{15,}$/.test(id)) throw new Error('PDF no válido.');
-      const file=DriveApp.getFileById(id), blob=file.getBlob(), b64=Utilities.base64Encode(blob.getBytes()), nombre=esc_(file.getName());
-      const html='<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><title>'+nombre+'</title><style>html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#fff}embed{display:block;width:100%;height:100%;border:0}</style></head><body><embed type="application/pdf" title="'+nombre+'" src="data:application/pdf;base64,'+b64+'"></body></html>';
+      const file=pdfArchivoCargo_(id), b64=Utilities.base64Encode(file.getBlob().getBytes()), nombre=esc_(file.getName());
+      const html='<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>'+nombre+'</title><style>html,body{margin:0;background:#e9eef3;font-family:Arial,sans-serif}#m{padding:14px;color:#0b1b3a}canvas{display:block;width:100%;max-width:900px;height:auto;margin:8px auto;background:#fff;box-shadow:0 2px 10px rgba(0,0,0,.25)}</style></head><body><div id="m">Cargando PDF…</div><div id="p"></div>'
+        +'<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"><\/script><script>'
+        +'(async function(){try{pdfjsLib.GlobalWorkerOptions.workerSrc="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";var b=atob("'+b64+'"),u=new Uint8Array(b.length);for(var i=0;i<b.length;i++)u[i]=b.charCodeAt(i);var d=await pdfjsLib.getDocument({data:u}).promise;var w=Math.max(300,Math.min(window.innerWidth,900)-16),r=Math.min(window.devicePixelRatio||1,2.5);for(var n=1;n<=d.numPages;n++){var pg=await d.getPage(n),v0=pg.getViewport({scale:1}),v=pg.getViewport({scale:w/v0.width*r}),c=document.createElement("canvas");c.width=v.width;c.height=v.height;document.getElementById("p").appendChild(c);await pg.render({canvasContext:c.getContext("2d"),viewport:v}).promise}document.getElementById("m").style.display="none"}catch(e){document.getElementById("m").textContent="No se pudo mostrar el PDF: "+e.message}})();'
+        +'<\/script></body></html>';
       return HtmlService.createHtmlOutput(html).setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
     }catch(err){return HtmlService.createHtmlOutput('<!doctype html><html><body style="font-family:Arial;padding:30px;color:#a0001c">No se pudo mostrar el PDF: '+esc_(err.message||err)+'</body></html>').setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);}
   }
@@ -950,35 +952,26 @@ function diagnosticoSistema() {
  */
 function obtenerPdfBase64(token, referencia) {
   validarSesion_(token);
-  var id = String(referencia || '').trim();
-  if (!id) throw new Error('Falta el ID del PDF.');
-  var file = DriveApp.getFileById(id);
-  var blob = file.getBlob();
+  var file = pdfArchivoCargo_(referencia);
   return {
     nombre: file.getName(),
-    mime: blob.getContentType() || 'application/pdf',
-    base64: Utilities.base64Encode(blob.getBytes())
+    mime: 'application/pdf',
+    base64: Utilities.base64Encode(file.getBlob().getBytes())
   };
 }
 
-/** Visor PDF del módulo Cargos. No modifica la lógica de guardado ni de correo. */
-function doGet(e) {
-  try {
-    var id = String(e && e.parameter && e.parameter.pdf || '').trim();
-    if (!id) {
-      return HtmlService.createHtmlOutput('<!doctype html><html><body><p>Cargos del Personal</p></body></html>');
-    }
-    var file = DriveApp.getFileById(id);
-    var blob = file.getBlob();
-    var b64 = Utilities.base64Encode(blob.getBytes());
-    var html = '<!doctype html><html><head><meta charset="utf-8"><title>PDF firmado</title>' +
-      '<style>html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#222}iframe{width:100%;height:100%;border:0}</style>' +
-      '</head><body><iframe src="data:application/pdf;base64,' + b64 + '" title="PDF firmado"></iframe></body></html>';
-    return HtmlService.createHtmlOutput(html);
-  } catch (err) {
-    return HtmlService.createHtmlOutput('<!doctype html><html><body style="font-family:Arial;padding:20px">' +
-      '<h3>No se pudo mostrar el PDF</h3><p>' + String(err && err.message || err).replace(/&/g,'&amp;').replace(/</g,'&lt;') + '</p></body></html>');
+/** Devuelve el archivo solo si está dentro de la carpeta de cargos. */
+function pdfArchivoCargo_(referencia) {
+  var id = String(referencia || '').trim();
+  var m = id.match(/\/d\/([\w-]{15,})/) || id.match(/[?&]id=([\w-]{15,})/);
+  if (m) id = m[1];
+  if (!/^[\w-]{15,}$/.test(id)) throw new Error('PDF no válido.');
+  var file = DriveApp.getFileById(id);
+  var padres = file.getParents();
+  while (padres.hasNext()) {
+    if (padres.next().getId() === CFG.DRIVE_FOLDER_ID) return file;
   }
+  throw new Error('El archivo no pertenece a la carpeta de cargos.');
 }
 
 /** Puente RPC para ejecutar este módulo desde GitHub Pages. */
