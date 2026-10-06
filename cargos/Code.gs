@@ -932,11 +932,10 @@ function anexoHtml_(cargo, firmaDataUrl, firmadoExacto) {
     '<div style="' + B + 'border-top:0;padding:4px;font-size:9px;height:48px"><sup>(18)</sup> Información adicional:</div>' +
     '<div style="text-align:right;font-size:8px;color:#9a9a9a;margin-top:6px">Firmado el ' + esc_(firmadoExacto) + ' hs (hora de Argentina)</div>' +
     '</div>';
-  // Hoja 2 del PDF: el formulario horizontal se gira 90° sobre la hoja vertical.
-  const rot = 'transform:rotate(90deg);-webkit-transform:rotate(90deg);-ms-transform:rotate(90deg);' +
-    'transform-origin:0 0;-webkit-transform-origin:0 0;position:relative;left:690px;top:0;';
-  return '<div style="page-break-before:always"></div>' +
-    (CFG.ANEXO_GIRADO ? '<div style="height:1010px;overflow:hidden"><div style="' + rot + '">' + hoja + '</div></div>' : hoja);
+  // Hoja 2 del PDF: el formulario se genera realmente en A4 apaisado.
+  return (CFG.ANEXO_GIRADO
+    ? '<div style="page:anexo;break-before:page;page-break-before:always">' + hoja + '</div>'
+    : '<div style="page-break-before:always">' + hoja + '</div>');
 }
 
 function actaPdf_(cargo, firmaDataUrl, aclaracion, dniFirma) {
@@ -995,7 +994,7 @@ function actaPdf_(cargo, firmaDataUrl, aclaracion, dniFirma) {
         '&nbsp;&nbsp;&nbsp;&nbsp;<b>Empresa:</b> ' + esc_(cargo.empresa) + '</p>';
 
   const html =
-    '<html><head><meta charset="utf-8"><style>@page{size:A4 portrait;margin:0}</style></head>' +
+    '<html><head><meta charset="utf-8"><style>@page cargo{size:A4 portrait;margin:0}@page anexo{size:A4 landscape;margin:0}body{page:cargo}</style></head>' +
     '<body style="font-family:Arial,Helvetica,sans-serif;font-size:10px;color:#000;margin:0;padding:34px 40px">' +
 
     '<table style="width:100%"><tr>' +
