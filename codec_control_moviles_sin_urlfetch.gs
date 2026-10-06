@@ -559,6 +559,66 @@ function formatearHoraPDF_(valor) {
   return s;
 }
 
+function obtenerCorreosServicio_(objetivo) {
+  objetivo = String(objetivo || '').trim();
+  if (!objetivo) return '';
+
+  function normalizar(v) {
+    return String(v || '').toLowerCase().trim()
+      .normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+  }
+
+  var objetivoNorm = normalizar(objetivo);
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sh = ss.getSheetByName('Usuarios y contraseñas');
+  if (!sh) return '';
+
+  var values = sh.getDataRange().getDisplayValues();
+  if (!values || values.length < 2) return '';
+
+  var headers = values[0].map(normalizar);
+
+  function buscarIndice(nombres, fallback) {
+    for (var i = 0; i < nombres.length; i++) {
+      var idx = headers.indexOf(normalizar(nombres[i]));
+      if (idx >= 0) return idx;
+    }
+    return fallback;
+  }
+
+  var iNombre = buscarIndice(['nombre'], 1);
+  var iRol = buscarIndice(['rol'], 4);
+  var iCorreo = buscarIndice(['correo'], 5);
+
+  var correos = [];
+  var vistos = {};
+
+  for (var r = 1; r < values.length; r++) {
+    var row = values[r] || [];
+    var nombre = String(row[iNombre] || '').trim();
+    var rol = String(row[iRol] || '').trim();
+
+    if (normalizar(rol) !== 'servicios') continue;
+    if (normalizar(nombre) !== objetivoNorm) continue;
+
+    var correoCelda = String(row[iCorreo] || '').trim();
+    if (!correoCelda) continue;
+
+    var partes = correoCelda.split(/[;,]/);
+    for (var p = 0; p < partes.length; p++) {
+      var correo = String(partes[p] || '').trim();
+      if (!correo) continue;
+      var key = correo.toLowerCase();
+      if (!vistos[key]) {
+        vistos[key] = true;
+        correos.push(correo);
+      }
+    }
+  }
+
+  return correos.join(',');
+}
+
 function enviarControlPorCorreo_(data) {
   var fila = data.fila || [];
   var doc = null;
@@ -753,7 +813,22 @@ function enviarControlPorCorreo_(data) {
       replyTo: 'fjacyno@gmail.com'
     };
 
-    if (!data.modoPrueba) mailOptions.cc = CC_CONTROL_MOVILES;
+    if (!data.modoPrueba) {
+      var correosServicio = obtenerCorreosServicio_(fila[8]);
+      var ccBase = String(CC_CONTROL_MOVILES || '').split(/[;,]/).map(function(v){ return String(v || '').trim(); });
+      var ccTodos = ccBase.concat(String(correosServicio || '').split(/[;,]/).map(function(v){ return String(v || '').trim(); }));
+      var ccUnicos = [];
+      var ccVistos = {};
+      for (var ci = 0; ci < ccTodos.length; ci++) {
+        var ccCorreo = ccTodos[ci];
+        if (!ccCorreo) continue;
+        var ccKey = ccCorreo.toLowerCase();
+        if (ccVistos[ccKey]) continue;
+        ccVistos[ccKey] = true;
+        ccUnicos.push(ccCorreo);
+      }
+      if (ccUnicos.length) mailOptions.cc = ccUnicos.join(',');
+    }
 
     MailApp.sendEmail(mailOptions);
 
