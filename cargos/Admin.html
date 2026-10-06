@@ -886,7 +886,7 @@ async function abrirPdf(){
   $('pdfFrame').style.display = 'none';
 
   try {
-    const r = await gs('obtenerPdfBase64', m[1]);
+    const r = await gs('obtenerPdfBase64', S.token, m[1]);
     if (!r || !r.base64) throw new Error('El backend no devolvió el PDF.');
 
     if (PDF_VIEW_URL) {
