@@ -292,7 +292,22 @@ function subirFotosControlDrive(fotosArray) {
 // -----------------------------------------------------------------------------
 // 4. GUARDADO DEFINITIVO EN GOOGLE SHEETS ("combustible", "carroelectrico", "bicicleta")
 // -----------------------------------------------------------------------------
-function guardarControlCompleto(tipo, filaDatos, fotosArray, supervisor, empresa) {
+
+function obtenerFechaHoraArgentina_() {
+  var tz = 'America/Argentina/Buenos_Aires';
+  var ahora = new Date();
+  var fecha = Utilities.formatDate(ahora, tz, 'yyyy-MM-dd');
+  var hora = Utilities.formatDate(ahora, tz, 'HH:mm');
+  var nDia = parseInt(Utilities.formatDate(ahora, tz, 'u'), 10);
+  var dias = ['Lunes','Martes','Miércoles','Jueves','Viernes','Sábado','Domingo'];
+  return {
+    fecha: fecha,
+    hora: hora,
+    dia: dias[nDia - 1] || ''
+  };
+}
+
+function guardarControlCompleto(tipo, filaDatos, fotosArray, supervisor, empresa, fechaHoraManual) {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var sheetName = '';
   var t = String(tipo || '').toLowerCase().trim();
@@ -323,6 +338,15 @@ function guardarControlCompleto(tipo, filaDatos, fotosArray, supervisor, empresa
   if (!supNombre || !supCorreo) {
     supNombre = 'Fernando Jacyno';
     supCorreo = 'fjacyno@ktl-seguridad.com';
+  }
+
+  // Si la persona no modificó fecha/hora, se fija al momento exacto del guardado
+  // usando la hora de Argentina del servidor de Apps Script.
+  if (fechaHoraManual !== true) {
+    var fechaHoraAR = obtenerFechaHoraArgentina_();
+    filaDatos[1] = fechaHoraAR.fecha;
+    filaDatos[2] = fechaHoraAR.dia;
+    filaDatos[3] = fechaHoraAR.hora;
   }
 
   var fotoInfo = subirFotosControlDrive(fotosArray || []);
@@ -1222,6 +1246,7 @@ function getAppHtml() {
   var FOTOS_BASE64 = [null, null, null, null];
   var TIPO_ACTUAL = '';
   var MAX_FOTO_MB = 5;
+  var FECHA_HORA_MANUAL = false;
 
   var ITEMS_AUTO = [
     {n:"Estado Externo General", ic:"🚗"}, {n:"Interior (Butacas)", ic:"💺"}, {n:"Luces", ic:"💡"},
@@ -1243,16 +1268,28 @@ function getAppHtml() {
   var FOTOS_GRID_TIPO_RENDERIZADO = null;
 
   window.onload = function() {
+    FECHA_HORA_MANUAL = false;
     var hoy = new Date();
     document.getElementById('form-fecha').value = hoy.toISOString().split('T')[0];
     var hh = String(hoy.getHours()).padStart(2, '0');
     var mm = String(hoy.getMinutes()).padStart(2, '0');
     document.getElementById('form-hora').value = hh + ':' + mm;
+
+    document.getElementById('form-fecha').addEventListener('change', function(){ FECHA_HORA_MANUAL = true; });
+    document.getElementById('form-hora').addEventListener('change', function(){ FECHA_HORA_MANUAL = true; });
+
     renderFotosGrid();
     if (typeof google !== 'undefined' && google.script && google.script.run) {
       google.script.run.withSuccessHandler(function(res) {
         if (res) { DB_DATOS = res; poblarListas(); }
       }).getDatosControlMoviles();
+
+      google.script.run.withSuccessHandler(function(res) {
+        if (!res) return;
+        FECHA_HORA_MANUAL = false;
+        document.getElementById('form-fecha').value = res.fecha || '';
+        document.getElementById('form-hora').value = res.hora || '';
+      }).obtenerFechaHoraArgentina_();
     }
   };
 
@@ -1506,7 +1543,8 @@ function getAppHtml() {
           var nombre = opt && opt.getAttribute('data-nombre') ? opt.getAttribute('data-nombre') : 'Fernando Jacyno';
           return {nombre:nombre, correo:correo};
         })(),
-        document.getElementById('form-empresa').value
+        document.getElementById('form-empresa').value,
+        FECHA_HORA_MANUAL
       );
   }
 
@@ -1536,11 +1574,19 @@ function getAppHtml() {
     document.getElementById('pantalla-datos').classList.add('hidden');
     document.getElementById('pantalla-tipo').classList.remove('hidden');
 
+    FECHA_HORA_MANUAL = false;
     var hoy = new Date();
     document.getElementById('form-fecha').value = hoy.toISOString().split('T')[0];
     var hh = String(hoy.getHours()).padStart(2, '0');
     var mm = String(hoy.getMinutes()).padStart(2, '0');
     document.getElementById('form-hora').value = hh + ':' + mm;
+
+    google.script.run.withSuccessHandler(function(res) {
+      if (!res) return;
+      FECHA_HORA_MANUAL = false;
+      document.getElementById('form-fecha').value = res.fecha || '';
+      document.getElementById('form-hora').value = res.hora || '';
+    }).obtenerFechaHoraArgentina_();
 
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }
