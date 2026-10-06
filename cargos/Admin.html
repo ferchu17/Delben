@@ -904,12 +904,20 @@ function abrirPdf(){
   const url = String(S.last.pdf).trim();
   if (!url) return toast('No se encontró el enlace del PDF.');
 
-  // Mostramos el mismo PDF de Drive dentro de la aplicación.
-  // Así se puede cerrar el visor y volver al menú sin cerrar la aplicación.
+  // El PDF está en Drive y puede ser privado. No usamos gview porque
+  // gview no tiene la sesión del backend y puede mostrar "Solicitar acceso".
+  // El propio Code.gs ya tiene un visor que lee el PDF con DriveApp y
+  // lo entrega como contenido embebible.
   const frame = $('pdfFrame');
   const visor = $('pdfVisor');
   if (!frame || !visor) return window.open(url, '_blank');
-  frame.src = 'https://docs.google.com/gview?embedded=1&url=' + encodeURIComponent(url);
+
+  const m = url.match(/[-\\w]{25,}/);
+  if (!m) return toast('No se pudo obtener el ID del PDF.');
+  const pdfId = m[0];
+
+  const backendPdf = 'https://script.google.com/macros/s/AKfycbxMPvbI0GmgJzKTsjy1XJujE24JgotrWyTG617UcDgRUE2PjzAsnMD8lQY1-YFgx-fq/exec?pdf=' + encodeURIComponent(pdfId);
+  frame.src = backendPdf;
   visor.classList.remove('hidden');
   document.body.style.overflow = 'hidden';
 }
