@@ -909,7 +909,7 @@ function abrirPdf(){
   const frame = $('pdfFrame');
   const visor = $('pdfVisor');
   if (!frame || !visor) return window.open(url, '_blank');
-  frame.src = url;
+  frame.src = 'https://docs.google.com/gview?embedded=1&url=' + encodeURIComponent(url);
   visor.classList.remove('hidden');
   document.body.style.overflow = 'hidden';
 }
