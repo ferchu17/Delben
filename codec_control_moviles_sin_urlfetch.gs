@@ -1,6 +1,6 @@
 // ID de la carpeta en Google Drive para guardar las fotos de inspección
 var FOLDER_ID_FOTOS_MOVILES = '1m81-m3AAiZXGarP9xoq3ZSh-7qJQ5i6I';
-var CC_CONTROL_MOVILES = 'fjacyno@ktl-seguridad.com,gsanmartin@ktl-seguridad.com';
+var CC_CONTROL_MOVILES = 'fjacyno@ktl-seguridad.com';
 
 // Logo DELBEN: se reutiliza el PNG que ya está embebido en getAppHtml().
 // Así la generación del PDF no depende de UrlFetchApp ni de un archivo externo en Drive.
