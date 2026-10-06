@@ -899,15 +899,11 @@ async function enviar(){
 
 var PDF_VIEW_URL = '';
 
-function abrirPdf(){
+async function abrirPdf(){
   if (!S.last || !S.last.pdf) return toast('No se encontró el enlace del PDF.');
   const url = String(S.last.pdf).trim();
   if (!url) return toast('No se encontró el enlace del PDF.');
 
-  // El PDF está en Drive y puede ser privado. No usamos gview porque
-  // gview no tiene la sesión del backend y puede mostrar "Solicitar acceso".
-  // El propio Code.gs ya tiene un visor que lee el PDF con DriveApp y
-  // lo entrega como contenido embebible.
   const frame = $('pdfFrame');
   const visor = $('pdfVisor');
   if (!frame || !visor) return window.open(url, '_blank');
@@ -916,10 +912,28 @@ function abrirPdf(){
   if (!m) return toast('No se pudo obtener el ID del PDF.');
   const pdfId = m[0];
 
-  const backendPdf = 'https://script.google.com/macros/s/AKfycbxMPvbI0GmgJzKTsjy1XJujE24JgotrWyTG617UcDgRUE2PjzAsnMD8lQY1-YFgx-fq/exec?pdf=' + encodeURIComponent(pdfId);
-  frame.src = backendPdf;
-  visor.classList.remove('hidden');
-  document.body.style.overflow = 'hidden';
+  try {
+    toast('Cargando PDF…');
+    const r = await gs('obtenerPdfBase64', S.token, pdfId);
+    if (!r || !r.base64) throw new Error('El backend no devolvió el PDF.');
+
+    const bin = atob(r.base64);
+    const bytes = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+
+    if (PDF_VIEW_URL) {
+      try { URL.revokeObjectURL(PDF_VIEW_URL); } catch(e) {}
+      PDF_VIEW_URL = '';
+    }
+
+    const blob = new Blob([bytes], {type: r.mime || 'application/pdf'});
+    PDF_VIEW_URL = URL.createObjectURL(blob);
+    frame.src = PDF_VIEW_URL;
+    visor.classList.remove('hidden');
+    document.body.style.overflow = 'hidden';
+  } catch (e) {
+    toast('No se pudo mostrar el PDF: ' + msgErr(e));
+  }
 }
 function cerrarPdf(){
   var visor = document.getElementById('pdfVisor');
