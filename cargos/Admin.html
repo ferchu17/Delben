@@ -130,6 +130,15 @@ tr.dev td{background:#d3d7dc;font-weight:700}
 .devBanner{background:#d3d7dc;border:2px solid #7b848d;border-radius:10px;font-weight:800;text-align:center;padding:8px;margin:10px 0;letter-spacing:1px}
 .legend{font-size:12px;color:var(--muted);margin:2px 0 8px}
 .legend i{display:inline-block;width:14px;height:14px;background:#d3d7dc;border:1px solid #7b848d;border-radius:3px;vertical-align:-2px;margin-right:4px}
+
+/* visor de PDF dentro de la aplicación */
+#pdfVisor{position:fixed;inset:0;background:rgba(0,0,0,.72);z-index:6000;display:flex;flex-direction:column;padding:10px}
+#pdfVisor.hidden{display:none!important}
+#pdfVisor .pdfHead{display:flex;justify-content:space-between;align-items:center;gap:10px;background:#fff;border:2px solid var(--green);border-radius:12px 12px 0 0;padding:8px 10px}
+#pdfVisor .pdfTitle{font-weight:800;color:var(--blue);font-size:16px}
+#pdfVisor .pdfClose{width:auto;margin:0;background:#fff;color:#a0001c;border-color:#a0001c;padding:9px 14px}
+#pdfVisor .pdfBody{flex:1;min-height:0;background:#fff;border:2px solid var(--green);border-top:0;border-radius:0 0 12px 12px;overflow:hidden}
+#pdfVisor iframe{display:block;width:100%;height:100%;border:0;background:#fff}
 </style>
 </head>
 <body>
@@ -287,6 +296,18 @@ tr.dev td{background:#d3d7dc;font-weight:700}
 </div>
 <div id="pop" class="hidden"></div>
 <div id="toast" class="hidden"></div>
+
+<!-- VISOR DE PDF -->
+<div id="pdfVisor" class="hidden">
+  <div class="pdfHead">
+    <span class="pdfTitle">PDF del cargo firmado</span>
+    <button type="button" class="btn pdfClose" onclick="cerrarPdf()">CERRAR PDF</button>
+  </div>
+  <div class="pdfBody">
+    <iframe id="pdfFrame" title="PDF del cargo firmado"></iframe>
+  </div>
+</div>
+
 
 <script>
 /* Puente GitHub Pages -> Apps Script para Cargos del Personal.
@@ -883,16 +904,21 @@ function abrirPdf(){
   const url = String(S.last.pdf).trim();
   if (!url) return toast('No se encontró el enlace del PDF.');
 
-  // Usamos exactamente el mismo método que funciona en "Cargos Firmados":
-  // abrir directamente el enlace de Drive, sin convertir el PDF a Base64
-  // ni volver a renderizarlo dentro de un Blob/iframe.
-  window.open(url, '_blank');
+  // Mostramos el mismo PDF de Drive dentro de la aplicación.
+  // Así se puede cerrar el visor y volver al menú sin cerrar la aplicación.
+  const frame = $('pdfFrame');
+  const visor = $('pdfVisor');
+  if (!frame || !visor) return window.open(url, '_blank');
+  frame.src = url;
+  visor.classList.remove('hidden');
+  document.body.style.overflow = 'hidden';
 }
 function cerrarPdf(){
   var visor = document.getElementById('pdfVisor');
   var frame = document.getElementById('pdfFrame');
   if (frame) frame.src = 'about:blank';
   if (visor) visor.classList.add('hidden');
+  document.body.style.overflow = '';
   if (PDF_VIEW_URL) {
     try { URL.revokeObjectURL(PDF_VIEW_URL); } catch(e) {}
     PDF_VIEW_URL = '';
