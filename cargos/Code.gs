@@ -48,9 +48,10 @@ const CFG = {
   // Copia fija de todos los cargos enviados
   EMAIL_COPIA: 'fjacyno@ktl-seguridad.com',
 
-  // C.U.I.T. por empresa para el Anexo I (Res. 299/11). Completar con el nombre de la empresa
-  // tal como figura en la columna Empresa de Personal, por ejemplo: { 'KTL SEGURIDAD': '30-00000000-0' }
-  CUIT_EMPRESAS: {},
+  // Anexo I (Res. 299/11): datos de la empresa desde la solapa "empresas"
+  SHEET_EMPRESAS: 'empresas',
+  // true: el Anexo va como hoja 2 del PDF, girado para leerse apaisado. false: hoja vertical normal.
+  ANEXO_GIRADO: true,
 
   MAX_ITEMS: 15,
   SESSION_SECONDS: 21600 // 6 horas (máximo de CacheService)
@@ -797,65 +798,145 @@ function logoKtlSrc_() {
   return 'data:image/jpeg;base64,' + LOGO_KTL_B64;
 }
 
-/** Anexo I – Resolución 299/11 (constancia de entrega de ropa de trabajo y EPP). Solo para cargos. */
-function anexoHtml_(cargo, firmaDataUrl, firmadoEl) {
+/* =========================================================
+   ANEXO I – Resolución 299/11 (solo en cargos, no en devoluciones)
+   ========================================================= */
+
+/** Datos de la empresa desde la solapa "empresas": los 6 datos salen de la MISMA fila. */
+function empresaDatos_(nombreEmpresa) {
+  const vacio = { razon: String(nombreEmpresa || ''), cuit: '', domicilio: '', localidad: '', cp: '', provincia: '' };
+  try {
+    let sh = null;
+    const planillas = [fuenteSs_(), SpreadsheetApp.openById(prop_('CARGOS_SPREADSHEET_ID') || CFG.CARGOS_SPREADSHEET_ID)];
+    for (let i = 0; i < planillas.length && !sh; i++) {
+      try { sh = hoja_(planillas[i], CFG.SHEET_EMPRESAS); } catch (e) { /* prueba la otra planilla */ }
+    }
+    if (!sh) throw new Error('No existe la solapa "' + CFG.SHEET_EMPRESAS + '".');
+    const t = leerTabla_(sh, {
+      empresa: { names: ['Empresa', 'Razón Social', 'Razon Social', 'Nombre'], required: true },
+      razon: { names: ['Razón Social', 'Razon Social', 'Denominación'], required: false },
+      cuit: { names: ['CUIT', 'C.U.I.T.'], required: false },
+      domicilio: { names: ['Domicilio', 'Dirección', 'Direccion'], required: false },
+      localidad: { names: ['Localidad', 'Ciudad'], required: false },
+      cp: { names: ['Código Postal', 'Codigo Postal', 'C.P.', 'CP'], required: false },
+      provincia: { names: ['Provincia'], required: false }
+    });
+    const m = t.map, buscada = norm_(nombreEmpresa);
+    const celda = function (r, k) { return m[k] >= 0 ? String(r[m[k]] || '').trim() : ''; };
+    let fila = null;
+    for (let i = 0; i < t.rows.length && !fila; i++) {
+      if (norm_(celda(t.rows[i], 'empresa')) === buscada || (m.razon >= 0 && norm_(celda(t.rows[i], 'razon')) === buscada)) fila = t.rows[i];
+    }
+    for (let i = 0; i < t.rows.length && !fila && buscada; i++) {
+      const n = norm_(celda(t.rows[i], 'empresa'));
+      if (n && (n.indexOf(buscada) >= 0 || buscada.indexOf(n) >= 0)) fila = t.rows[i];
+    }
+    if (!fila) { Logger.log('Anexo I: la empresa "' + nombreEmpresa + '" no está en la solapa empresas.'); return vacio; }
+    return {
+      razon: celda(fila, 'razon') || celda(fila, 'empresa') || vacio.razon,
+      cuit: celda(fila, 'cuit'), domicilio: celda(fila, 'domicilio'), localidad: celda(fila, 'localidad'),
+      cp: celda(fila, 'cp'), provincia: celda(fila, 'provincia')
+    };
+  } catch (e) {
+    Logger.log('Anexo I – empresas: ' + (e && e.message || e));
+    return vacio;
+  }
+}
+
+/** Inventario: Tipo = columna D, Marca = columna J, Certificación = columna K (por posición). */
+function inventarioAnexo_(items) {
+  const res = (items || []).map(function () { return { tipo: '', marca: '', cert: '' }; });
+  try {
+    const t = leerTabla_(hoja_(fuenteSs_(), CFG.SHEET_INVENTARIO), {
+      codigo: { names: ['Codigo', 'Código', 'Cod'], required: true },
+      item: { names: ['Item', 'Ítem', 'Items', 'Ítems', 'Elemento'], required: true }
+    });
+    const c = function (r, i) { return String(r[i] == null ? '' : r[i]).trim(); };
+    (items || []).forEach(function (x, k) {
+      const cod = String(x.codigo || '').trim(), nom = norm_(x.item);
+      let fila = null;
+      for (let i = 0; i < t.rows.length && !fila; i++) {
+        if (cod && c(t.rows[i], t.map.codigo) === cod && (!nom || norm_(c(t.rows[i], t.map.item)) === nom)) fila = t.rows[i];
+      }
+      for (let i = 0; i < t.rows.length && !fila; i++) {
+        if (nom && norm_(c(t.rows[i], t.map.item)) === nom) fila = t.rows[i];
+      }
+      if (fila) res[k] = { tipo: c(fila, 3), marca: c(fila, 9), cert: c(fila, 10) };
+    });
+  } catch (e) {
+    Logger.log('Anexo I – inventario: ' + (e && e.message || e));
+  }
+  return res;
+}
+
+/**
+ * Anexo I: reproduce el formulario oficial (horizontal, 18 renglones). Sin logo.
+ * Va como segunda hoja del PDF del cargo, girado para que se lea apaisado.
+ * Campos 9 y 10 (puesto y EPP necesarios): por ahora quedan vacíos.
+ */
+function anexoHtml_(cargo, firmaDataUrl, firmadoExacto) {
   const B = 'border:1px solid #000;';
-  const C = B + 'padding:3px 4px;font-size:8px;vertical-align:top;';
+  const C = B + 'padding:2px 4px;font-size:9px;vertical-align:top;';
   const items = cargo.items || [];
-  const cuit = (function () {
-    const m = CFG.CUIT_EMPRESAS || {};
-    const k = String(cargo.empresa || '').trim().toUpperCase();
-    return m[cargo.empresa] || m[k] || '';
-  })();
-  const fechaEntrega = Utilities.formatDate(new Date(), CFG.TZ, 'dd/MM/yyyy');
+  const emp = empresaDatos_(cargo.empresa);
+  const inv = inventarioAnexo_(items);
+  const fechaEntrega = Utilities.formatDate(cargo.fecha instanceof Date ? cargo.fecha : new Date(), CFG.TZ, 'dd/MM/yyyy');
   let filas = '';
   for (let i = 0; i < 18; i++) {
-    const x = items[i];
-    filas += '<tr style="height:24px">' +
-      '<td style="' + C + 'text-align:center;background:#d9d9d9;width:16px">' + (i + 1) + '</td>' +
-      '<td style="' + C + '">' + (x ? esc_(x.item) + (x.codigo ? ' (' + esc_(x.codigo) + ')' : '') : '&nbsp;') + '</td>' +
-      '<td style="' + C + '">&nbsp;</td>' +
-      '<td style="' + C + '">&nbsp;</td>' +
-      '<td style="' + C + 'text-align:center">&nbsp;</td>' +
+    const x = items[i], v = inv[i] || {};
+    filas += '<tr style="height:21px">' +
+      '<td style="' + C + 'text-align:center;background:#d9d9d9">' + (i + 1) + '</td>' +
+      '<td style="' + C + '">' + (x ? esc_(x.item) : '&nbsp;') + '</td>' +
+      '<td style="' + C + '">' + (x ? esc_(v.tipo) : '&nbsp;') + '</td>' +
+      '<td style="' + C + '">' + (x ? esc_(v.marca) : '&nbsp;') + '</td>' +
+      '<td style="' + C + 'text-align:center">' + (x ? esc_(v.cert) : '&nbsp;') + '</td>' +
       '<td style="' + C + 'text-align:center">' + (x ? esc_(x.cantidad) : '&nbsp;') + '</td>' +
       '<td style="' + C + 'text-align:center">' + (x ? fechaEntrega : '&nbsp;') + '</td>' +
-      '<td style="' + C + '">' + (x ? '<img src="' + firmaDataUrl + '" height="16">' : '&nbsp;') + '</td>' +
+      '<td style="' + C + '">' + (x ? '<img src="' + firmaDataUrl + '" height="17">' : '&nbsp;') + '</td>' +
       '</tr>';
   }
-  return '<div style="page-break-before:always"></div>' +
-    '<div style="font-family:Arial,Helvetica,sans-serif;color:#000">' +
-    '<div style="text-align:right;font-weight:bold;font-style:italic;font-size:10px">Resolución 299/11, Anexo I</div>' +
-    '<div style="background:#000;color:#fff;text-align:center;font-weight:bold;font-size:10px;padding:3px 2px">ENTREGA DE ROPA DE TRABAJO Y ELEMENTOS DE PROTECCIÓN PERSONAL</div>' +
+  const hoja =
+    '<div style="width:1000px;font-family:Arial,Helvetica,sans-serif;color:#000">' +
+    '<div style="text-align:right;font-weight:bold;font-style:italic;font-size:11px">Resolución 299/11, Anexo I</div>' +
+    '<div style="background:#000;color:#fff;text-align:center;font-weight:bold;font-size:11px;padding:3px 2px">ENTREGA DE ROPA DE TRABAJO Y ELEMENTOS DE PROTECCIÓN PERSONAL</div>' +
     '<table style="width:100%;border-collapse:collapse;table-layout:fixed">' +
-      '<tr><td colspan="5" style="' + C + '"><sup>(1)</sup> <b>Razón Social:</b> ' + esc_(cargo.empresa) + '</td>' +
-          '<td colspan="3" style="' + C + '"><sup>(2)</sup> <b>C.U.I.T.:</b> ' + esc_(cuit) + '</td></tr>' +
-      '<tr><td colspan="5" style="' + C + '"><sup>(3)</sup> <b>Dirección:</b> ' + esc_(cargo.objetivo) + '</td>' +
-          '<td colspan="3" style="' + C + '"><sup>(4)</sup> <b>Localidad:</b></td></tr>' +
-      '<tr><td colspan="3" style="' + C + '"><sup>(5)</sup> <b>C.P.:</b></td>' +
-          '<td colspan="5" style="' + C + '"><sup>(6)</sup> <b>Provincia:</b></td></tr>' +
-      '<tr><td colspan="5" style="' + C + '"><sup>(7)</sup> <b>Nombre y Apellido del Trabajador:</b> ' + esc_(cargo.nombre) + '</td>' +
-          '<td colspan="3" style="' + C + '"><sup>(8)</sup> <b>D.N.I.:</b> ' + esc_(cargo.dni) + '</td></tr>' +
-      '<tr><td colspan="4" style="' + C + 'height:60px"><sup>(9)</sup> Descripción breve del puesto/s de trabajo en el/los cuales se desempeña el trabajador:</td>' +
-          '<td colspan="4" style="' + C + '"><sup>(10)</sup> Elementos de protección personal, necesarios para el trabajador, según el puesto de trabajo:</td></tr>' +
+      '<tr><td style="' + C + 'width:70%"><sup>(1)</sup> Razón Social: <b>' + esc_(emp.razon) + '</b></td>' +
+          '<td style="' + C + '"><sup>(2)</sup> C.U.I.T.: <b>' + esc_(emp.cuit) + '</b></td></tr>' +
     '</table>' +
-    '<table style="width:100%;border-collapse:collapse;table-layout:fixed;margin-top:6px">' +
-      '<tr style="background:#fff;text-align:center;font-weight:bold">' +
-        '<td style="' + C + 'width:16px">&nbsp;</td>' +
-        '<td style="' + C + 'width:24%"><sup>(11)</sup> Producto</td>' +
-        '<td style="' + C + 'width:15%"><sup>(12)</sup> Tipo // Modelo</td>' +
-        '<td style="' + C + 'width:11%"><sup>(13)</sup> Marca</td>' +
-        '<td style="' + C + 'width:11%"><sup>(14)</sup> Posee certificación SI // NO</td>' +
-        '<td style="' + C + 'width:8%"><sup>(15)</sup> Cantidad</td>' +
-        '<td style="' + C + 'width:12%"><sup>(16)</sup> Fecha de entrega</td>' +
+    '<table style="width:100%;border-collapse:collapse;table-layout:fixed">' +
+      '<tr><td style="' + C + 'width:45%"><sup>(3)</sup> Dirección: <b>' + esc_(emp.domicilio) + '</b></td>' +
+          '<td style="' + C + 'width:25%"><sup>(4)</sup> Localidad: <b>' + esc_(emp.localidad) + '</b></td>' +
+          '<td style="' + C + 'width:10%"><sup>(5)</sup> C.P.: <b>' + esc_(emp.cp) + '</b></td>' +
+          '<td style="' + C + '"><sup>(6)</sup> Provincia: <b>' + esc_(emp.provincia) + '</b></td></tr>' +
+    '</table>' +
+    '<table style="width:100%;border-collapse:collapse;table-layout:fixed">' +
+      '<tr><td style="' + C + 'width:75%"><sup>(7)</sup> Nombre y Apellido del Trabajador: <b>' + esc_(cargo.nombre) + '</b></td>' +
+          '<td style="' + C + '"><sup>(8)</sup> D.N.I.: <b>' + esc_(cargo.dni) + '</b></td></tr>' +
+    '</table>' +
+    '<table style="width:100%;border-collapse:collapse;table-layout:fixed">' +
+      '<tr><td style="' + C + 'width:50%;height:46px"><sup>(9)</sup> Descripción breve del puesto/s de trabajo en el/los cuales se desempeña el trabajador:</td>' +
+          '<td style="' + C + '"><sup>(10)</sup> Elementos de protección personal, necesarios para el trabajador, según el puesto de trabajo:</td></tr>' +
+    '</table>' +
+    '<table style="width:100%;border-collapse:collapse;table-layout:fixed;margin-top:4px">' +
+      '<tr style="text-align:center">' +
+        '<td style="' + C + 'width:22px">&nbsp;</td>' +
+        '<td style="' + C + 'width:21%"><sup>(11)</sup> Producto</td>' +
+        '<td style="' + C + 'width:14%"><sup>(12)</sup> Tipo // Modelo</td>' +
+        '<td style="' + C + 'width:12%"><sup>(13)</sup> Marca</td>' +
+        '<td style="' + C + 'width:9%"><sup>(14)</sup> Posee certificación SI // NO</td>' +
+        '<td style="' + C + 'width:7%"><sup>(15)</sup> Cantidad</td>' +
+        '<td style="' + C + 'width:10%"><sup>(16)</sup> Fecha de entrega</td>' +
         '<td style="' + C + '"><sup>(17)</sup> Firma del trabajador</td></tr>' +
       filas +
     '</table>' +
-    '<div style="' + B + 'border-top:0;padding:4px;font-size:8px;height:70px"><sup>(18)</sup> Información adicional:' +
-      (cargo.observaciones ? ' ' + esc_(cargo.observaciones) : '') + '</div>' +
-    '<table align="right" style="margin-top:8px;border-collapse:collapse"><tr><td style="border:2px solid #000;padding:4px 10px;font-size:9px;font-weight:bold;text-align:center">' +
-      'RESOLUCIÓN 299/11 · ANEXO I<br>Constancia registrada el ' + esc_(firmadoEl) + ' (hora de Argentina)<br>Cargo N° ' + esc_(cargo.id) +
-    '</td></tr></table>' +
+    '<div style="' + B + 'border-top:0;padding:4px;font-size:9px;height:48px"><sup>(18)</sup> Información adicional:</div>' +
+    '<div style="text-align:right;font-size:8px;color:#9a9a9a;margin-top:6px">Firmado el ' + esc_(firmadoExacto) + ' hs (hora de Argentina)</div>' +
     '</div>';
+  // Hoja 2 del PDF: el formulario horizontal se gira 90° sobre la hoja vertical.
+  const rot = 'transform:rotate(90deg);-webkit-transform:rotate(90deg);-ms-transform:rotate(90deg);' +
+    'transform-origin:0 0;-webkit-transform-origin:0 0;position:relative;left:690px;top:0;';
+  return '<div style="page-break-before:always"></div>' +
+    (CFG.ANEXO_GIRADO ? '<div style="height:1010px;overflow:hidden"><div style="' + rot + '">' + hoja + '</div></div>' : hoja);
 }
 
 function actaPdf_(cargo, firmaDataUrl, aclaracion, dniFirma) {
@@ -875,6 +956,7 @@ function actaPdf_(cargo, firmaDataUrl, aclaracion, dniFirma) {
   }
 
   const firmadoEl = Utilities.formatDate(new Date(), CFG.TZ, 'dd/MM/yyyy HH:mm');
+  const firmadoExacto = Utilities.formatDate(new Date(), CFG.TZ, "dd/MM/yyyy 'a las' HH:mm:ss");
 
   const sello = dev
     ? '<table align="right" style="border-collapse:collapse;margin-top:6px"><tr>' +
@@ -938,14 +1020,15 @@ function actaPdf_(cargo, firmaDataUrl, aclaracion, dniFirma) {
     pieFirma +
 
     '<p style="font-size:8px;color:#555;margin:14px 0 0">' + (dev ? 'Devolución N° ' : 'Cargo N° ') + esc_(cargo.id) +
-      ' · Firmado digitalmente el ' + firmadoEl + ' · Registrado por ' + esc_(cargo.supervisor) + '</p>' +
+      ' · Firmado digitalmente el ' + firmadoEl + ' · Registrado por ' + esc_(cargo.supervisor) +
+      (dev ? '' : ' · <span style="color:#a8a8a8">Sello de firma: ' + esc_(firmadoExacto) + ' hs (hora de Argentina)</span>') + '</p>' +
 
     '<p style="text-align:center;font-size:8px;color:#333;margin:14px 0 0;border-top:1px solid #999;padding-top:6px">' +
       'KTL SEGURIDAD · (011) 4000-9600 · www.ktl-seguridad.com<br>' +
       'Adolfo Alsina 1360 6º piso (C1088AAJ) C.A.B.A., Argentina' +
     '</p>' +
 
-    (dev ? '' : anexoHtml_(cargo, firmaDataUrl, firmadoEl)) +
+    (dev ? '' : anexoHtml_(cargo, firmaDataUrl, firmadoExacto)) +
 
     '</body></html>';
 
@@ -967,6 +1050,7 @@ function diagnosticoSistema() {
   paso('Personal (sin BAJA)', function () { return empleados_().length + ' empleados'; });
   paso('Inventario', function () { return inventario_().length + ' ítems'; });
   paso('Objetivos', function () { return objetivos_().length + ' objetivos'; });
+  paso('Anexo I – empresas', function () { const e = empresaDatos_('__prueba__'); return 'solapa empresas leída (CUIT/domicilio se completan por empresa)'; });
   paso('Usuarios', function () {
     const t = leerTabla_(hoja_(SpreadsheetApp.openById(CFG.AUTH_SPREADSHEET_ID), CFG.AUTH_SHEET), authDefs_());
     return t.rows.length + ' usuarios (email: ' + (t.map.email >= 0 ? 'sí' : 'no hay columna, se usa el usuario si parece un email') + ')';
