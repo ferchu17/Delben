@@ -50,8 +50,6 @@ const CFG = {
 
   // Anexo I (Res. 299/11): datos de la empresa desde la solapa "empresas"
   SHEET_EMPRESAS: 'empresas',
-  // true: el Anexo va como hoja 2 del PDF, girado para leerse apaisado. false: hoja vertical normal.
-  ANEXO_GIRADO: true,
 
   MAX_ITEMS: 15,
   SESSION_SECONDS: 21600 // 6 horas (máximo de CacheService)
@@ -871,71 +869,81 @@ function inventarioAnexo_(items) {
 
 /**
  * Anexo I: reproduce el formulario oficial (horizontal, 18 renglones). Sin logo.
- * Va como segunda hoja del PDF del cargo, girado para que se lea apaisado.
- * Campos 9 y 10 (puesto y EPP necesarios): por ahora quedan vacíos.
+ * Va como hoja 2 (apaisada) del PDF del cargo. Campos 9 y 10: por ahora vacíos.
+ * Los renglones sin usar se tachan con una línea cruzada, como en el formulario en papel.
  */
-function anexoHtml_(cargo, firmaDataUrl, firmadoExacto) {
+function anexoHtml_(cargo, firmaDataUrl, selloFirma) {
+  const F = "font-family:'Times New Roman',Times,serif;";
   const B = 'border:1px solid #000;';
-  const C = B + 'padding:2px 4px;font-size:9px;vertical-align:top;';
+  const C = B + F + 'padding:1px 5px;font-size:11px;vertical-align:middle;';
   const items = cargo.items || [];
   const emp = empresaDatos_(cargo.empresa);
   const inv = inventarioAnexo_(items);
   const fechaEntrega = Utilities.formatDate(cargo.fecha instanceof Date ? cargo.fecha : new Date(), CFG.TZ, 'dd/MM/yyyy');
+  const W = [26, 236, 160, 130, 100, 80, 110, 188];            // anchos de columna (px) = 1030
+  const colgroup = '<colgroup>' + W.map(function (w) { return '<col style="width:' + w + 'px">'; }).join('') + '</colgroup>';
+  const H = 20;                                                // alto de cada renglón (px)
+  const usados = Math.min(items.length, 18);
   let filas = '';
   for (let i = 0; i < 18; i++) {
     const x = items[i], v = inv[i] || {};
-    filas += '<tr style="height:21px">' +
-      '<td style="' + C + 'text-align:center;background:#d9d9d9">' + (i + 1) + '</td>' +
-      '<td style="' + C + '">' + (x ? esc_(x.item) : '&nbsp;') + '</td>' +
-      '<td style="' + C + '">' + (x ? esc_(v.tipo) : '&nbsp;') + '</td>' +
-      '<td style="' + C + '">' + (x ? esc_(v.marca) : '&nbsp;') + '</td>' +
-      '<td style="' + C + 'text-align:center">' + (x ? esc_(v.cert) : '&nbsp;') + '</td>' +
-      '<td style="' + C + 'text-align:center">' + (x ? esc_(x.cantidad) : '&nbsp;') + '</td>' +
-      '<td style="' + C + 'text-align:center">' + (x ? fechaEntrega : '&nbsp;') + '</td>' +
-      '<td style="' + C + '">' + (x ? '<img src="' + firmaDataUrl + '" height="17">' : '&nbsp;') + '</td>' +
+    filas += '<tr style="height:' + H + 'px">' +
+      '<td style="' + C + 'text-align:center;background:#d9d9d9;font-size:10px">' + (i + 1) + '</td>' +
+      '<td style="' + C + '">' + (x ? esc_(x.item) : '') + '</td>' +
+      '<td style="' + C + '">' + (x ? esc_(v.tipo) : '') + '</td>' +
+      '<td style="' + C + '">' + (x ? esc_(v.marca) : '') + '</td>' +
+      '<td style="' + C + 'text-align:center">' + (x ? esc_(v.cert) : '') + '</td>' +
+      '<td style="' + C + 'text-align:center">' + (x ? esc_(x.cantidad) : '') + '</td>' +
+      '<td style="' + C + 'text-align:center">' + (x ? fechaEntrega : '') + '</td>' +
+      '<td style="' + C + 'text-align:center">' + (x ? '<img src="' + firmaDataUrl + '" height="18">' : '') + '</td>' +
       '</tr>';
   }
-  const hoja =
-    '<div style="width:1000px;font-family:Arial,Helvetica,sans-serif;color:#000">' +
-    '<div style="text-align:right;font-weight:bold;font-style:italic;font-size:11px">Resolución 299/11, Anexo I</div>' +
-    '<div style="background:#000;color:#fff;text-align:center;font-weight:bold;font-size:11px;padding:3px 2px">ENTREGA DE ROPA DE TRABAJO Y ELEMENTOS DE PROTECCIÓN PERSONAL</div>' +
-    '<table style="width:100%;border-collapse:collapse;table-layout:fixed">' +
-      '<tr><td style="' + C + 'width:70%"><sup>(1)</sup> Razón Social: <b>' + esc_(emp.razon) + '</b></td>' +
-          '<td style="' + C + '"><sup>(2)</sup> C.U.I.T.: <b>' + esc_(emp.cuit) + '</b></td></tr>' +
-    '</table>' +
-    '<table style="width:100%;border-collapse:collapse;table-layout:fixed">' +
-      '<tr><td style="' + C + 'width:45%"><sup>(3)</sup> Dirección: <b>' + esc_(emp.domicilio) + '</b></td>' +
-          '<td style="' + C + 'width:25%"><sup>(4)</sup> Localidad: <b>' + esc_(emp.localidad) + '</b></td>' +
-          '<td style="' + C + 'width:10%"><sup>(5)</sup> C.P.: <b>' + esc_(emp.cp) + '</b></td>' +
-          '<td style="' + C + '"><sup>(6)</sup> Provincia: <b>' + esc_(emp.provincia) + '</b></td></tr>' +
-    '</table>' +
-    '<table style="width:100%;border-collapse:collapse;table-layout:fixed">' +
-      '<tr><td style="' + C + 'width:75%"><sup>(7)</sup> Nombre y Apellido del Trabajador: <b>' + esc_(cargo.nombre) + '</b></td>' +
-          '<td style="' + C + '"><sup>(8)</sup> D.N.I.: <b>' + esc_(cargo.dni) + '</b></td></tr>' +
-    '</table>' +
-    '<table style="width:100%;border-collapse:collapse;table-layout:fixed">' +
-      '<tr><td style="' + C + 'width:50%;height:46px"><sup>(9)</sup> Descripción breve del puesto/s de trabajo en el/los cuales se desempeña el trabajador:</td>' +
-          '<td style="' + C + '"><sup>(10)</sup> Elementos de protección personal, necesarios para el trabajador, según el puesto de trabajo:</td></tr>' +
-    '</table>' +
-    '<table style="width:100%;border-collapse:collapse;table-layout:fixed;margin-top:4px">' +
-      '<tr style="text-align:center">' +
-        '<td style="' + C + 'width:22px">&nbsp;</td>' +
-        '<td style="' + C + 'width:21%"><sup>(11)</sup> Producto</td>' +
-        '<td style="' + C + 'width:14%"><sup>(12)</sup> Tipo // Modelo</td>' +
-        '<td style="' + C + 'width:12%"><sup>(13)</sup> Marca</td>' +
-        '<td style="' + C + 'width:9%"><sup>(14)</sup> Posee certificación SI // NO</td>' +
-        '<td style="' + C + 'width:7%"><sup>(15)</sup> Cantidad</td>' +
-        '<td style="' + C + 'width:10%"><sup>(16)</sup> Fecha de entrega</td>' +
-        '<td style="' + C + '"><sup>(17)</sup> Firma del trabajador</td></tr>' +
-      filas +
-    '</table>' +
-    '<div style="' + B + 'border-top:0;padding:4px;font-size:9px;height:48px"><sup>(18)</sup> Información adicional:</div>' +
-    '<div style="text-align:right;font-size:8px;color:#9a9a9a;margin-top:6px">Firmado el ' + esc_(firmadoExacto) + ' hs (hora de Argentina)</div>' +
+  // Línea cruzada sobre los renglones sin usar: desde la esquina superior izquierda del primero
+  // sin usar (columna Producto) hasta la esquina inferior derecha del último (columna Fecha).
+  const lineaX = W[0], lineaW = W[1] + W[2] + W[3] + W[4] + W[5] + W[6];
+  const lineaH = (18 - usados) * H;
+  const cruz = lineaH > 0
+    ? '<svg width="' + lineaW + '" height="' + lineaH + '" viewBox="0 0 ' + lineaW + ' ' + lineaH + '" ' +
+      'style="position:absolute;left:' + lineaX + 'px;top:' + (usados * H) + 'px">' +
+      '<line x1="0" y1="0" x2="' + lineaW + '" y2="' + lineaH + '" stroke="#000" stroke-width="1.3"/></svg>'
+    : '';
+  const T = 'width:1030px;border-collapse:collapse;table-layout:fixed;';
+  const sub = function (n) { return '<sup style="font-size:7px">(' + n + ')</sup> '; };
+  const val = function (t) { return '<b style="font-size:13px">' + esc_(t) + '</b>'; };
+  return '<div class="anexo" style="page:anexo;page-break-before:always;width:1030px;' + F + 'color:#000">' +
+    '<div style="text-align:right;font-weight:bold;font-style:italic;font-size:13px">Resolución 299/11, Anexo I</div>' +
+    '<div style="background:#000;color:#fff;text-align:center;font-weight:bold;font-size:13px;padding:2px">ENTREGA DE ROPA DE TRABAJO Y ELEMENTOS DE PROTECCIÓN PERSONAL</div>' +
+    '<table style="' + T + '"><tr>' +
+      '<td style="' + C + 'width:75%;height:24px">' + sub(1) + 'Razón Social: ' + val(emp.razon) + '</td>' +
+      '<td style="' + C + '">' + sub(2) + 'C.U.I.T.: ' + val(emp.cuit) + '</td></tr></table>' +
+    '<table style="' + T + '"><tr>' +
+      '<td style="' + C + 'width:42%;height:24px">' + sub(3) + 'Dirección: ' + val(emp.domicilio) + '</td>' +
+      '<td style="' + C + 'width:24%">' + sub(4) + 'Localidad: ' + val(emp.localidad) + '</td>' +
+      '<td style="' + C + 'width:12%">' + sub(5) + 'C.P.: ' + val(emp.cp) + '</td>' +
+      '<td style="' + C + '">' + sub(6) + 'Provincia: ' + val(emp.provincia) + '</td></tr></table>' +
+    '<table style="' + T + '"><tr>' +
+      '<td style="' + C + 'width:75%;height:24px">' + sub(7) + 'Nombre y Apellido del Trabajador: ' + val(cargo.nombre + ' - LP ' + (cargo.lp || '')) + '</td>' +
+      '<td style="' + C + '">' + sub(8) + 'D.N.I.: ' + val(cargo.dni) + '</td></tr></table>' +
+    '<table style="' + T + '"><tr>' +
+      '<td style="' + C + 'width:50%;height:80px;vertical-align:top">' + sub(9) + 'Descripción breve del puesto/s de trabajo en el/los cuales se desempeña el trabajador:</td>' +
+      '<td style="' + C + 'vertical-align:top">' + sub(10) + 'Elementos de protección personal, necesarios para el trabajador, según el puesto de trabajo:</td></tr></table>' +
+    '<table style="' + T + 'margin-top:6px">' + colgroup +
+      '<tr style="text-align:center;height:34px">' +
+        '<td style="' + C + 'background:#d9d9d9">&nbsp;</td>' +
+        '<td style="' + C + '">' + sub(11) + 'Producto</td>' +
+        '<td style="' + C + '">' + sub(12) + 'Tipo // Modelo</td>' +
+        '<td style="' + C + '">' + sub(13) + 'Marca</td>' +
+        '<td style="' + C + 'font-size:10px">' + sub(14) + 'Posee certificación SI // NO</td>' +
+        '<td style="' + C + '">' + sub(15) + 'Cantidad</td>' +
+        '<td style="' + C + '">' + sub(16) + 'Fecha de entrega</td>' +
+        '<td style="' + C + '">' + sub(17) + 'Firma del trabajador</td></tr></table>' +
+    '<div style="position:relative;width:1030px">' +
+      '<table style="' + T + '">' + colgroup + filas + '</table>' + cruz +
+    '</div>' +
+    '<div style="' + B + 'border-top:0;width:1018px;padding:4px 5px;font-size:11px;height:48px">' + sub(18) + 'Información adicional:</div>' +
+    '<div style="text-align:center;font-family:Arial,sans-serif;font-size:7px;color:#b0b0b0;margin-top:8px;letter-spacing:.4px">' +
+      'SELLO DE TIEMPO - FIRMA REGISTRADA: ' + esc_(selloFirma) + ' ART</div>' +
     '</div>';
-  // Hoja 2 del PDF: el formulario se genera realmente en A4 apaisado.
-  return (CFG.ANEXO_GIRADO
-    ? '<div style="page:anexo;break-before:page;page-break-before:always">' + hoja + '</div>'
-    : '<div style="page-break-before:always">' + hoja + '</div>');
 }
 
 function actaPdf_(cargo, firmaDataUrl, aclaracion, dniFirma) {
@@ -955,7 +963,7 @@ function actaPdf_(cargo, firmaDataUrl, aclaracion, dniFirma) {
   }
 
   const firmadoEl = Utilities.formatDate(new Date(), CFG.TZ, 'dd/MM/yyyy HH:mm');
-  const firmadoExacto = Utilities.formatDate(new Date(), CFG.TZ, "dd/MM/yyyy 'a las' HH:mm:ss");
+  const selloFirma = Utilities.formatDate(new Date(), CFG.TZ, 'dd/MM/yyyy HH:mm:ss');
 
   const sello = dev
     ? '<table align="right" style="border-collapse:collapse;margin-top:6px"><tr>' +
@@ -994,7 +1002,7 @@ function actaPdf_(cargo, firmaDataUrl, aclaracion, dniFirma) {
         '&nbsp;&nbsp;&nbsp;&nbsp;<b>Empresa:</b> ' + esc_(cargo.empresa) + '</p>';
 
   const html =
-    '<html><head><meta charset="utf-8"><style>@page cargo{size:A4 portrait;margin:0}@page anexo{size:A4 landscape;margin:0}body{page:cargo}</style></head>' +
+    '<html><head><meta charset="utf-8"><style>@page cargo{size:A4 portrait;margin:0}@page anexo{size:A4 landscape;margin:8mm}body{page:cargo}</style></head>' +
     '<body style="font-family:Arial,Helvetica,sans-serif;font-size:10px;color:#000;margin:0;padding:34px 40px">' +
 
     '<table style="width:100%"><tr>' +
@@ -1020,14 +1028,16 @@ function actaPdf_(cargo, firmaDataUrl, aclaracion, dniFirma) {
 
     '<p style="font-size:8px;color:#555;margin:14px 0 0">' + (dev ? 'Devolución N° ' : 'Cargo N° ') + esc_(cargo.id) +
       ' · Firmado digitalmente el ' + firmadoEl + ' · Registrado por ' + esc_(cargo.supervisor) +
-      (dev ? '' : ' · <span style="color:#a8a8a8">Sello de firma: ' + esc_(firmadoExacto) + ' hs (hora de Argentina)</span>') + '</p>' +
+'</p>' +
 
     '<p style="text-align:center;font-size:8px;color:#333;margin:14px 0 0;border-top:1px solid #999;padding-top:6px">' +
       'KTL SEGURIDAD · (011) 4000-9600 · www.ktl-seguridad.com<br>' +
       'Adolfo Alsina 1360 6º piso (C1088AAJ) C.A.B.A., Argentina' +
     '</p>' +
 
-    (dev ? '' : anexoHtml_(cargo, firmaDataUrl, firmadoExacto)) +
+    (dev ? '' :
+      '<div style="text-align:center;font-family:Arial,sans-serif;font-size:7px;color:#b0b0b0;margin-top:10px;letter-spacing:.4px">SELLO DE TIEMPO - FIRMA REGISTRADA: ' + esc_(selloFirma) + ' ART</div>' +
+      anexoHtml_(cargo, firmaDataUrl, selloFirma)) +
 
     '</body></html>';
 
