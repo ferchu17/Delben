@@ -48,6 +48,10 @@ const CFG = {
   // Copia fija de todos los cargos enviados
   EMAIL_COPIA: 'fjacyno@ktl-seguridad.com',
 
+  // C.U.I.T. por empresa para el Anexo I (Res. 299/11). Completar con el nombre de la empresa
+  // tal como figura en la columna Empresa de Personal, por ejemplo: { 'KTL SEGURIDAD': '30-00000000-0' }
+  CUIT_EMPRESAS: {},
+
   MAX_ITEMS: 15,
   SESSION_SECONDS: 21600 // 6 horas (máximo de CacheService)
 };
@@ -793,6 +797,67 @@ function logoKtlSrc_() {
   return 'data:image/jpeg;base64,' + LOGO_KTL_B64;
 }
 
+/** Anexo I – Resolución 299/11 (constancia de entrega de ropa de trabajo y EPP). Solo para cargos. */
+function anexoHtml_(cargo, firmaDataUrl, firmadoEl) {
+  const B = 'border:1px solid #000;';
+  const C = B + 'padding:3px 4px;font-size:8px;vertical-align:top;';
+  const items = cargo.items || [];
+  const cuit = (function () {
+    const m = CFG.CUIT_EMPRESAS || {};
+    const k = String(cargo.empresa || '').trim().toUpperCase();
+    return m[cargo.empresa] || m[k] || '';
+  })();
+  const fechaEntrega = Utilities.formatDate(new Date(), CFG.TZ, 'dd/MM/yyyy');
+  let filas = '';
+  for (let i = 0; i < 18; i++) {
+    const x = items[i];
+    filas += '<tr style="height:24px">' +
+      '<td style="' + C + 'text-align:center;background:#d9d9d9;width:16px">' + (i + 1) + '</td>' +
+      '<td style="' + C + '">' + (x ? esc_(x.item) + (x.codigo ? ' (' + esc_(x.codigo) + ')' : '') : '&nbsp;') + '</td>' +
+      '<td style="' + C + '">&nbsp;</td>' +
+      '<td style="' + C + '">&nbsp;</td>' +
+      '<td style="' + C + 'text-align:center">&nbsp;</td>' +
+      '<td style="' + C + 'text-align:center">' + (x ? esc_(x.cantidad) : '&nbsp;') + '</td>' +
+      '<td style="' + C + 'text-align:center">' + (x ? fechaEntrega : '&nbsp;') + '</td>' +
+      '<td style="' + C + '">' + (x ? '<img src="' + firmaDataUrl + '" height="16">' : '&nbsp;') + '</td>' +
+      '</tr>';
+  }
+  return '<div style="page-break-before:always"></div>' +
+    '<div style="font-family:Arial,Helvetica,sans-serif;color:#000">' +
+    '<div style="text-align:right;font-weight:bold;font-style:italic;font-size:10px">Resolución 299/11, Anexo I</div>' +
+    '<div style="background:#000;color:#fff;text-align:center;font-weight:bold;font-size:10px;padding:3px 2px">ENTREGA DE ROPA DE TRABAJO Y ELEMENTOS DE PROTECCIÓN PERSONAL</div>' +
+    '<table style="width:100%;border-collapse:collapse;table-layout:fixed">' +
+      '<tr><td colspan="5" style="' + C + '"><sup>(1)</sup> <b>Razón Social:</b> ' + esc_(cargo.empresa) + '</td>' +
+          '<td colspan="3" style="' + C + '"><sup>(2)</sup> <b>C.U.I.T.:</b> ' + esc_(cuit) + '</td></tr>' +
+      '<tr><td colspan="5" style="' + C + '"><sup>(3)</sup> <b>Dirección:</b> ' + esc_(cargo.objetivo) + '</td>' +
+          '<td colspan="3" style="' + C + '"><sup>(4)</sup> <b>Localidad:</b></td></tr>' +
+      '<tr><td colspan="3" style="' + C + '"><sup>(5)</sup> <b>C.P.:</b></td>' +
+          '<td colspan="5" style="' + C + '"><sup>(6)</sup> <b>Provincia:</b></td></tr>' +
+      '<tr><td colspan="5" style="' + C + '"><sup>(7)</sup> <b>Nombre y Apellido del Trabajador:</b> ' + esc_(cargo.nombre) + '</td>' +
+          '<td colspan="3" style="' + C + '"><sup>(8)</sup> <b>D.N.I.:</b> ' + esc_(cargo.dni) + '</td></tr>' +
+      '<tr><td colspan="4" style="' + C + 'height:60px"><sup>(9)</sup> Descripción breve del puesto/s de trabajo en el/los cuales se desempeña el trabajador:</td>' +
+          '<td colspan="4" style="' + C + '"><sup>(10)</sup> Elementos de protección personal, necesarios para el trabajador, según el puesto de trabajo:</td></tr>' +
+    '</table>' +
+    '<table style="width:100%;border-collapse:collapse;table-layout:fixed;margin-top:6px">' +
+      '<tr style="background:#fff;text-align:center;font-weight:bold">' +
+        '<td style="' + C + 'width:16px">&nbsp;</td>' +
+        '<td style="' + C + 'width:24%"><sup>(11)</sup> Producto</td>' +
+        '<td style="' + C + 'width:15%"><sup>(12)</sup> Tipo // Modelo</td>' +
+        '<td style="' + C + 'width:11%"><sup>(13)</sup> Marca</td>' +
+        '<td style="' + C + 'width:11%"><sup>(14)</sup> Posee certificación SI // NO</td>' +
+        '<td style="' + C + 'width:8%"><sup>(15)</sup> Cantidad</td>' +
+        '<td style="' + C + 'width:12%"><sup>(16)</sup> Fecha de entrega</td>' +
+        '<td style="' + C + '"><sup>(17)</sup> Firma del trabajador</td></tr>' +
+      filas +
+    '</table>' +
+    '<div style="' + B + 'border-top:0;padding:4px;font-size:8px;height:70px"><sup>(18)</sup> Información adicional:' +
+      (cargo.observaciones ? ' ' + esc_(cargo.observaciones) : '') + '</div>' +
+    '<table align="right" style="margin-top:8px;border-collapse:collapse"><tr><td style="border:2px solid #000;padding:4px 10px;font-size:9px;font-weight:bold;text-align:center">' +
+      'RESOLUCIÓN 299/11 · ANEXO I<br>Constancia registrada el ' + esc_(firmadoEl) + ' (hora de Argentina)<br>Cargo N° ' + esc_(cargo.id) +
+    '</td></tr></table>' +
+    '</div>';
+}
+
 function actaPdf_(cargo, firmaDataUrl, aclaracion, dniFirma) {
   const dev = cargo.tipo === 'devolucion';
   const items = cargo.items || [];
@@ -879,6 +944,8 @@ function actaPdf_(cargo, firmaDataUrl, aclaracion, dniFirma) {
       'KTL SEGURIDAD · (011) 4000-9600 · www.ktl-seguridad.com<br>' +
       'Adolfo Alsina 1360 6º piso (C1088AAJ) C.A.B.A., Argentina' +
     '</p>' +
+
+    (dev ? '' : anexoHtml_(cargo, firmaDataUrl, firmadoEl)) +
 
     '</body></html>';
 
