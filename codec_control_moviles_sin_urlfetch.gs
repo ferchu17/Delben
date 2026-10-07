@@ -6,7 +6,7 @@ var CC_CONTROL_MOVILES = 'fjacyno@ktl-seguridad.com';
 // Así la generación del PDF no depende de UrlFetchApp ni de un archivo externo en Drive.
 function obtenerLogoBlob_() {
   var html = getAppHtml();
-  var m = html.match(/data:image\\/png;base64,([A-Za-z0-9+/=]+)/);
+  var m = html.match(/data:image\/png;base64,([A-Za-z0-9+/=]+)/);
   if (!m || !m[1]) {
     throw new Error('No se encontró el logo DELBEN embebido en getAppHtml().');
   }
@@ -177,13 +177,12 @@ function getDatosControlMoviles() {
  */
 function getSupervisores() {
   var respaldo = [
-    {nombre:'Fernando Jacyno', correo:'fjacyno@ktl-seguridad.com'},
-    {nombre:'Gustavo San Martin', correo:'gsanmartin@ktl-seguridad.com'}
+    {nombre:'Fernando Jacyno', correo:'fjacyno@ktl-seguridad.com'}
   ];
 
   function normalizar(v) {
     return String(v || '').toLowerCase().trim()
-      .normalize('NFD').replace(/[\\u0300-\\u036f]/g, '');
+      .normalize('NFD').replace(/[\u0300-\u036f]/g, '');
   }
 
   function agregar(out, nombre, correo) {
@@ -566,7 +565,7 @@ function procesarColaPDFControles_() {
 function formatearFechaPDF_(valor) {
   if (valor === null || valor === undefined || valor === '') return '';
   var s = String(valor).trim();
-  var m = s.match(/^(\\d{4})-(\\d{2})-(\\d{2})$/);
+  var m = s.match(/^(\d{4})-(\d{2})-(\d{2})$/);
   if (m) return m[3] + '/' + m[2] + '/' + m[1];
   var d = new Date(valor);
   if (!isNaN(d.getTime())) return Utilities.formatDate(d, Session.getScriptTimeZone() || 'America/Argentina/Buenos_Aires', 'dd/MM/yyyy');
@@ -576,32 +575,41 @@ function formatearFechaPDF_(valor) {
 function formatearHoraPDF_(valor) {
   if (valor === null || valor === undefined || valor === '') return '';
   var s = String(valor).trim();
-  var m = s.match(/^(\\d{1,2}):(\\d{2})(?::\\d{2})?/);
+  var m = s.match(/^(\d{1,2}):(\d{2})(?::\d{2})?/);
   if (m) return ('0' + m[1]).slice(-2) + ':' + m[2];
   var d = new Date(valor);
   if (!isNaN(d.getTime())) return Utilities.formatDate(d, Session.getScriptTimeZone() || 'America/Argentina/Buenos_Aires', 'HH:mm');
   return s;
 }
 
+/**
+ * Correos del servicio (objetivo) que realizó el control.
+ * Se leen de la solapa "Usuarios y contraseñas" (id, nombre, usuario, password, rol, correo):
+ * filas con rol "servicios" cuyo nombre coincide con el objetivo del control.
+ * La celda correo puede tener varios correos separados por coma o punto y coma.
+ */
 function obtenerCorreosServicio_(objetivo) {
   objetivo = String(objetivo || '').trim();
   if (!objetivo) return '';
 
   function normalizar(v) {
     return String(v || '').toLowerCase().trim()
-      .normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+      .normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/\s+/g, ' ');
   }
 
   var objetivoNorm = normalizar(objetivo);
-  var ss = SpreadsheetApp.getActiveSpreadsheet();
-  var sh = ss.getSheetByName('Usuarios y contraseñas');
+  var ss = null;
+  try { ss = SpreadsheetApp.getActiveSpreadsheet(); } catch (e) { ss = null; }
+  var sh = ss ? ss.getSheetByName('Usuarios y contraseñas') : null;
+  if (!sh) {
+    try { sh = SpreadsheetApp.openById('1Z06eLpbng51tYcycQlr0fLNI1OYmOpnmQp94YHY_coY').getSheetByName('Usuarios y contraseñas'); } catch (e2) { sh = null; }
+  }
   if (!sh) return '';
 
   var values = sh.getDataRange().getDisplayValues();
   if (!values || values.length < 2) return '';
 
   var headers = values[0].map(normalizar);
-
   function buscarIndice(nombres, fallback) {
     for (var i = 0; i < nombres.length; i++) {
       var idx = headers.indexOf(normalizar(nombres[i]));
@@ -609,38 +617,35 @@ function obtenerCorreosServicio_(objetivo) {
     }
     return fallback;
   }
-
   var iNombre = buscarIndice(['nombre'], 1);
   var iRol = buscarIndice(['rol'], 4);
-  var iCorreo = buscarIndice(['correo'], 5);
+  var iCorreo = buscarIndice(['correo', 'email', 'mail'], 5);
+  var emailRe = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-  var correos = [];
-  var vistos = {};
-
-  for (var r = 1; r < values.length; r++) {
-    var row = values[r] || [];
-    var nombre = String(row[iNombre] || '').trim();
-    var rol = String(row[iRol] || '').trim();
-
-    if (normalizar(rol) !== 'servicios') continue;
-    if (normalizar(nombre) !== objetivoNorm) continue;
-
-    var correoCelda = String(row[iCorreo] || '').trim();
-    if (!correoCelda) continue;
-
-    var partes = correoCelda.split(/[;,]/);
-    for (var p = 0; p < partes.length; p++) {
-      var correo = String(partes[p] || '').trim();
-      if (!correo) continue;
-      var key = correo.toLowerCase();
-      if (!vistos[key]) {
-        vistos[key] = true;
-        correos.push(correo);
-      }
-    }
+  function juntar(filas) {
+    var correos = [], vistos = {};
+    filas.forEach(function (row) {
+      String(row[iCorreo] || '').split(/[;,\s]+/).forEach(function (c) {
+        c = String(c || '').trim();
+        if (c && emailRe.test(c) && !vistos[c.toLowerCase()]) { vistos[c.toLowerCase()] = true; correos.push(c); }
+      });
+    });
+    return correos.join(',');
   }
 
-  return correos.join(',');
+  var servicios = [];
+  for (var r = 1; r < values.length; r++) {
+    if (normalizar(values[r][iRol]).indexOf('servicio') === 0) servicios.push(values[r]);
+  }
+  // 1) nombre igual al objetivo; 2) si no hay, uno contiene al otro
+  var exactas = servicios.filter(function (row) { return normalizar(row[iNombre]) === objetivoNorm; });
+  var correos = juntar(exactas);
+  if (correos) return correos;
+  var parecidas = servicios.filter(function (row) {
+    var n = normalizar(row[iNombre]);
+    return n && (n.indexOf(objetivoNorm) >= 0 || objetivoNorm.indexOf(n) >= 0);
+  });
+  return juntar(parecidas);
 }
 
 function enviarControlPorCorreo_(data) {
@@ -838,19 +843,15 @@ function enviarControlPorCorreo_(data) {
     };
 
     if (!data.modoPrueba) {
-      var correosServicio = obtenerCorreosServicio_(fila[8]);
-      var ccBase = String(CC_CONTROL_MOVILES || '').split(/[;,]/).map(function(v){ return String(v || '').trim(); });
-      var ccTodos = ccBase.concat(String(correosServicio || '').split(/[;,]/).map(function(v){ return String(v || '').trim(); }));
-      var ccUnicos = [];
-      var ccVistos = {};
-      for (var ci = 0; ci < ccTodos.length; ci++) {
-        var ccCorreo = ccTodos[ci];
-        if (!ccCorreo) continue;
-        var ccKey = ccCorreo.toLowerCase();
-        if (ccVistos[ccKey]) continue;
-        ccVistos[ccKey] = true;
-        ccUnicos.push(ccCorreo);
-      }
+      // Copia fija + correos del servicio que realizó el control (sin duplicados).
+      var ccLista = String(CC_CONTROL_MOVILES || '').split(/[;,]/)
+        .concat(String(obtenerCorreosServicio_(fila[8]) || '').split(/[;,]/));
+      var ccUnicos = [], ccVistos = {};
+      ccLista.forEach(function (c) {
+        c = String(c || '').trim();
+        var k = c.toLowerCase();
+        if (c && !ccVistos[k] && k !== String(destinatario).toLowerCase()) { ccVistos[k] = true; ccUnicos.push(c); }
+      });
       if (ccUnicos.length) mailOptions.cc = ccUnicos.join(',');
     }
 

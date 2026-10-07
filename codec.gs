@@ -1,6 +1,6 @@
 // ID de la carpeta en Google Drive para guardar las fotos de inspección
 var FOLDER_ID_FOTOS_MOVILES = '1m81-m3AAiZXGarP9xoq3ZSh-7qJQ5i6I';
-var CC_CONTROL_MOVILES = 'fjacyno@ktl-seguridad.com,gsanmartin@ktl-seguridad.com';
+var CC_CONTROL_MOVILES = 'fjacyno@ktl-seguridad.com';
 
 // Logo DELBEN: se usa el PNG embebido en la propia aplicación.
 // Así la generación del PDF no depende de UrlFetchApp ni de GitHub.
@@ -174,8 +174,7 @@ function getDatosControlMoviles() {
  */
 function getSupervisores() {
   var respaldo = [
-    {nombre:'Fernando Jacyno', correo:'fjacyno@ktl-seguridad.com'},
-    {nombre:'Gustavo San Martin', correo:'gsanmartin@ktl-seguridad.com'}
+    {nombre:'Fernando Jacyno', correo:'fjacyno@ktl-seguridad.com'}
   ];
 
   function normalizar(v) {
@@ -556,6 +555,72 @@ function formatearHoraPDF_(valor) {
   return s;
 }
 
+/**
+ * Correos del servicio (objetivo) que realizó el control.
+ * Se leen de la solapa "Usuarios y contraseñas" (id, nombre, usuario, password, rol, correo):
+ * filas con rol "servicios" cuyo nombre coincide con el objetivo del control.
+ * La celda correo puede tener varios correos separados por coma o punto y coma.
+ */
+function obtenerCorreosServicio_(objetivo) {
+  objetivo = String(objetivo || '').trim();
+  if (!objetivo) return '';
+
+  function normalizar(v) {
+    return String(v || '').toLowerCase().trim()
+      .normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/\s+/g, ' ');
+  }
+
+  var objetivoNorm = normalizar(objetivo);
+  var ss = null;
+  try { ss = SpreadsheetApp.getActiveSpreadsheet(); } catch (e) { ss = null; }
+  var sh = ss ? ss.getSheetByName('Usuarios y contraseñas') : null;
+  if (!sh) {
+    try { sh = SpreadsheetApp.openById('1Z06eLpbng51tYcycQlr0fLNI1OYmOpnmQp94YHY_coY').getSheetByName('Usuarios y contraseñas'); } catch (e2) { sh = null; }
+  }
+  if (!sh) return '';
+
+  var values = sh.getDataRange().getDisplayValues();
+  if (!values || values.length < 2) return '';
+
+  var headers = values[0].map(normalizar);
+  function buscarIndice(nombres, fallback) {
+    for (var i = 0; i < nombres.length; i++) {
+      var idx = headers.indexOf(normalizar(nombres[i]));
+      if (idx >= 0) return idx;
+    }
+    return fallback;
+  }
+  var iNombre = buscarIndice(['nombre'], 1);
+  var iRol = buscarIndice(['rol'], 4);
+  var iCorreo = buscarIndice(['correo', 'email', 'mail'], 5);
+  var emailRe = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+  function juntar(filas) {
+    var correos = [], vistos = {};
+    filas.forEach(function (row) {
+      String(row[iCorreo] || '').split(/[;,\s]+/).forEach(function (c) {
+        c = String(c || '').trim();
+        if (c && emailRe.test(c) && !vistos[c.toLowerCase()]) { vistos[c.toLowerCase()] = true; correos.push(c); }
+      });
+    });
+    return correos.join(',');
+  }
+
+  var servicios = [];
+  for (var r = 1; r < values.length; r++) {
+    if (normalizar(values[r][iRol]).indexOf('servicio') === 0) servicios.push(values[r]);
+  }
+  // 1) nombre igual al objetivo; 2) si no hay, uno contiene al otro
+  var exactas = servicios.filter(function (row) { return normalizar(row[iNombre]) === objetivoNorm; });
+  var correos = juntar(exactas);
+  if (correos) return correos;
+  var parecidas = servicios.filter(function (row) {
+    var n = normalizar(row[iNombre]);
+    return n && (n.indexOf(objetivoNorm) >= 0 || objetivoNorm.indexOf(n) >= 0);
+  });
+  return juntar(parecidas);
+}
+
 function enviarControlPorCorreo_(data) {
   var fila = data.fila || [];
   var doc = null;
@@ -800,7 +865,18 @@ function enviarControlPorCorreo_(data) {
       replyTo: 'fjacyno@gmail.com'
     };
 
-    if (!data.modoPrueba) mailOptions.cc = CC_CONTROL_MOVILES;
+    if (!data.modoPrueba) {
+      // Copia fija + correos del servicio que realizó el control (sin duplicados).
+      var ccLista = String(CC_CONTROL_MOVILES || '').split(/[;,]/)
+        .concat(String(obtenerCorreosServicio_(fila[8]) || '').split(/[;,]/));
+      var ccUnicos = [], ccVistos = {};
+      ccLista.forEach(function (c) {
+        c = String(c || '').trim();
+        var k = c.toLowerCase();
+        if (c && !ccVistos[k] && k !== String(destinatario).toLowerCase()) { ccVistos[k] = true; ccUnicos.push(c); }
+      });
+      if (ccUnicos.length) mailOptions.cc = ccUnicos.join(',');
+    }
 
     MailApp.sendEmail(mailOptions);
 
