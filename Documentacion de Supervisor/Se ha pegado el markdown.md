@@ -1,0 +1,1 @@
+Contenido pendiente: archivo preparado desde la documentación proporcionada.
