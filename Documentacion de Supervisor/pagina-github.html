@@ -2,26 +2,27 @@
 <html lang="es">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>DELBEN · Documentación</title>
 <style>
-  html,body{margin:0;height:100%;background:#BFDAF5;font-family:Arial,sans-serif}
-  iframe{position:fixed;inset:0;width:100%;height:100%;border:0}
-  .aviso{position:fixed;left:50%;bottom:16px;transform:translateX(-50%);background:#1F2937;color:#fff;padding:10px 14px;border-radius:8px;font-size:14px;display:none}
-  .aviso a{color:#93C5FD}
+  html,body{margin:0;height:100%;font-family:Arial,sans-serif;color:#1E3A5F;
+    background:linear-gradient(180deg,#BFDAF5 0%,#62A8F8 100%)}
+  .caja{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);text-align:center;padding:20px}
+  a{color:#0B4A8B;font-weight:bold}
 </style>
 </head>
 <body>
 <!-- DELBEN SGI · Documentación de Supervisor
-     Esta página solo muestra la app de Apps Script. Si se publica una implementación
-     nueva con otra URL, cambiar APP_URL. -->
-<iframe id="app" title="DELBEN Documentación" allow="clipboard-write; downloads"></iframe>
-<div id="aviso" class="aviso">Si la app no carga, <a id="abrir" target="_top">abrila acá</a>.</div>
+     Esta página lleva directo a la app de Apps Script. Se abre la app completa (no dentro
+     de un recuadro) para que Google pueda reconocer la sesión del usuario.
+     Si se publica una implementación nueva con otra URL, cambiar APP_URL en los dos lugares. -->
+<div class="caja">
+  <p>Abriendo DELBEN · Documentación…</p>
+  <p>Si no se abre sola, <a id="abrir" href="https://script.google.com/macros/s/AKfycbyYVPr6NI9TeIZ0KeCJsUBDAYSs2PWvUjrXx26-lpy-OW1ihWA953I6BkXyEldlhAb0/exec">tocá acá</a>.</p>
+</div>
 <script>
   var APP_URL = 'https://script.google.com/macros/s/AKfycbyYVPr6NI9TeIZ0KeCJsUBDAYSs2PWvUjrXx26-lpy-OW1ihWA953I6BkXyEldlhAb0/exec';
-  document.getElementById('app').src = APP_URL;
-  document.getElementById('abrir').href = APP_URL;
-  setTimeout(function(){ document.getElementById('aviso').style.display = 'block'; }, 12000);
+  window.location.replace(APP_URL);
 </script>
 </body>
 </html>
