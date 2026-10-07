@@ -12,6 +12,9 @@ var SS_ID = '1Z06eLpbng51tYcycQlr0fLNI1OYmOpnmQp94YHY_coY';
 // tipo 'personas'  : listado de personal + documentos de la carpeta de Drive
 // -----------------------------------------------------------------------------
 var CONFIG = {
+  // PIN para entrar a la app (se pide una vez por celular). Vacío = sin PIN.
+  pin: '',
+
   secciones: [
     {
       id: 'automotriz',
@@ -27,8 +30,13 @@ var CONFIG = {
       icono: 'fa-helmet-safety',
       color1: '#5B1F86', color2: '#8E3FBF',
       folderId: '1FoxJ4mUZaCVTmYMk83KXfTinjrUOAfc7',
-      // Carpetas por empresa. Si queda vacío, se usan las subcarpetas de folderId.
-      carpetas: []
+      // Carpetas por empresa: cada una es un botón dentro de Documentación.
+      carpetas: [
+        { titulo: 'PPQ',      folderId: '1P_uXK8LstAf13Tnq552DYfUZ_SIRYDNa' },
+        { titulo: 'LEG',      folderId: '1b60vNCphBLxkAaHwLVKbgG2lKLI3zGkf' },
+        { titulo: 'LE GUYET', folderId: '1rtDBPTxvHUPM0OuLplRbDBiPYeIb3eEa' },
+        { titulo: 'KDE',      folderId: '1SfVotkywMdgBXOd9GgoLc5V9XL9P1kuO' }
+      ]
     },
     {
       id: 'seguro-vida',
@@ -37,7 +45,12 @@ var CONFIG = {
       icono: 'fa-heart-pulse',
       color1: '#14653A', color2: '#2BAE66',
       folderId: '11rukAFFvCUvZ6W5bSF1aV3OvFxMDWSFI',
-      carpetas: []
+      carpetas: [
+        { titulo: 'PPQ',      folderId: '1X52Xz-aNVHGbgFu7Yc9tXboJ0AvIoTnq' },
+        { titulo: 'LEG',      folderId: '1ocXeqUQNweTGEv05vTUOqHyYjrSSMV5G' },
+        { titulo: 'LE GUYET', folderId: '1LLNUq73DXImUbKQo7CtfCS0WklKRgIUD' },
+        { titulo: 'KDE',      folderId: '1L72pGujmPiYfXDNBABgW8iWXhkCGfHb9' }
+      ]
     }
   ],
   profundidadMaxima: 4,
@@ -62,6 +75,37 @@ function doGet() {
     .setTitle('DELBEN · Documentación')
     .addMetaTag('viewport', 'width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no')
     .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
+}
+
+// -----------------------------------------------------------------------------
+// API para la página publicada en GitHub (sin el banner de Google).
+// La página llama a esta URL /exec con POST {accion, args, pin} y recibe JSON.
+// -----------------------------------------------------------------------------
+var ACCIONES_API = {
+  getConfigApp: getConfigApp,
+  getDatosAutomotriz: getDatosAutomotriz,
+  getPersonal: getPersonal,
+  listarCarpeta: listarCarpeta,
+  descargarDocumento: descargarDocumento,
+  enviarDocumentos: enviarDocumentos
+};
+
+function doPost(e) {
+  var salida;
+  try {
+    var req = JSON.parse((e && e.postData && e.postData.contents) || '{}');
+    var pin = String(CONFIG.pin || '').trim();
+    if (pin && String(req.pin || '').trim() !== pin) {
+      salida = { ok: false, codigo: req.pin ? 'PIN_INCORRECTO' : 'PIN_REQUERIDO', error: req.pin ? 'PIN incorrecto.' : 'Ingresá el PIN.' };
+    } else {
+      var fn = ACCIONES_API[req.accion];
+      if (!fn) throw new Error('Acción no válida.');
+      salida = { ok: true, data: fn.apply(null, req.args || []) };
+    }
+  } catch (err) {
+    salida = { ok: false, error: (err && err.message) || String(err) };
+  }
+  return ContentService.createTextOutput(JSON.stringify(salida)).setMimeType(ContentService.MimeType.JSON);
 }
 
 function getConfigApp() {
