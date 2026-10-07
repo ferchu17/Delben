@@ -1104,7 +1104,7 @@ function guardarControl() {
   fila.push('');
   var fotos = photoSlots.filter(function (p) { return p !== null; });
   var btn = $('btn-submit');
-  showLoading('Guardando registro' + (fotos.length ? ' y subiendo fotos' : '') + '...');
+  showLoading('Guardando registro y preparando PDF...');
   btn.disabled = true;
   apiGuardar(tipo, fila, fotos, supervisor, empresa, function (res) {
     hideLoading(); btn.disabled = false;
@@ -1123,9 +1123,9 @@ function mostrarModalExito(nombre, res) {
   var sub = $('modal-sub-exito');
   if (sub) {
     if (res && res.correoPendiente) {
-      sub.innerHTML = 'Control guardado correctamente. <b>El PDF será enviado al supervisor.</b>';
+      sub.innerHTML = 'Control guardado correctamente. <b>El PDF será guardado y enviado al supervisor.</b>';
     } else if (res && res.correoEnviado) {
-      sub.innerHTML = 'Control guardado y <b>PDF enviado al supervisor</b>.';
+      sub.innerHTML = 'Control guardado y <b>PDF guardado en Drive y enviado al supervisor</b>.';
     } else {
       sub.innerHTML = 'Control guardado. El PDF no pudo enviarse: <b>' + esc((res && res.errorCorreo) || 'revise la configuración de correo') + '</b>';
     }
