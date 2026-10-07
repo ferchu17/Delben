@@ -815,9 +815,13 @@ function enviarControlPorCorreo_(data) {
             var imgPar2 = celdaFoto.appendParagraph('');
             imgPar2.setAlignment(DocumentApp.HorizontalAlignment.CENTER);
 
-            var img2 = imgPar2.appendInlineImage(
-              DriveApp.getFileById(idsFotos[p + q]).getBlob()
+            var fotoObj = fotosPDF[p + q];
+            var fotoBlob = Utilities.newBlob(
+              Utilities.base64Decode(fotoObj.base64),
+              fotoObj.mimeType || 'image/jpeg',
+              fotoObj.name || ('foto_' + (p + q + 1) + '.jpg')
             );
+            var img2 = imgPar2.appendInlineImage(fotoBlob);
 
             var maxW2 = 300;
             var maxH2 = 225;
