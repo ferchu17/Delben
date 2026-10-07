@@ -1,5 +1,6 @@
-// ID de la carpeta en Google Drive para guardar las fotos de inspección
-var FOLDER_ID_FOTOS_MOVILES = '1m81-m3AAiZXGarP9xoq3ZSh-7qJQ5i6I';
+// ID de la carpeta en Google Drive donde se guardan los informes PDF.
+// Las fotos solo se usan temporalmente para generar el PDF y luego se eliminan.
+var FOLDER_ID_INFORMES_MOVILES = '1H7NBCS9Jm_41NHVVJx1JpWeGfF-3rrLL';
 var CC_CONTROL_MOVILES = 'fjacyno@ktl-seguridad.com';
 
 // Logo DELBEN: se usa el PNG embebido en la propia aplicación.
@@ -266,9 +267,9 @@ function subirFotosControlDrive(fotosArray) {
   if (!fotosArray || !fotosArray.length) return { urls: [], ids: [] };
   var folder;
   try {
-    folder = DriveApp.getFolderById(FOLDER_ID_FOTOS_MOVILES);
+    folder = DriveApp.getFolderById(FOLDER_ID_INFORMES_MOVILES);
   } catch(e) {
-    throw new Error('No se pudo acceder a la carpeta de fotos de Drive: ' + e.message);
+    throw new Error('No se pudo acceder a la carpeta de informes PDF de Drive: ' + e.message);
   }
   var urls = [], ids = [];
   for (var i = 0; i < fotosArray.length; i++) {
@@ -277,7 +278,6 @@ function subirFotosControlDrive(fotosArray) {
       var decoded = Utilities.base64Decode(f.base64);
       var blob = Utilities.newBlob(decoded, f.mimeType || 'image/jpeg', f.name || ('control_' + Date.now() + '_' + (i+1) + '.jpg'));
       var file = folder.createFile(blob);
-      file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
       urls.push(file.getUrl());
       ids.push(file.getId());
     }
@@ -863,6 +863,16 @@ function enviarControlPorCorreo_(data) {
     doc.saveAndClose();
 
     var pdf = DriveApp.getFileById(doc.getId()).getAs(MimeType.PDF).setName(docName + '.pdf');
+
+    // Guarda el informe PDF definitivo en la carpeta indicada por el usuario.
+    // Las fotos utilizadas para armar el PDF son temporales y se eliminan inmediatamente.
+    var carpetaInformes = DriveApp.getFolderById(FOLDER_ID_INFORMES_MOVILES);
+    var archivoPDF = carpetaInformes.createFile(pdf);
+    var idsFotosTemporales = data.fotosIds || [];
+    for (var tf = 0; tf < idsFotosTemporales.length; tf++) {
+      try { DriveApp.getFileById(idsFotosTemporales[tf]).setTrashed(true); } catch (_) {}
+    }
+
     var subject = 'DELBEN · Control de Móvil #' + data.id + ' · ' + (fila[4] || '');
     var html = '<div style="font-family:Arial,sans-serif;color:#37414A"><h2 style="color:#0065BC">Control de móvil registrado</h2><p>Se adjunta el informe PDF del control <b>#' + data.id + '</b>.</p><p><b>Movilero:</b> ' + escHtml_(fila[4]) + '<br><b>Vehículo:</b> ' + escHtml_(fila[10] || '') + '<br><b>Fecha:</b> ' + escHtml_(fechaFormato) + ' · <b>Hora:</b> ' + escHtml_(horaFormato) + '</p><p>Este correo fue generado automáticamente por DELBEN SGI.</p></div>';
 
@@ -908,6 +918,10 @@ function enviarControlPorCorreo_(data) {
   } catch (e) {
     if (doc) {
       try { DriveApp.getFileById(doc.getId()).setTrashed(true); } catch (_) {}
+    }
+    var fotosTemp = (data && data.fotosIds) || [];
+    for (var cf = 0; cf < fotosTemp.length; cf++) {
+      try { DriveApp.getFileById(fotosTemp[cf]).setTrashed(true); } catch (_) {}
     }
     return {ok:false,error:String(e && e.message ? e.message : e)};
   }
