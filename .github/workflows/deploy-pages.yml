@@ -30,9 +30,7 @@ jobs:
           mkdir -p _site
           cp *.html _site/
           cp -R cargos _site/cargos
-          cp *.html _site/
-          cp -R cargos _site/cargos
-          mkdir -p _site/documentacion
+                   mkdir -p _site/documentacion
           cp "Documentacion de Supervisor/pagina-github.html" _site/documentacion/index.html
             
 
