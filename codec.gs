@@ -857,8 +857,6 @@ function enviarControlPorCorreo_(data) {
     var subject = 'DELBEN · Control de Móvil #' + data.id + ' · ' + (fila[4] || '');
     var html = '<div style="font-family:Arial,sans-serif;color:#37414A"><h2 style="color:#0065BC">Control de móvil registrado</h2><p>Se adjunta el informe PDF del control <b>#' + data.id + '</b>.</p><p><b>Movilero:</b> ' + escHtml_(fila[4]) + '<br><b>Vehículo:</b> ' + escHtml_(fila[10] || '') + '<br><b>Fecha:</b> ' + escHtml_(fechaFormato) + ' · <b>Hora:</b> ' + escHtml_(horaFormato) + '</p><p>Este correo fue generado automáticamente por DELBEN SGI.</p></div>';
 
-    var cuentaEjecutora = String(Session.getEffectiveUser().getEmail() || '').trim().toLowerCase();
-
     var destinatario = data.modoPrueba
       ? String(data.destinatarioPrueba || 'fjacyno@ktl-seguridad.com').trim()
       : String(data.supervisor.correo || '').trim();
@@ -895,7 +893,7 @@ function enviarControlPorCorreo_(data) {
     MailApp.sendEmail(mailOptions);
 
     DriveApp.getFileById(doc.getId()).setTrashed(true);
-    return {ok:true, cuentaEjecutora:cuentaEjecutora};
+    return {ok:true};
   } catch (e) {
     if (doc) {
       try { DriveApp.getFileById(doc.getId()).setTrashed(true); } catch (_) {}
