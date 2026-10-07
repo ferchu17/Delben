@@ -179,7 +179,7 @@ function getSupervisores() {
 
   function normalizar(v) {
     return String(v || '').toLowerCase().trim()
-      .normalize('NFD').replace(/[\\u0300-\\u036f]/g, '');
+      .normalize('NFD').replace(/[\u0300-\u036f]/g, '');
   }
 
   function agregar(out, nombre, correo) {
@@ -288,6 +288,22 @@ function subirFotosControlDrive(fotosArray) {
 // -----------------------------------------------------------------------------
 // 4. GUARDADO DEFINITIVO EN GOOGLE SHEETS ("combustible", "carroelectrico", "bicicleta")
 // -----------------------------------------------------------------------------
+// -----------------------------------------------------------------------------
+// FECHA Y HORA OFICIAL DE ARGENTINA (la fija el servidor, no el celular)
+// -----------------------------------------------------------------------------
+var TZ_ARGENTINA = 'America/Argentina/Buenos_Aires';
+
+function obtenerFechaHoraOficial() {
+  var ahora = new Date();
+  var nDia = parseInt(Utilities.formatDate(ahora, TZ_ARGENTINA, 'u'), 10); // 1 = lunes ... 7 = domingo
+  var dias = ['lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado', 'domingo'];
+  return {
+    fecha: Utilities.formatDate(ahora, TZ_ARGENTINA, 'yyyy-MM-dd'),
+    hora: Utilities.formatDate(ahora, TZ_ARGENTINA, 'HH:mm'),
+    dia: dias[nDia - 1] || ''
+  };
+}
+
 function guardarControlCompleto(tipo, filaDatos, fotosArray, supervisor, empresa) {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var sheetName = '';
@@ -331,6 +347,13 @@ function guardarControlCompleto(tipo, filaDatos, fotosArray, supervisor, empresa
     nextId = (!isNaN(valId) && valId > 0) ? (valId + 1) : lastRow;
   }
   filaDatos[0] = nextId;
+
+  // Fecha, día y hora SIEMPRE oficiales de Argentina al momento exacto del guardado:
+  // se ignora lo que mande el celular.
+  var oficial = obtenerFechaHoraOficial();
+  filaDatos[1] = oficial.fecha;
+  filaDatos[2] = oficial.dia;
+  filaDatos[3] = oficial.hora;
 
   // La columna de fotos ya existe en la estructura actual. Supervisor se agrega al final.
   var header = sh.getRange(1, 1, 1, Math.max(sh.getLastColumn(), 1)).getValues()[0];
@@ -538,20 +561,20 @@ function procesarColaPDFControles_() {
 function formatearFechaPDF_(valor) {
   if (valor === null || valor === undefined || valor === '') return '';
   var s = String(valor).trim();
-  var m = s.match(/^(\\d{4})-(\\d{2})-(\\d{2})$/);
+  var m = s.match(/^(\d{4})-(\d{2})-(\d{2})$/);
   if (m) return m[3] + '/' + m[2] + '/' + m[1];
   var d = new Date(valor);
-  if (!isNaN(d.getTime())) return Utilities.formatDate(d, Session.getScriptTimeZone() || 'America/Argentina/Buenos_Aires', 'dd/MM/yyyy');
+  if (!isNaN(d.getTime())) return Utilities.formatDate(d, TZ_ARGENTINA, 'dd/MM/yyyy');
   return s;
 }
 
 function formatearHoraPDF_(valor) {
   if (valor === null || valor === undefined || valor === '') return '';
   var s = String(valor).trim();
-  var m = s.match(/^(\\d{1,2}):(\\d{2})(?::\\d{2})?/);
+  var m = s.match(/^(\d{1,2}):(\d{2})(?::\d{2})?/);
   if (m) return ('0' + m[1]).slice(-2) + ':' + m[2];
   var d = new Date(valor);
-  if (!isNaN(d.getTime())) return Utilities.formatDate(d, Session.getScriptTimeZone() || 'America/Argentina/Buenos_Aires', 'HH:mm');
+  if (!isNaN(d.getTime())) return Utilities.formatDate(d, TZ_ARGENTINA, 'HH:mm');
   return s;
 }
 
@@ -1098,8 +1121,8 @@ function getAppHtml() {
 
     <div class="card card-blue">
       <div class="row2">
-        <div class="field"><label>Fecha</label><input type="date" id="form-fecha"></div>
-        <div class="field"><label>Hora</label><input type="time" id="form-hora"></div>
+        <div class="field"><label>Fecha</label><input type="date" id="form-fecha" readonly style="pointer-events:none;background:#eef2f6"></div>
+        <div class="field"><label>Hora</label><input type="time" id="form-hora" readonly style="pointer-events:none;background:#eef2f6"></div>
       </div>
     </div>
 
@@ -1232,12 +1255,19 @@ function getAppHtml() {
   var FOTOS_LABELS_BICI = ["Vista 1", "Vista 2", "Vista 3", "Vista 4"];
   var FOTOS_GRID_TIPO_RENDERIZADO = null;
 
+  /* Fecha y hora oficiales de Argentina (las entrega el servidor; no se usa la hora del celular) */
+  function cargarFechaHoraOficial() {
+    if (typeof google !== 'undefined' && google.script && google.script.run) {
+      google.script.run.withSuccessHandler(function(r) {
+        if (!r) return;
+        document.getElementById('form-fecha').value = r.fecha;
+        document.getElementById('form-hora').value = r.hora;
+      }).obtenerFechaHoraOficial();
+    }
+  }
+
   window.onload = function() {
-    var hoy = new Date();
-    document.getElementById('form-fecha').value = hoy.toISOString().split('T')[0];
-    var hh = String(hoy.getHours()).padStart(2, '0');
-    var mm = String(hoy.getMinutes()).padStart(2, '0');
-    document.getElementById('form-hora').value = hh + ':' + mm;
+    cargarFechaHoraOficial();
     renderFotosGrid();
     if (typeof google !== 'undefined' && google.script && google.script.run) {
       google.script.run.withSuccessHandler(function(res) {
@@ -1455,7 +1485,7 @@ function getAppHtml() {
 
     var fecha = document.getElementById('form-fecha').value;
     var hora = document.getElementById('form-hora').value;
-    var dia = new Date(fecha + 'T00:00:00').toLocaleDateString('es-AR', { weekday: 'long' });
+    var dia = '';
     var per = document.getElementById('form-personal').value;
     var dni = document.getElementById('form-dni').value;
     var leg = document.getElementById('form-legajo').value;
@@ -1526,11 +1556,7 @@ function getAppHtml() {
     document.getElementById('pantalla-datos').classList.add('hidden');
     document.getElementById('pantalla-tipo').classList.remove('hidden');
 
-    var hoy = new Date();
-    document.getElementById('form-fecha').value = hoy.toISOString().split('T')[0];
-    var hh = String(hoy.getHours()).padStart(2, '0');
-    var mm = String(hoy.getMinutes()).padStart(2, '0');
-    document.getElementById('form-hora').value = hh + ':' + mm;
+    cargarFechaHoraOficial();
 
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }
