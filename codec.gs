@@ -261,29 +261,9 @@ function getSupervisores() {
 }
 
 // -----------------------------------------------------------------------------
-// 3. SUBIDA DE FOTOS A GOOGLE DRIVE
+// 3. FOTOS: se mantienen en memoria y se incorporan directamente al PDF.
+//    NO se guardan como archivos independientes en Google Drive.
 // -----------------------------------------------------------------------------
-function subirFotosControlDrive(fotosArray) {
-  if (!fotosArray || !fotosArray.length) return { urls: [], ids: [] };
-  var folder;
-  try {
-    folder = DriveApp.getFolderById(FOLDER_ID_INFORMES_MOVILES);
-  } catch(e) {
-    throw new Error('No se pudo acceder a la carpeta de informes PDF de Drive: ' + e.message);
-  }
-  var urls = [], ids = [];
-  for (var i = 0; i < fotosArray.length; i++) {
-    var f = fotosArray[i];
-    if (f && f.base64) {
-      var decoded = Utilities.base64Decode(f.base64);
-      var blob = Utilities.newBlob(decoded, f.mimeType || 'image/jpeg', f.name || ('control_' + Date.now() + '_' + (i+1) + '.jpg'));
-      var file = folder.createFile(blob);
-      urls.push(file.getUrl());
-      ids.push(file.getId());
-    }
-  }
-  return { urls: urls, ids: ids };
-}
 
 // -----------------------------------------------------------------------------
 // 4. GUARDADO DEFINITIVO EN GOOGLE SHEETS ("combustible", "carroelectrico", "bicicleta")
@@ -337,8 +317,10 @@ function guardarControlCompleto(tipo, filaDatos, fotosArray, supervisor, empresa
     supCorreo = 'fjacyno@ktl-seguridad.com';
   }
 
-  var fotoInfo = subirFotosControlDrive(fotosArray || []);
-  var linksFotos = fotoInfo.urls.join(', ');
+  // Las fotos NO se suben a Drive. Se conservan en memoria y se incorporan
+  // directamente al documento temporal que genera el PDF.
+  var fotosParaPDF = Array.isArray(fotosArray) ? fotosArray : [];
+  var linksFotos = '';
 
   var lastRow = sh.getLastRow();
   var nextId = 1;
@@ -377,31 +359,30 @@ function guardarControlCompleto(tipo, filaDatos, fotosArray, supervisor, empresa
   rowOut.push(supNombre);
   sh.appendRow(rowOut);
 
-  // El guardado no espera a DocumentApp/Drive/MailApp.
-  // El correo con PDF se procesa en segundo plano mediante una cola.
-  encolarControlPDFCorreo_({
+  // Genera el PDF y envía el correo usando las fotos en memoria.
+  // No se crean archivos de fotos en Drive.
+  var resultadoPDF = enviarControlPorCorreo_({
     id: nextId,
     hoja: sheetName,
     tipo: String(tipo || ''),
     fila: filaDatos,
     supervisor: { nombre: supNombre, correo: supCorreo },
     empresa: empresa,
-    fotosIds: fotoInfo.ids,
-    fotosUrls: fotoInfo.urls,
-    linksFotos: linksFotos
+    fotosArray: fotosParaPDF,
+    linksFotos: ''
   });
 
   return {
-    ok: true,
+    ok: !!(resultadoPDF && resultadoPDF.ok),
     id: nextId,
     hoja: sheetName,
-    fotos: linksFotos,
+    fotos: '',
     persona: String(filaDatos[4] || ''),
     supervisor: supNombre,
-    correoEnviado: false,
-    correoPendiente: true,
+    correoEnviado: !!(resultadoPDF && resultadoPDF.ok),
+    correoPendiente: false,
     correo: supCorreo,
-    errorCorreo: ''
+    errorCorreo: resultadoPDF && resultadoPDF.error ? resultadoPDF.error : ''
   };
 }
 
@@ -803,8 +784,8 @@ function enviarControlPorCorreo_(data) {
     // REGISTRO FOTOGRÁFICO
     // Las 4 fotos se presentan juntas en una cuadrícula 2 x 2.
     // =========================================================
-    var idsFotos = data.fotosIds || [];
-    if (idsFotos.length) {
+    var fotosPDF = data.fotosArray || [];
+    if (fotosPDF.length) {
       body.appendPageBreak();
 
       var fotoTitulo = body.appendParagraph('REGISTRO FOTOGRÁFICO');
@@ -820,7 +801,7 @@ function enviarControlPorCorreo_(data) {
       var fotosTabla = body.appendTable();
       fotosTabla.setBorderWidth(1).setBorderColor('#AAB8C5');
 
-      for (var p = 0; p < idsFotos.length; p += 2) {
+      for (var p = 0; p < fotosPDF.length; p += 2) {
         var filaFotos = fotosTabla.appendTableRow();
         filaFotos.setMinimumHeight(245);
 
@@ -830,7 +811,7 @@ function enviarControlPorCorreo_(data) {
           celdaFoto.setPaddingTop(6).setPaddingBottom(5).setPaddingLeft(6).setPaddingRight(6);
           celdaFoto.setVerticalAlignment(DocumentApp.VerticalAlignment.CENTER);
 
-          if (idsFotos[p + q]) {
+          if (fotosPDF[p + q] && fotosPDF[p + q].base64) {
             var imgPar2 = celdaFoto.appendParagraph('');
             imgPar2.setAlignment(DocumentApp.HorizontalAlignment.CENTER);
 
@@ -864,14 +845,10 @@ function enviarControlPorCorreo_(data) {
 
     var pdf = DriveApp.getFileById(doc.getId()).getAs(MimeType.PDF).setName(docName + '.pdf');
 
-    // Guarda el informe PDF definitivo en la carpeta indicada por el usuario.
-    // Las fotos utilizadas para armar el PDF son temporales y se eliminan inmediatamente.
+    // Guarda SOLAMENTE el informe PDF definitivo en la carpeta indicada.
+    // Las fotos nunca se guardan como archivos independientes en Drive.
     var carpetaInformes = DriveApp.getFolderById(FOLDER_ID_INFORMES_MOVILES);
     var archivoPDF = carpetaInformes.createFile(pdf);
-    var idsFotosTemporales = data.fotosIds || [];
-    for (var tf = 0; tf < idsFotosTemporales.length; tf++) {
-      try { DriveApp.getFileById(idsFotosTemporales[tf]).setTrashed(true); } catch (_) {}
-    }
 
     var subject = 'DELBEN · Control de Móvil #' + data.id + ' · ' + (fila[4] || '');
     var html = '<div style="font-family:Arial,sans-serif;color:#37414A"><h2 style="color:#0065BC">Control de móvil registrado</h2><p>Se adjunta el informe PDF del control <b>#' + data.id + '</b>.</p><p><b>Movilero:</b> ' + escHtml_(fila[4]) + '<br><b>Vehículo:</b> ' + escHtml_(fila[10] || '') + '<br><b>Fecha:</b> ' + escHtml_(fechaFormato) + ' · <b>Hora:</b> ' + escHtml_(horaFormato) + '</p><p>Este correo fue generado automáticamente por DELBEN SGI.</p></div>';
@@ -918,10 +895,6 @@ function enviarControlPorCorreo_(data) {
   } catch (e) {
     if (doc) {
       try { DriveApp.getFileById(doc.getId()).setTrashed(true); } catch (_) {}
-    }
-    var fotosTemp = (data && data.fotosIds) || [];
-    for (var cf = 0; cf < fotosTemp.length; cf++) {
-      try { DriveApp.getFileById(fotosTemp[cf]).setTrashed(true); } catch (_) {}
     }
     return {ok:false,error:String(e && e.message ? e.message : e)};
   }
