@@ -932,7 +932,7 @@ function enviarMailControl_(data, pdf) {
         : html,
       attachments: [pdf],
       name: 'DELBEN SGI',
-      replyTo: 'fjacyno@gmail.com'
+      replyTo: String(CC_CONTROL_MOVILES || '').split(/[;,]/)[0].trim() || 'fjacyno@ktl-seguridad.com'
     };
 
     if (!data.modoPrueba) {
@@ -1112,6 +1112,32 @@ function reenviarControlMoviles_(hoja, id) {
   var estado = 'REENVIADO ' + obtenerFechaHoraOficial().fecha + ' ' + obtenerFechaHoraOficial().hora + ' · ' + origen;
   try { registrarEstadoCorreoEnHoja_(hoja, id, estado); } catch (_) {}
   return '#' + id + ' (' + hoja + '): OK → ' + supCorreo + ' · ' + origen + (envio && envio.aviso ? ' · ' + envio.aviso : '');
+}
+
+
+// Reenvía TODOS los controles cuyo ESTADO CORREO empiece con "NO ENVIADO" (columna creada desde la última versión).
+function reenviarPendientesMoviles() {
+  var out = [];
+  ['combustible', 'carroelectrico', 'bicicleta'].forEach(function (hoja) {
+    try {
+      var sh = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(hoja);
+      if (!sh || sh.getLastRow() < 2) return;
+      var header = sh.getRange(1, 1, 1, sh.getLastColumn()).getValues()[0].map(function (h) { return String(h || '').trim().toLowerCase(); });
+      var cEst = header.indexOf('estado correo');
+      if (cEst < 0) return;
+      var vals = sh.getRange(2, 1, sh.getLastRow() - 1, sh.getLastColumn()).getDisplayValues();
+      vals.forEach(function (r) {
+        if (String(r[cEst] || '').toUpperCase().indexOf('NO ENVIADO') === 0) {
+          try { out.push(reenviarControlMoviles_(hoja, r[0])); }
+          catch (e) { out.push('#' + r[0] + ' (' + hoja + '): ERROR ' + String(e && e.message ? e.message : e)); }
+        }
+      });
+    } catch (e) { out.push(hoja + ': ' + e); }
+  });
+  if (!out.length) out.push('No hay controles pendientes (ESTADO CORREO = NO ENVIADO).');
+  var txt = out.join('\n');
+  console.log(txt);
+  return txt;
 }
 
 // Estado general del envío de correos: cuota, cuenta, carpeta, triggers y últimos controles.
