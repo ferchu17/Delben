@@ -1144,6 +1144,7 @@ function reenviarPendientesMoviles() {
 function diagnosticoCorreosMoviles() {
   var l = [];
   try { l.push('Cuenta efectiva: ' + (Session.getEffectiveUser().getEmail() || 'no identificada')); } catch (e) { l.push('Cuenta efectiva: ' + e); }
+  try { var ssD = SpreadsheetApp.getActiveSpreadsheet(); l.push('Planilla donde se guarda: "' + ssD.getName() + '" · ' + ssD.getUrl()); } catch (e) { l.push('Planilla activa: NO DISPONIBLE (' + e + ')'); }
   try { l.push('Cuota diaria de correos restante: ' + MailApp.getRemainingDailyQuota()); } catch (e) { l.push('Cuota: ' + e); }
   try { l.push('Carpeta de informes: ' + DriveApp.getFolderById(FOLDER_ID_INFORMES_MOVILES).getName() + ' (accesible)'); }
   catch (e) { l.push('Carpeta de informes: NO ACCESIBLE → ' + e); }
@@ -1161,7 +1162,11 @@ function diagnosticoCorreosMoviles() {
       var cEst = header.indexOf('estado correo');
       var desde = Math.max(2, sh.getLastRow() - 9);
       var vals = sh.getRange(desde, 1, sh.getLastRow() - desde + 1, lastCol).getDisplayValues();
-      l.push('--- ' + hoja + ' (últimos ' + vals.length + ')');
+      var ocultas = 0;
+      for (var rr = 2; rr <= sh.getLastRow(); rr++) { if (sh.isRowHiddenByFilter(rr) || sh.isRowHiddenByUser(rr)) ocultas++; }
+      l.push('--- ' + hoja + ' · filas con datos: ' + (sh.getLastRow() - 1) + ' · última fila: ' + sh.getLastRow() +
+             ' · filas ocultas (filtro/manual): ' + ocultas + ' · filtro activo: ' + (sh.getFilter() ? 'SÍ' : 'no') +
+             ' · últimos ' + vals.length + ':');
       vals.forEach(function (r) {
         l.push('#' + r[0] + ' · ' + r[1] + ' ' + r[3] + ' · ' + r[4] + ' · ' + (cEst >= 0 ? (r[cEst] || '(sin estado)') : '(sin columna ESTADO CORREO)'));
       });
