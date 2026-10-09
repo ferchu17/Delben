@@ -372,6 +372,15 @@ function guardarControlCompleto(tipo, filaDatos, fotosArray, supervisor, empresa
     linksFotos: ''
   });
 
+  try {
+    registrarEstadoCorreoEnHoja_(sheetName, nextId,
+      resultadoPDF && resultadoPDF.ok
+        ? ('ENVIADO ' + obtenerFechaHoraOficial().fecha + ' ' + obtenerFechaHoraOficial().hora + (resultadoPDF.aviso ? ' · ' + resultadoPDF.aviso : ''))
+        : ('NO ENVIADO · ' + (resultadoPDF && resultadoPDF.error ? resultadoPDF.error : 'error desconocido')));
+  } catch (errEstado) {
+    console.error('No se pudo registrar el estado del correo del control #' + nextId + ': ' + errEstado);
+  }
+
   return {
     ok: !!(resultadoPDF && resultadoPDF.ok),
     id: nextId,
@@ -382,6 +391,7 @@ function guardarControlCompleto(tipo, filaDatos, fotosArray, supervisor, empresa
     correoEnviado: !!(resultadoPDF && resultadoPDF.ok),
     correoPendiente: false,
     correo: supCorreo,
+    avisoCorreo: resultadoPDF && resultadoPDF.aviso ? resultadoPDF.aviso : '',
     errorCorreo: resultadoPDF && resultadoPDF.error ? resultadoPDF.error : ''
   };
 }
@@ -634,6 +644,7 @@ function enviarControlPorCorreo_(data) {
     var body = doc.getBody();
 
     // Márgenes compactos para que el informe sea visualmente equilibrado.
+    body.setPageWidth(595.28).setPageHeight(841.89); // Hoja A4
     body.setMarginTop(24).setMarginBottom(24).setMarginLeft(34).setMarginRight(34);
 
     // =========================================================
@@ -720,7 +731,15 @@ function enviarControlPorCorreo_(data) {
       ? ['Manubrio','Freno Delantero','Freno Trasero','Guardabarros','Pedales','Cargador','Pie de Apoyo','Acelerador','Asiento','Pintura']
       : ['Estado Externo General','Interior (Butacas)','Luces','Neumático Delantero Der.','Neumático Delantero Izq.','Neumático Trasero Der.','Neumático Trasero Izq.','Rueda de Auxilio','Escobillas Parabrisas','Luces Bajas','Luces Altas','Luz Trasera Izq.','Luz Trasera Der.','Luces de Giro','Bocina','Limpieza Int./Ext.','Baliza Lumínica','Ploteos'];
 
-    var startIdx = esBici ? 9 : 12;
+    // La app siempre envía al final: [..., ítems de control, novedad, fotos].
+    // Se ubica la novedad desde el final de la fila para que nunca quede desfasada
+    // (en Bicicleta los ítems empiezan en la posición 10, no en la 9).
+    var novIdx = fila.length - 2;
+    var startIdx = novIdx - controles.length;
+    if (startIdx < 0) {
+      startIdx = esBici ? 10 : 12;
+      novIdx = startIdx + controles.length;
+    }
     var tbl = body.appendTable();
     var headerRow2 = tbl.appendTableRow();
     var h1 = headerRow2.appendTableCell('CONTROL');
@@ -752,13 +771,13 @@ function enviarControlPorCorreo_(data) {
       }
     }
 
-    var novIdx = startIdx + controles.length;
     body.appendParagraph('').setFontSize(3);
 
     var novTitle = body.appendParagraph('NOVEDAD / OBSERVACIÓN GENERAL');
     novTitle.setBold(true).setForegroundColor('#24415A').setFontSize(10.5);
 
-    var novPar = body.appendParagraph(String(fila[novIdx] || 'Sin Novedad'));
+    var novTexto = String(fila[novIdx] == null ? '' : fila[novIdx]).trim();
+    var novPar = body.appendParagraph(novTexto || 'Sin Novedad');
     novPar.setFontSize(8.5).setForegroundColor('#24415A');
 
     // Resumen visual: las novedades deben resaltar claramente.
@@ -798,23 +817,38 @@ function enviarControlPorCorreo_(data) {
 
       body.appendParagraph('').setFontSize(3);
 
+      // Recuadro 2 x 2 que ocupa la hoja A4 completa.
+      // Cada foto queda a 3 mm (8,5 pt) de los bordes de su recuadro.
+      var MM3 = 8.5;
+      var anchoUtil = body.getPageWidth() - body.getMarginLeft() - body.getMarginRight();
+      var altoUtil = body.getPageHeight() - body.getMarginTop() - body.getMarginBottom();
+      // Espacio reservado para título, subtítulo y pie de la hoja de fotos.
+      var reservaTextos = 100;
+      var anchoCelda = Math.floor(anchoUtil / 2) - 1;
+      var altoFila = Math.floor((altoUtil - reservaTextos) / 2);
+      var maxW2 = anchoCelda - (MM3 * 2) - 2;
+      var maxH2 = altoFila - (MM3 * 2) - 6;
+
       var fotosTabla = body.appendTable();
       fotosTabla.setBorderWidth(1).setBorderColor('#AAB8C5');
 
-      for (var p = 0; p < fotosPDF.length; p += 2) {
+      for (var p = 0; p < 4; p += 2) {
         var filaFotos = fotosTabla.appendTableRow();
-        filaFotos.setMinimumHeight(245);
+        filaFotos.setMinimumHeight(altoFila);
 
         for (var q = 0; q < 2; q++) {
           var celdaFoto = filaFotos.appendTableCell();
           celdaFoto.setBackgroundColor('#F8FBFD');
-          celdaFoto.setPaddingTop(6).setPaddingBottom(5).setPaddingLeft(6).setPaddingRight(6);
+          celdaFoto.setPaddingTop(MM3).setPaddingBottom(MM3).setPaddingLeft(MM3).setPaddingRight(MM3);
           celdaFoto.setVerticalAlignment(DocumentApp.VerticalAlignment.CENTER);
 
-          if (fotosPDF[p + q] && fotosPDF[p + q].base64) {
-            var imgPar2 = celdaFoto.appendParagraph('');
-            imgPar2.setAlignment(DocumentApp.HorizontalAlignment.CENTER);
+          var imgPar2 = celdaFoto.getNumChildren() > 0
+            ? celdaFoto.getChild(0).asParagraph()
+            : celdaFoto.appendParagraph('');
+          imgPar2.setAlignment(DocumentApp.HorizontalAlignment.CENTER)
+            .setSpacingBefore(0).setSpacingAfter(0).setLineSpacing(1);
 
+          if (fotosPDF[p + q] && fotosPDF[p + q].base64) {
             var fotoObj = fotosPDF[p + q];
             var fotoBlob = Utilities.newBlob(
               Utilities.base64Decode(fotoObj.base64),
@@ -823,20 +857,17 @@ function enviarControlPorCorreo_(data) {
             );
             var img2 = imgPar2.appendInlineImage(fotoBlob);
 
-            var maxW2 = 300;
-            var maxH2 = 225;
             var iw2 = img2.getWidth();
             var ih2 = img2.getHeight();
             var scale2 = Math.min(maxW2 / iw2, maxH2 / ih2);
             img2.setWidth(Math.round(iw2 * scale2));
             img2.setHeight(Math.round(ih2 * scale2));
-
-            var cap2 = celdaFoto.appendParagraph('Vista ' + (p + q + 1));
-            cap2.setAlignment(DocumentApp.HorizontalAlignment.CENTER)
-              .setBold(true).setForegroundColor('#24415A').setFontSize(8.5);
           }
         }
       }
+
+      fotosTabla.setColumnWidth(0, anchoCelda);
+      fotosTabla.setColumnWidth(1, anchoCelda);
     }
 
     body.appendParagraph('').setFontSize(3);
@@ -850,12 +881,39 @@ function enviarControlPorCorreo_(data) {
     var pdf = DriveApp.getFileById(doc.getId()).getAs(MimeType.PDF).setName(docName + '.pdf');
 
     // Guarda SOLAMENTE el informe PDF definitivo en la carpeta indicada.
-    // Las fotos nunca se guardan como archivos independientes en Drive.
-    var carpetaInformes = DriveApp.getFolderById(FOLDER_ID_INFORMES_MOVILES);
-    var archivoPDF = carpetaInformes.createFile(pdf);
+    // Si la carpeta no está disponible, el correo igual se envía.
+    var archivoPDF = null;
+    try {
+      archivoPDF = DriveApp.getFolderById(FOLDER_ID_INFORMES_MOVILES).createFile(pdf);
+    } catch (errCarpeta) {
+      console.error('No se pudo guardar el PDF del control #' + data.id + ' en la carpeta de informes: ' + errCarpeta);
+    }
+    if (archivoPDF && !data.modoPrueba) {
+      try {
+        registrarLinkPDFEnHoja_(data.hoja, data.id, archivoPDF.getUrl());
+      } catch (errLink) {
+        console.error('No se pudo pegar el link del PDF del control #' + data.id + ': ' + errLink);
+      }
+    }
 
+    var envio = enviarMailControl_(data, pdf);
+
+    DriveApp.getFileById(doc.getId()).setTrashed(true);
+    return {ok:true, aviso:(envio && envio.aviso) || ''};
+  } catch (e) {
+    if (doc) {
+      try { DriveApp.getFileById(doc.getId()).setTrashed(true); } catch (_) {}
+    }
+    return {ok:false,error:String(e && e.message ? e.message : e)};
+  }
+}
+
+
+// Arma el correo del control y lo envía (destinatario = supervisor elegido; copia = fjacyno + servicio).
+function enviarMailControl_(data, pdf) {
+  var fila = data.fila || [];
     var subject = 'DELBEN · Control de Móvil #' + data.id + ' · ' + (fila[4] || '');
-    var html = '<div style="font-family:Arial,sans-serif;color:#37414A"><h2 style="color:#0065BC">Control de móvil registrado</h2><p>Se adjunta el informe PDF del control <b>#' + data.id + '</b>.</p><p><b>Movilero:</b> ' + escHtml_(fila[4]) + '<br><b>Vehículo:</b> ' + escHtml_(fila[10] || '') + '<br><b>Fecha:</b> ' + escHtml_(fechaFormato) + ' · <b>Hora:</b> ' + escHtml_(horaFormato) + '</p><p>Este correo fue generado automáticamente por DELBEN SGI.</p></div>';
+    var html = '<div style="font-family:Arial,sans-serif;color:#37414A"><h2 style="color:#0065BC">Control de móvil registrado</h2><p>Se adjunta el informe PDF del control <b>#' + data.id + '</b>.</p><p><b>Movilero:</b> ' + escHtml_(fila[4]) + '<br><b>Vehículo:</b> ' + escHtml_(fila[10] || '') + '<br><b>Fecha:</b> ' + escHtml_(formatearFechaPDF_(fila[1])) + ' · <b>Hora:</b> ' + escHtml_(formatearHoraPDF_(fila[3])) + '</p><p>Este correo fue generado automáticamente por DELBEN SGI.</p></div>';
 
     var destinatario = data.modoPrueba
       ? String(data.destinatarioPrueba || 'fjacyno@ktl-seguridad.com').trim()
@@ -879,8 +937,10 @@ function enviarControlPorCorreo_(data) {
 
     if (!data.modoPrueba) {
       // Copia fija + correos del servicio que realizó el control (sin duplicados).
+      var correosServicio = '';
+      try { correosServicio = obtenerCorreosServicio_(fila[8]); } catch (errSrv) { console.error('Correos del servicio: ' + errSrv); }
       var ccLista = String(CC_CONTROL_MOVILES || '').split(/[;,]/)
-        .concat(String(obtenerCorreosServicio_(fila[8]) || '').split(/[;,]/));
+        .concat(String(correosServicio || '').split(/[;,]/));
       var ccUnicos = [], ccVistos = {};
       ccLista.forEach(function (c) {
         c = String(c || '').trim();
@@ -890,16 +950,200 @@ function enviarControlPorCorreo_(data) {
       if (ccUnicos.length) mailOptions.cc = ccUnicos.join(',');
     }
 
-    MailApp.sendEmail(mailOptions);
+    return enviarMailConRespaldo_(mailOptions);
+}
 
-    DriveApp.getFileById(doc.getId()).setTrashed(true);
-    return {ok:true};
-  } catch (e) {
-    if (doc) {
-      try { DriveApp.getFileById(doc.getId()).setTrashed(true); } catch (_) {}
-    }
-    return {ok:false,error:String(e && e.message ? e.message : e)};
+// Envía el correo cuidando la cuota diaria y reintentando sin copias si éstas fallan.
+function enviarMailConRespaldo_(opts) {
+  var cant = String(opts.to || '').split(/[;,]/).filter(String).length +
+             String(opts.cc || '').split(/[;,]/).filter(String).length;
+  var cuota = MailApp.getRemainingDailyQuota();
+  if (cuota < 1) {
+    throw new Error('Se agotó la cuota diaria de correos de Google (se renueva a las 24 hs). Recién entonces se podrá reenviar.');
   }
+  try {
+    MailApp.sendEmail(opts);
+    return { ok: true, aviso: cuota < cant ? 'Cuota diaria casi agotada (quedaban ' + cuota + ').' : '' };
+  } catch (e1) {
+    if (!opts.cc) throw e1;
+    var sinCopia = {};
+    Object.keys(opts).forEach(function (k) { if (k !== 'cc') sinCopia[k] = opts[k]; });
+    MailApp.sendEmail(sinCopia);   // si también falla, el error sube
+    return { ok: true, aviso: 'Enviado SIN copias porque falló el envío con copia: ' + String(e1 && e1.message ? e1.message : e1) };
+  }
+}
+
+// Busca la fila del control por su id (columna A) en la pestaña correspondiente
+// y escribe el link del PDF en la columna "VISTAS FOTOGRAFICAS".
+function registrarLinkPDFEnHoja_(hoja, id, url) {
+  if (!hoja || !id || !url) return false;
+  var sh = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(hoja);
+  if (!sh) throw new Error('No se encontró la pestaña "' + hoja + '"');
+
+  var lastCol = sh.getLastColumn();
+  var lastRow = sh.getLastRow();
+  if (lastRow < 2 || lastCol < 1) return false;
+
+  var header = sh.getRange(1, 1, 1, lastCol).getValues()[0];
+  var colVistas = -1;
+  for (var c = 0; c < header.length; c++) {
+    var h = String(header[c] || '').trim().toLowerCase();
+    try { h = h.normalize('NFD').replace(/[\u0300-\u036f]/g, ''); } catch (_) {}
+    if (h === 'vistas fotograficas') { colVistas = c; break; }
+    if (colVistas < 0 && h.indexOf('foto') >= 0) colVistas = c;
+  }
+  if (colVistas < 0) throw new Error('No se encontró la columna "VISTAS FOTOGRAFICAS" en "' + hoja + '"');
+
+  var ids = sh.getRange(2, 1, lastRow - 1, 1).getValues();
+  for (var r = ids.length - 1; r >= 0; r--) {
+    if (String(ids[r][0]).trim() === String(id).trim()) {
+      sh.getRange(r + 2, colVistas + 1).setValue(url);
+      return true;
+    }
+  }
+  throw new Error('No se encontró el control #' + id + ' en "' + hoja + '"');
+}
+
+
+// Escribe en la fila del control si el correo salió o no (columna "ESTADO CORREO").
+function registrarEstadoCorreoEnHoja_(hoja, id, texto) {
+  var sh = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(hoja);
+  if (!sh) return false;
+  var lastCol = sh.getLastColumn(), lastRow = sh.getLastRow();
+  if (lastRow < 2) return false;
+  var header = sh.getRange(1, 1, 1, lastCol).getValues()[0];
+  var col = -1;
+  for (var c = 0; c < header.length; c++) {
+    if (String(header[c] || '').trim().toLowerCase() === 'estado correo') { col = c; break; }
+  }
+  if (col < 0) { col = lastCol; sh.getRange(1, col + 1).setValue('ESTADO CORREO'); }
+  var ids = sh.getRange(2, 1, lastRow - 1, 1).getValues();
+  for (var r = ids.length - 1; r >= 0; r--) {
+    if (String(ids[r][0]).trim() === String(id).trim()) {
+      sh.getRange(r + 2, col + 1).setValue(String(texto).slice(0, 450));
+      return true;
+    }
+  }
+  return false;
+}
+
+// -----------------------------------------------------------------------------
+// REENVÍO DE CONTROLES QUE NO LLEGARON
+// 1) Ejecutar diagnosticoCorreosMoviles() y mirar la columna ESTADO CORREO / el listado.
+// 2) Completar REENVIAR_CONTROLES_MOVILES con la pestaña y los N° de control.
+// 3) Ejecutar reenviarControlesMoviles(). Si el PDF ya está en Drive se reenvía ese mismo
+//    PDF (con fotos); si no, se regenera desde la planilla SIN fotos.
+// -----------------------------------------------------------------------------
+var REENVIAR_CONTROLES_MOVILES = [
+  // { hoja: 'combustible', ids: [101, 102] },
+  // { hoja: 'bicicleta', ids: [15] },
+  // { hoja: 'carroelectrico', ids: [7] }
+];
+
+function reenviarControlesMoviles() {
+  var out = [];
+  REENVIAR_CONTROLES_MOVILES.forEach(function (g) {
+    (g.ids || []).forEach(function (id) {
+      try { out.push(reenviarControlMoviles_(g.hoja, id)); }
+      catch (e) { out.push('#' + id + ' (' + g.hoja + '): ERROR ' + String(e && e.message ? e.message : e)); }
+    });
+  });
+  if (!out.length) out.push('No hay controles en REENVIAR_CONTROLES_MOVILES. Completá la lista y volvé a ejecutar.');
+  var txt = out.join('\n');
+  console.log(txt);
+  return txt;
+}
+
+function reenviarControlMoviles_(hoja, id) {
+  var sh = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(hoja);
+  if (!sh) throw new Error('No existe la pestaña "' + hoja + '".');
+  var lastCol = sh.getLastColumn(), lastRow = sh.getLastRow();
+  var header = sh.getRange(1, 1, 1, lastCol).getValues()[0].map(function (h) {
+    var t = String(h || '').trim().toLowerCase();
+    try { t = t.normalize('NFD').replace(/[̀-ͯ]/g, ''); } catch (_) {}
+    return t;
+  });
+  var fila = -1;
+  var ids = sh.getRange(2, 1, Math.max(lastRow - 1, 1), 1).getValues();
+  for (var r = ids.length - 1; r >= 0; r--) {
+    if (String(ids[r][0]).trim() === String(id).trim()) { fila = r + 2; break; }
+  }
+  if (fila < 0) throw new Error('no se encontró el control en la pestaña.');
+
+  var v = sh.getRange(fila, 1, 1, lastCol).getDisplayValues()[0];
+  var colSup = header.lastIndexOf('supervisor');
+  var colVistas = header.indexOf('vistas fotograficas');
+  if (colVistas < 0) { for (var c = 0; c < header.length; c++) { if (header[c].indexOf('foto') >= 0) { colVistas = c; break; } } }
+  var supNombre = colSup >= 0 ? String(v[colSup] || '').trim() : '';
+  var datosFila = v.slice(0, colSup >= 0 ? colSup : v.length);
+
+  var supCorreo = '';
+  try {
+    var sups = getSupervisores();
+    var buscado = supNombre.toLowerCase();
+    for (var i = 0; i < sups.length; i++) {
+      if (String(sups[i].nombre || '').trim().toLowerCase() === buscado) { supCorreo = sups[i].correo; break; }
+    }
+  } catch (_) {}
+  if (!supCorreo) { supCorreo = 'fjacyno@ktl-seguridad.com'; supNombre = supNombre || 'Fernando Jacyno'; }
+
+  var data = {
+    id: id, hoja: hoja, tipo: String(datosFila[9] || hoja), fila: datosFila,
+    supervisor: { nombre: supNombre, correo: supCorreo }, empresa: '', fotosArray: [], linksFotos: ''
+  };
+
+  // ¿Ya existe el PDF en Drive?
+  var link = colVistas >= 0 ? String(v[colVistas] || '') : '';
+  var m = link.match(/\/d\/([\w-]{15,})/) || link.match(/[?&]id=([\w-]{15,})/);
+  var envio, origen;
+  if (m) {
+    try {
+      var pdf = DriveApp.getFileById(m[1]).getBlob();
+      envio = enviarMailControl_(data, pdf);
+      origen = 'PDF existente (con fotos)';
+    } catch (e1) { m = null; }
+  }
+  if (!m) {
+    var r2 = enviarControlPorCorreo_(data);
+    if (!r2.ok) throw new Error(r2.error);
+    envio = r2;
+    origen = 'PDF regenerado SIN fotos';
+  }
+  var estado = 'REENVIADO ' + obtenerFechaHoraOficial().fecha + ' ' + obtenerFechaHoraOficial().hora + ' · ' + origen;
+  try { registrarEstadoCorreoEnHoja_(hoja, id, estado); } catch (_) {}
+  return '#' + id + ' (' + hoja + '): OK → ' + supCorreo + ' · ' + origen + (envio && envio.aviso ? ' · ' + envio.aviso : '');
+}
+
+// Estado general del envío de correos: cuota, cuenta, carpeta, triggers y últimos controles.
+function diagnosticoCorreosMoviles() {
+  var l = [];
+  try { l.push('Cuenta efectiva: ' + (Session.getEffectiveUser().getEmail() || 'no identificada')); } catch (e) { l.push('Cuenta efectiva: ' + e); }
+  try { l.push('Cuota diaria de correos restante: ' + MailApp.getRemainingDailyQuota()); } catch (e) { l.push('Cuota: ' + e); }
+  try { l.push('Carpeta de informes: ' + DriveApp.getFolderById(FOLDER_ID_INFORMES_MOVILES).getName() + ' (accesible)'); }
+  catch (e) { l.push('Carpeta de informes: NO ACCESIBLE → ' + e); }
+  try {
+    var tr = ScriptApp.getProjectTriggers().map(function (t) { return t.getHandlerFunction(); });
+    l.push('Triggers del proyecto: ' + (tr.length ? tr.join(', ') : 'ninguno'));
+  } catch (e) { l.push('Triggers: ' + e); }
+  try { l.push('Correos del servicio (prueba "Barrio San Francisco"): ' + (obtenerCorreosServicio_('Barrio San Francisco') || '(ninguno)')); } catch (e) { l.push('Correos del servicio: ' + e); }
+  ['combustible', 'carroelectrico', 'bicicleta'].forEach(function (hoja) {
+    try {
+      var sh = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(hoja);
+      if (!sh || sh.getLastRow() < 2) return;
+      var lastCol = sh.getLastColumn();
+      var header = sh.getRange(1, 1, 1, lastCol).getValues()[0].map(function (h) { return String(h || '').trim().toLowerCase(); });
+      var cEst = header.indexOf('estado correo');
+      var desde = Math.max(2, sh.getLastRow() - 9);
+      var vals = sh.getRange(desde, 1, sh.getLastRow() - desde + 1, lastCol).getDisplayValues();
+      l.push('--- ' + hoja + ' (últimos ' + vals.length + ')');
+      vals.forEach(function (r) {
+        l.push('#' + r[0] + ' · ' + r[1] + ' ' + r[3] + ' · ' + r[4] + ' · ' + (cEst >= 0 ? (r[cEst] || '(sin estado)') : '(sin columna ESTADO CORREO)'));
+      });
+    } catch (e) { l.push(hoja + ': ' + e); }
+  });
+  var txt = l.join('\n');
+  console.log(txt);
+  return txt;
 }
 
 function probarCorreo() {
