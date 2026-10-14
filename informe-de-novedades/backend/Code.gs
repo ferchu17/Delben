@@ -43,7 +43,11 @@ function doPost(e) {
     if (CONFIG.TOKEN && req.token !== CONFIG.TOKEN) return json_({ ok: false, error: 'No autorizado' });
     switch (req.action) {
       case 'logo':       return json_(logo_());
-      case 'listas':     return json_({ ok: true, usuarios: leerUsuarios_(), quienesRetiran: leerQuienesRetiran_(), objetivos: leerObjetivos_(), siguiente: siguienteNumero_() });
+      case 'listas': {
+        const usuarios = leerUsuarios_();
+        const objetivos = leerObjetivos_();
+        return json_({ ok: true, usuarios: usuarios, quienesRetiran: usuarios.map(u => ({ nombre: u.nombre })), objetivos: objetivos, siguiente: siguienteNumero_() });
+      }
       case 'reservar':   return json_(reservar_(req));
       case 'finalizar':  return json_(finalizar_(req));
       case 'buscar':     return json_(buscar_(req));
@@ -72,13 +76,13 @@ function ss_() { return SpreadsheetApp.openById(CONFIG.SPREADSHEET_ID); }
 // Busca pestañas ignorando mayúsculas, tildes y espacios sobrantes.
 function buscarHoja_(nombre) {
   const ss = ss_();
-  const buscado = norm_(nombre).replace(/\\s+/g, ' ');
-  let sh = ss.getSheets().find(s => norm_(s.getName()).replace(/\\s+/g, ' ') === buscado);
+  const buscado = norm_(nombre).replace(/\s+/g, ' ');
+  let sh = ss.getSheets().find(s => norm_(s.getName()).replace(/\s+/g, ' ') === buscado);
   if (sh) return sh;
 
   // Admite variantes del nombre, por ejemplo "Quién retira" o "Quien retira ".
   if (buscado.indexOf('quien retira') >= 0 || buscado === 'quien retira') {
-    sh = ss.getSheets().find(s => norm_(s.getName()).replace(/\\s+/g, ' ').indexOf('quien retira') >= 0);
+    sh = ss.getSheets().find(s => norm_(s.getName()).replace(/\s+/g, ' ').indexOf('quien retira') >= 0);
     if (sh) return sh;
   }
   return null;
@@ -157,7 +161,7 @@ function leerQuienesRetiran_() {
   }
   const seen = {};
   return vals.slice(headerRow + 1)
-    .map(row => String(row[colNombre] || '').replace(/\\s+/g, ' ').trim())
+    .map(row => String(row[colNombre] || '').replace(/\s+/g, ' ').trim())
     .filter(name => {
       const k = norm_(name);
       if (!name || /^(nombre|nombres|apellido|personal|empleado|vigilador|persona)$/.test(k) || seen[k]) return false;
