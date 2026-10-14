@@ -38,6 +38,8 @@ jobs:
           # DELBEN SGI: la página se arma con los archivos de Apps Script de sgi-app/apps-script (Admin + JS1, JS2, JS3)
           mkdir -p _site/sgi
           python3 tools/armar_pagina.py sgi-app _site/sgi Admin
+          # Informe de Novedades: app estática (HTML + JS), se copia tal cual
+          cp -R informe-de-novedades _site/informe-de-novedades
             
 
       - name: Configure Pages
