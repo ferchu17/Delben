@@ -46,7 +46,8 @@ function doPost(e) {
       case 'listas': {
         const usuarios = leerUsuarios_();
         const objetivos = leerObjetivos_();
-        return json_({ ok: true, usuarios: usuarios, quienesRetiran: usuarios.map(u => ({ nombre: u.nombre })), objetivos: objetivos, siguiente: siguienteNumero_() });
+        const quienesRetiran = leerQuienesRetiran_();
+        return json_({ ok: true, usuarios: usuarios, quienesRetiran: quienesRetiran, objetivos: objetivos, siguiente: siguienteNumero_() });
       }
       case 'reservar':   return json_(reservar_(req));
       case 'finalizar':  return json_(finalizar_(req));
