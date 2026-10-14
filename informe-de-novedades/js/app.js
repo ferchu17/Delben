@@ -93,21 +93,31 @@
     stopRec();
     const target = document.getElementById(btn.dataset.target), state = $(`.mic-state[data-for="${btn.dataset.target}"]`);
     if (!SR) { toast("Tu navegador no permite dictado en esta pantalla. Usá el micrófono del teclado del celular 🎤", true); return; }
-    const r = new SR(); r.lang = "es-AR"; r.continuous = true; r.interimResults = true;
+    const r = new SR(); r.lang = "es-AR"; r.continuous = true; r.interimResults = true; r.maxAlternatives = 1;
     const base = target.value ? target.value.replace(/\s+$/, "") + " " : "";
-    let finals = "";
+    // El navegador vuelve a entregar resultados anteriores en cada evento.
+    // Guardarlos por índice evita concatenar dos veces el mismo fragmento.
+    const segmentos = [];
     r.onresult = (ev) => {
-      let interim = "";
-      for (let i = ev.resultIndex; i < ev.results.length; i++) {
-        const t = ev.results[i][0].transcript;
-        if (ev.results[i].isFinal) finals += t + " "; else interim += t;
+      for (let i = 0; i < ev.results.length; i++) {
+        segmentos[i] = ev.results[i][0].transcript;
       }
-      target.value = (base + finals + interim).replace(/\s+/g, " ").replace(/^\s+/, "");
+      target.value = (base + segmentos.filter(Boolean).join(" ")).replace(/\s+/g, " ").trimStart();
+      target.dispatchEvent(new Event("input", { bubbles: true }));
       if (target.tagName === "TEXTAREA") target.scrollTop = target.scrollHeight;
     };
-    r.onerror = (e) => { state.textContent = e.error === "not-allowed" ? "Permiso de micrófono denegado" : "Error de micrófono: " + e.error; };
-    r.onend = () => { if (rec === r) { try { r.start(); } catch (e) { stopRec(); } } };   // sigue escuchando hasta que lo apagues
-    try { r.start(); } catch (e) { return; }
+    r.onerror = (e) => {
+      if (state) state.textContent = e.error === "not-allowed" ? "Permiso de micrófono denegado" : "Error de micrófono: " + e.error;
+    };
+    r.onend = () => {
+      if (rec === r) {
+        rec = null;
+        if (recBtn) { recBtn.classList.remove("rec"); const sp = $("span", recBtn); if (sp) sp.textContent = "Hablar"; }
+        recBtn = null;
+        if (state && !state.textContent.startsWith("Error") && !state.textContent.includes("denegado")) state.textContent = "Dictado finalizado.";
+      }
+    };
+    try { r.start(); } catch (e) { toast("No se pudo iniciar el dictado. Volvé a tocar el micrófono.", true); return; }
     rec = r; recBtn = btn; btn.classList.add("rec"); const sp = $("span", btn); if (sp) sp.textContent = "Escuchando… tocá para parar";
     state.textContent = "🔴 Escuchando…";
   }
@@ -151,7 +161,14 @@
       d.innerHTML = f
         ? `<img src="${f.data}" alt="Foto ${i + 1}"><span class="n">Foto ${i + 1}</span><button type="button" class="del" aria-label="Quitar foto">✕</button>`
         : `<span class="plus">＋</span><span>Foto ${i + 1}</span><span style="font-weight:500;font-size:11.5px">📷 sacar / 🖼 elegir</span>`;
-      d.onclick = (e) => { if (e.target.classList.contains("del")) { S.fotos[i] = null; renderFotos(); return; } slotActivo = i; const fi = $("#fileInput"); fi.multiple = false; fi.value = ""; fi.click(); };
+      d.onclick = (e) => {
+        if (e.target.classList.contains("del")) { S.fotos[i] = null; renderFotos(); return; }
+        slotActivo = i;
+        openModal('<h2 style="margin:0 0 8px">Agregar fotografía</h2><p class="hint">Elegí cómo querés agregar la imagen.</p><div class="actions" style="flex-direction:column"><button type="button" class="btn send" id="fotoCamara">📷 Sacar foto con la cámara</button><button type="button" class="btn" id="fotoGaleria">🖼 Elegir de galería o archivos</button><button type="button" class="btn ghost" id="fotoCancelar">Cancelar</button></div>');
+        $("#fotoCamara").onclick = () => { closeModal(); const fi = $("#cameraInput"); fi.value = ""; fi.click(); };
+        $("#fotoGaleria").onclick = () => { closeModal(); const fi = $("#fileInput"); fi.value = ""; fi.multiple = false; fi.click(); };
+        $("#fotoCancelar").onclick = () => { slotActivo = null; closeModal(); };
+      };
       box.appendChild(d);
     });
     const n = S.fotos.filter(Boolean).length;
@@ -395,7 +412,8 @@
     $("#inPara").addEventListener("change", (e) => { if (buscarPersona(e.target.value)) addChip("para", e.target); });
     $("#inCc").addEventListener("change", (e) => { if (buscarPersona(e.target.value)) addChip("cc", e.target); });
     $("#de").onchange = () => renderChips("cc");
-    $("#fileInput").onchange = (e) => onFiles(e.target.files);
+    $("#fileInput").onchange = (e) => { onFiles(e.target.files); e.target.value = ""; };
+    $("#cameraInput").onchange = (e) => { onFiles(e.target.files); e.target.value = ""; };
     $("#masFotos").onclick = () => { S.fotos.push(null, null, null, null); renderFotos(); toast("Se agregaron 4 recuadros más"); };
     $("#enviar").onclick = enviar; $("#limpiar").onclick = () => limpiar(false);
     $("#btnBuscar").onclick = buscar; $("#q").addEventListener("keydown", (e) => { if (e.key === "Enter") buscar(); });
