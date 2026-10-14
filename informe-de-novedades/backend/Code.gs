@@ -8,6 +8,7 @@ const CONFIG = {
   SPREADSHEET_ID: '1Z06eLpbng51tYcycQlr0fLNI1OYmOpnmQp94YHY_coY',
   HOJA_INFORMES:  'informes_novedades',
   HOJA_USUARIOS:  'Usuarios y contraseñas',
+  HOJA_QUIEN_RETIRA: 'quien retira',
   HOJA_OBJETIVOS: 'objetivos',
   CARPETA_ID:     '1NXkehdUKNsGKs_yjyfzHev82v_cBH9jz',   // carpeta de Drive donde se guardan los PDF
 
@@ -42,7 +43,7 @@ function doPost(e) {
     if (CONFIG.TOKEN && req.token !== CONFIG.TOKEN) return json_({ ok: false, error: 'No autorizado' });
     switch (req.action) {
       case 'logo':       return json_(logo_());
-      case 'listas':     return json_({ ok: true, usuarios: leerUsuarios_(), objetivos: leerObjetivos_(), siguiente: siguienteNumero_() });
+      case 'listas':     return json_({ ok: true, usuarios: leerUsuarios_(), quienesRetiran: leerQuienesRetiran_(), objetivos: leerObjetivos_(), siguiente: siguienteNumero_() });
       case 'reservar':   return json_(reservar_(req));
       case 'finalizar':  return json_(finalizar_(req));
       case 'buscar':     return json_(buscar_(req));
@@ -116,6 +117,36 @@ function leerUsuarios_() {
     out.push({ nombre: nombre, email: iMail >= 0 ? String(r[iMail] || '').trim() : '' });
   });
   return out.sort((a, b) => a.nombre.localeCompare(b.nombre, 'es'));
+}
+
+// Lista del campo "De": se toma exclusivamente de la pestaña indicada por el usuario.
+function leerQuienesRetiran_() {
+  const sh = ss_().getSheetByName(CONFIG.HOJA_QUIEN_RETIRA);
+  if (!sh) throw new Error('No existe la pestaña "' + CONFIG.HOJA_QUIEN_RETIRA + '"');
+  const vals = sh.getDataRange().getDisplayValues();
+  if (!vals.length) return [];
+  let headerRow = 0, colNombre = -1;
+  // Detectar encabezado de nombre si existe; si no, usar la primera columna con datos.
+  for (let r = 0; r < Math.min(5, vals.length); r++) {
+    const heads = vals[r].map(norm_);
+    const c = heads.findIndex(h => /^(nombre|nombres|apellido y nombre|nombre y apellido|nombre completo|quien retira|quién retira|personal|empleado|vigilador|persona)$/.test(h));
+    if (c >= 0) { headerRow = r; colNombre = c; break; }
+  }
+  if (colNombre < 0) {
+    headerRow = 0;
+    colNombre = vals[0].findIndex(v => String(v || '').trim() !== '');
+    if (colNombre < 0) colNombre = 0;
+  }
+  const seen = {};
+  return vals.slice(headerRow + 1)
+    .map(row => String(row[colNombre] || '').replace(/\\s+/g, ' ').trim())
+    .filter(name => {
+      const k = norm_(name);
+      if (!name || /^(nombre|nombres|apellido|personal|empleado|vigilador|persona)$/.test(k) || seen[k]) return false;
+      seen[k] = true; return true;
+    })
+    .sort((a, b) => a.localeCompare(b, 'es'))
+    .map(nombre => ({ nombre }));
 }
 
 function leerObjetivos_() {
