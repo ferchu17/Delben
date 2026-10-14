@@ -3,7 +3,7 @@
    al backend (doPost de Apps Script) y la respuesta vuelve a la app. No cambia nada de la lógica ni de los cálculos. */
 (function () {
   'use strict';
-  var CLAVE = 'delben_novedades_backend';
+  var CLAVE = window.PUENTE_CLAVE || 'delben_novedades_backend';
   function backend() {
     var u = '';
     try { var q = new URLSearchParams(location.search).get('servidor'); if (q) localStorage.setItem(CLAVE, q); } catch (e) { }
@@ -39,7 +39,7 @@
     d.id = 'nvServidor';
     d.style.cssText = 'position:fixed;inset:0;background:rgba(10,30,60,.45);display:flex;align-items:center;justify-content:center;z-index:9999;font-family:system-ui,sans-serif';
     d.innerHTML = '<div style="background:#fff;border-radius:12px;padding:20px 22px;max-width:560px;width:92%">' +
-      '<h3 style="margin:0 0 8px">Falta la dirección del servidor</h3><p style="margin:0 0 10px;color:#475569">Pegá la URL de la Aplicación web de Apps Script de Novedades del Personal (termina en <b>/exec</b>).</p>' +
+      '<h3 style="margin:0 0 8px">Falta la dirección del servidor</h3><p style="margin:0 0 10px;color:#475569">Pegá la URL de la Aplicación web de Apps Script de ' + (window.PUENTE_APP || 'Novedades del Personal') + ' (termina en <b>/exec</b>).</p>' +
       '<input id="nvUrl" style="width:100%;padding:8px;border:1px solid #cbd5e1;border-radius:6px" placeholder="https://script.google.com/macros/s/.../exec">' +
       '<div style="text-align:right;margin-top:12px"><button id="nvOk" style="padding:8px 16px;background:#1660c9;color:#fff;border:0;border-radius:6px">Guardar</button></div></div>';
     document.body.appendChild(d);
@@ -53,5 +53,13 @@
   window.google = window.google || {};
   window.google.script = window.google.script || {};
   window.google.script.run = runner(null, null, null);
+  // google.script.url.getLocation (como en Apps Script): los parámetros de la dirección, por ejemplo ?sso= del acceso directo
+  window.google.script.url = window.google.script.url || {
+    getLocation: function (cb) {
+      var parameter = {}, parameters = {};
+      try { new URLSearchParams(location.search).forEach(function (v, k) { if (!(k in parameter)) parameter[k] = v; (parameters[k] = parameters[k] || []).push(v); }); } catch (e) { }
+      setTimeout(function () { cb({ parameter: parameter, parameters: parameters, hash: String(location.hash || '').replace(/^#/, '') }); }, 0);
+    }
+  };
   window.NOVEDADES_EN_GITHUB = true;
 })();

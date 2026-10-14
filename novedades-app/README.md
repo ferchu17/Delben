@@ -5,6 +5,10 @@ Carpeta nueva y separada del resto del repositorio. Contiene la app **Novedades 
 - **Link para compartir (no cambia nunca):** https://ferchu17.github.io/Delben/novedades/
 - **Fuente de verdad:** la carpeta `apps-script/` tiene los mismos archivos que el proyecto de Apps Script, sin cambios.
 
+## Botón SGI
+
+El botón SGI abre el SGI publicado en GitHub (https://ferchu17.github.io/Delben/sgi/) con el acceso directo: entra sin volver a pedir usuario y clave. Ver `sgi-app/README.md`.
+
 ## Cómo funciona
 
 ```
@@ -14,7 +18,7 @@ Usuario ──> https://ferchu17.github.io/Delben/novedades/   (la pantalla: Git
         Apps Script /exec  (doPost en Code.gs)  ──>  planillas, Drive, Stock Manager, modelos de Excel
 ```
 
-- La pantalla es la misma `Index.html` + `Styles` + `Logo` + `Formato` + `App` de Apps Script, armada en una sola página por `tools/armar_pagina.py`.
+- La pantalla es la misma `Index.html` + `Styles` + `Logo` + `Formato` + `App` de Apps Script, armada en una sola página por `tools/armar_pagina.py` (en la raíz del repositorio, lo usan Novedades y el SGI).
 - `web/puente.js` hace que cada `google.script.run.login(...)` / `google.script.run.api(...)` se mande al `doPost` de Apps Script. **La lógica, las fórmulas, los cálculos y los formatos de los Excel no cambian**: todo sigue corriendo en Apps Script con los mismos archivos.
 - El link viejo de Apps Script (`/exec`) sigue funcionando igual.
 
@@ -49,9 +53,9 @@ Los datos (planillas, personal, Stock Manager) nunca están en GitHub: quedan en
 ```
 novedades-app/
 ├── apps-script/        Archivos del proyecto de Apps Script (copiar tal cual)
-├── web/
-│   ├── config.js       URL del servidor (Apps Script /exec)
-│   └── puente.js       google.script.run -> doPost
-└── tools/
-    └── armar_pagina.py Arma web/index.html con los include() de Index.html
+└── web/
+    ├── config.js       URL del servidor (Apps Script /exec)
+    └── puente.js       google.script.run -> doPost
+
+tools/armar_pagina.py   (raíz del repositorio) arma la página con los include() de Index.html
 ```

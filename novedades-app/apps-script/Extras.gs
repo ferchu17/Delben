@@ -602,7 +602,8 @@ function asegurarFeriadosOficiales_() {
  * Solo administración cambia el enlace. Cada usuario ve el botón según su perfil (ventana "SGI" en Usuarios y perfiles)
  * y adentro del SGI tiene los permisos que le da el SGI.
  */
-var SGI_URL_DEFECTO_ = 'https://script.google.com/macros/s/AKfycbyc2gJ6TeTk-F3JzmJQ0kFYKqCX1r67VRP_VQhz26JD1HenhaWBcD5JcX4WAwJosWyRgQ/exec';
+// v1.24.1: el SGI publicado en GitHub (link fijo, sin el cartel de Google). Sigue aceptando el enlace de Apps Script si se carga en Datos.
+var SGI_URL_DEFECTO_ = 'https://ferchu17.github.io/Delben/sgi/';
 function sgiSecreto_() {
   var pr = PropertiesService.getScriptProperties(), s = pr.getProperty('SGI_SSO_SECRETO');
   if (!s) { s = Utilities.getUuid().replace(/-/g, '') + Utilities.getUuid().replace(/-/g, ''); pr.setProperty('SGI_SSO_SECRETO', s); pr.deleteProperty('SGI_SSO_PUBLICADO'); }
@@ -629,7 +630,7 @@ function accionSGIConfig_(u, d) {
   if (!esAdmin_(u)) throw new Error('Solo administración puede cambiar el enlace del SGI.');
   if (d && d.url !== undefined) {
     var url = String(d.url || '').trim();
-    if (url && !/^https:\/\/script\.google\.com\/.+\/exec/.test(url)) throw new Error('El enlace tiene que ser el de la app del SGI (https://script.google.com/.../exec).');
+    if (url && !/^https:\/\/script\.google\.com\/.+\/exec/.test(url) && !/^https:\/\/[a-z0-9-]+\.github\.io\//i.test(url)) throw new Error('El enlace tiene que ser el del SGI en GitHub (https://ferchu17.github.io/Delben/sgi/) o el de Apps Script (https://script.google.com/.../exec).');
     fijarConfig_('SGI_URL', url);
   }
   if (d && d.nuevoSecreto) PropertiesService.getScriptProperties().deleteProperty('SGI_SSO_SECRETO');
