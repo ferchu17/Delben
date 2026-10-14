@@ -2,4 +2,4 @@
    BACKEND: la URL de la Aplicación web de Apps Script (termina en /exec).
    Si alguna vez se crea una implementación NUEVA (otra URL), se cambia solo esta línea:
    el link que usa la gente (https://ferchu17.github.io/Delben/novedades/) sigue siendo el mismo. */
-window.NOVEDADES_BACKEND = '';
+window.NOVEDADES_BACKEND = 'https://script.google.com/macros/s/AKfycbwmsn1-KUir3vlJbzKrdeND6jbmPTAVWxfEguGKI-hR3bNDMHBIDq-r5-A_OpR63i7bvg/exec';
