@@ -149,7 +149,7 @@
     S[kind].push({ nombre: f ? f.nombre : nombre, email: f ? f.email : "" });
     input.value = ""; renderChips(kind);
   }
-  function autor() { const v = norm($("#de").value); return v ? (S.quienesRetiran.find(p => norm(p.nombre) === v) || null) : null; }
+  function autor() { const v = norm($("#de").value); if (!v) return null; const q = S.quienesRetiran.find(p => norm(p.nombre) === v); if (!q) return null; const u = S.usuarios.find(p => norm(p.nombre) === v); return { nombre: q.nombre, email: (u && u.email) || q.email || "" }; }
 
   /* ---------------- fotos ---------------- */
   let slotActivo = null;
@@ -265,8 +265,8 @@
         asunto: d.asunto, objetivo: d.objetivo, informe: d.informe, medidas: d.medidas, fotos: S.fotos.filter(Boolean)
       }, { logoUrl: CFG.LOGO_PDF });
       overlay("Guardando y enviando por correo…");
-      const to = S.para.map((p) => p.email);
-      const cc = [au.email].concat(S.cc.map((p) => p.email));
+      const to = [au.email].concat(S.para.map((p) => p.email)).filter(Boolean).filter((email, i, all) => all.indexOf(email) === i);
+      const cc = S.cc.map((p) => p.email).filter(Boolean).filter((email, i, all) => all.indexOf(email) === i && to.indexOf(email) < 0);
       const fin = await api("finalizar", { id: rs.id, pdfBase64: pdf.base64, to, cc });
       overlay();
       mostrarExito(fin, pdf, to, cc);
