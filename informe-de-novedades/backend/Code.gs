@@ -8,7 +8,7 @@ const CONFIG = {
   SPREADSHEET_ID: '1Z06eLpbng51tYcycQlr0fLNI1OYmOpnmQp94YHY_coY',
   HOJA_INFORMES:  'informes_novedades',
   HOJA_USUARIOS:  'Usuarios y contraseñas',
-  HOJA_QUIEN_RETIRA: 'quien retira',
+  HOJA_QUIEN_RETIRA: 'quienRetira',
   HOJA_OBJETIVOS: 'objetivos',
   CARPETA_ID:     '1NXkehdUKNsGKs_yjyfzHev82v_cBH9jz',   // carpeta de Drive donde se guardan los PDF
 
