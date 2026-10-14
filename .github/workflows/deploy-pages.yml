@@ -32,6 +32,9 @@ jobs:
           cp -R cargos _site/cargos
                    mkdir -p _site/documentacion
           cp "Documentacion de Supervisor/pagina-github.html" _site/documentacion/index.html
+          # Novedades del Personal: la página se arma con los archivos de Apps Script de novedades-app/apps-script
+          mkdir -p _site/novedades
+          python3 novedades-app/tools/armar_pagina.py novedades-app _site/novedades
             
 
       - name: Configure Pages

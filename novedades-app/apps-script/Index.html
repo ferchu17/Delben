@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <base target="_top">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Novedades del Personal</title>
+  <?!= include('Styles'); ?>
+</head>
+<body>
+  <header class="top">
+    <div class="marca"><img id="logoTop" alt="Delben"><span>Novedades del Personal</span></div>
+    <span id="demoFlag"></span>
+    <div class="esp"></div>
+    <div class="quien" id="quien"></div>
+    <button id="btnVoz" type="button" hidden title="Hablale a la app">🎤</button>
+    <button id="btnSGI" type="button" hidden title="Entrar al SGI (sin volver a poner usuario y clave)">SGI</button>
+    <button id="btnMenu" type="button" hidden>Menú</button>
+    <button id="btnSalir" type="button" hidden>Salir</button>
+  </header>
+  <main id="main"><div class="cargando">Cargando…</div></main>
+  <script>
+  // Si algo falla al abrir la app, se muestra el error en pantalla (en lugar de quedar en "Cargando…").
+  window.__errInicio = function (msg) {
+    var m = document.getElementById('main');
+    if (m && /Cargando/.test(m.textContent)) m.innerHTML = '<div class="vacio-msg" style="text-align:left;max-width:760px;margin:40px auto;background:#fff;border:1px solid #f1b0b0;border-radius:10px;padding:18px">' +
+      '<b style="color:#c62828">La app no pudo arrancar.</b><br>Mandale este mensaje a soporte:<pre style="white-space:pre-wrap;font-size:12px;background:#fafafa;padding:8px;border-radius:6px">' +
+      String(msg).replace(/[<>&]/g, function (c) { return { '<': '&lt;', '>': '&gt;', '&': '&amp;' }[c]; }) + '</pre>' +
+      '<button onclick="try{localStorage.clear();sessionStorage.clear()}catch(e){};location.reload()" style="padding:8px 14px">Borrar la sesión guardada y volver a entrar</button></div>';
+  };
+  window.addEventListener('error', function (e) { window.__errInicio((e.message || 'Error') + (e.lineno ? ' (línea ' + e.lineno + ')' : '')); });
+  window.addEventListener('unhandledrejection', function (e) { window.__errInicio(e.reason && e.reason.message ? e.reason.message : String(e.reason)); });
+  setTimeout(function () { if (typeof iniciar !== 'function') window.__errInicio('El archivo App no se cargó completo (falta la función iniciar). Revisá que el archivo App del editor termine con "iniciar();" y "</' + 'script>".'); }, 8000);
+  </script>
+  <div id="capaModal"></div>
+  <?!= include('Logo'); ?>
+  <?!= include('Formato'); ?>
+  <?!= include('App'); ?>
+</body>
+</html>
