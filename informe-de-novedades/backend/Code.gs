@@ -69,6 +69,21 @@ function logo_() {
 
 function ss_() { return SpreadsheetApp.openById(CONFIG.SPREADSHEET_ID); }
 
+// Busca pestañas ignorando mayúsculas, tildes y espacios sobrantes.
+function buscarHoja_(nombre) {
+  const ss = ss_();
+  const buscado = norm_(nombre).replace(/\\s+/g, ' ');
+  let sh = ss.getSheets().find(s => norm_(s.getName()).replace(/\\s+/g, ' ') === buscado);
+  if (sh) return sh;
+
+  // Admite variantes del nombre, por ejemplo "Quién retira" o "Quien retira ".
+  if (buscado.indexOf('quien retira') >= 0 || buscado === 'quien retira') {
+    sh = ss.getSheets().find(s => norm_(s.getName()).replace(/\\s+/g, ' ').indexOf('quien retira') >= 0);
+    if (sh) return sh;
+  }
+  return null;
+}
+
 function hojaInformes_() {
   const ss = ss_();
   let sh = ss.getSheetByName(CONFIG.HOJA_INFORMES);
@@ -121,8 +136,11 @@ function leerUsuarios_() {
 
 // Lista del campo "De": se toma exclusivamente de la pestaña indicada por el usuario.
 function leerQuienesRetiran_() {
-  const sh = ss_().getSheetByName(CONFIG.HOJA_QUIEN_RETIRA);
-  if (!sh) throw new Error('No existe la pestaña "' + CONFIG.HOJA_QUIEN_RETIRA + '"');
+  const sh = buscarHoja_(CONFIG.HOJA_QUIEN_RETIRA);
+  if (!sh) {
+    const nombres = ss_().getSheets().map(s => s.getName()).join(', ');
+    throw new Error('No encuentro la pestaña de quién retira. Pestañas disponibles: ' + nombres);
+  }
   const vals = sh.getDataRange().getDisplayValues();
   if (!vals.length) return [];
   let headerRow = 0, colNombre = -1;
