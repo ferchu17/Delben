@@ -77,13 +77,24 @@ function ss_() { return SpreadsheetApp.openById(CONFIG.SPREADSHEET_ID); }
 // Busca pestañas ignorando mayúsculas, tildes y espacios sobrantes.
 function buscarHoja_(nombre) {
   const ss = ss_();
-  const buscado = norm_(nombre).replace(/\s+/g, ' ');
-  let sh = ss.getSheets().find(s => norm_(s.getName()).replace(/\s+/g, ' ') === buscado);
+
+  // Primero buscar el nombre EXACTO informado: "quienRetira" (sin espacio).
+  // getSheetByName distingue el nombre real de la pestaña sin normalizarlo.
+  let sh = ss.getSheetByName(String(nombre || ''));
   if (sh) return sh;
 
-  // Admite variantes del nombre, por ejemplo "Quién retira" o "Quien retira ".
-  if (buscado.indexOf('quien retira') >= 0 || buscado === 'quien retira') {
-    sh = ss.getSheets().find(s => norm_(s.getName()).replace(/\s+/g, ' ').indexOf('quien retira') >= 0);
+  // Como respaldo, comparar sin distinguir mayúsculas, tildes ni espacios sobrantes.
+  const buscado = norm_(nombre).replace(/\s+/g, ' ');
+  sh = ss.getSheets().find(s => norm_(s.getName()).replace(/\s+/g, ' ') === buscado);
+  if (sh) return sh;
+
+  // Para "quienRetira", admitir solo variantes de escritura del mismo nombre,
+  // sin exigir que la pestaña contenga un espacio.
+  if (buscado === 'quienretira' || buscado === 'quien retira') {
+    sh = ss.getSheets().find(s => {
+      const n = norm_(s.getName()).replace(/\s+/g, '');
+      return n === 'quienretira';
+    });
     if (sh) return sh;
   }
   return null;
