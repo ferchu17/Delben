@@ -7,7 +7,7 @@
   const $$ = (s, r) => Array.from((r || document).querySelectorAll(s));
   const DEMO = !CFG.API_URL;
 
-  const S = { usuarios: [], objetivos: [], para: [], cc: [], fotos: [null, null, null, null], pdfCache: {} };
+  const S = { usuarios: [], quienesRetiran: [], objetivos: [], para: [], cc: [], fotos: [null, null, null, null], pdfCache: {} };
 
   /* ---------------- utilidades ---------------- */
   const norm = (s) => String(s || "").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").trim();
@@ -149,7 +149,7 @@
     S[kind].push({ nombre: f ? f.nombre : nombre, email: f ? f.email : "" });
     input.value = ""; renderChips(kind);
   }
-  function autor() { const v = $("#de").value; return v === "" ? null : S.usuarios[+v]; }
+  function autor() { const v = norm($("#de").value); return v ? (S.quienesRetiran.find(p => norm(p.nombre) === v) || null) : null; }
 
   /* ---------------- fotos ---------------- */
   let slotActivo = null;
@@ -214,6 +214,7 @@
   }
   function validar(d) {
     if (!d.de) return "Elegí quién redacta el informe (De)";
+    if (!S.quienesRetiran.some(p => norm(p.nombre) === norm(d.de))) return "Elegí un nombre de la lista «quien retira» en el campo De";
     if (!S.para.length) return "Agregá al menos una persona en «Para»";
     if (!d.asunto) return "Falta el asunto";
     if (!d.objetivo) return "Falta el objetivo / servicio";
@@ -421,8 +422,8 @@
 
     try {
       const r = await api("listas");
-      S.usuarios = r.usuarios; S.objetivos = r.objetivos; $("#numInforme").textContent = r.siguiente;
-      $("#de").innerHTML = '<option value="">Elegí quién redacta…</option>' + S.usuarios.map((u, i) => `<option value="${i}">${esc(u.nombre)}</option>`).join("");
+      S.usuarios = r.usuarios; S.quienesRetiran = r.quienesRetiran || []; S.objetivos = r.objetivos; $("#numInforme").textContent = r.siguiente;
+      $("#dl-quien-retira").innerHTML = S.quienesRetiran.map(u => `<option value="${esc(u.nombre)}"></option>`).join("");
       $("#dl-objetivos").innerHTML = S.objetivos.map((o) => `<option value="${esc(o.nombre)}">`).join("");
       $("#dl-personas").innerHTML = directorio().map((p) => `<option value="${esc(p.nombre)}">`).join("");
     } catch (e) { toast("No se pudieron cargar las listas: " + e.message, true); }
