@@ -7,6 +7,7 @@ Los archivos de Apps Script no se modifican: la lógica, los cálculos y los for
 """
 import os
 import re
+import hashlib
 import shutil
 import sys
 
@@ -21,9 +22,15 @@ def leer(nombre):
         return f.read()
 
 
+def version(nombre):
+    with open(os.path.join(web, nombre), 'rb') as f:
+        return hashlib.md5(f.read()).hexdigest()[:10]
+
+
+# ?v=... cambia cada vez que cambia el archivo: así el navegador no usa una copia vieja guardada
 html = leer('Index')
 html = html.replace("<?!= include('App'); ?>",
-                    '<script src="config.js"></script>\n  <script src="puente.js"></script>\n  ' + "<?!= include('App'); ?>")
+                    '<script src="config.js?v=' + version('config.js') + '"></script>\n  <script src="puente.js?v=' + version('puente.js') + '"></script>\n  ' + "<?!= include('App'); ?>")
 html = re.sub(r"<\?!=\s*include\('([^']+)'\);\s*\?>", lambda m: leer(m.group(1)), html)
 if '<?' in html:
     raise SystemExit('Quedó un <? ?> de Apps Script sin reemplazar en Index.html')
