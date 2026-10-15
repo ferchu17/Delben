@@ -18,7 +18,7 @@
 
   let toastT;
   function toast(msg, err) {
-    const t = $("#toast"); t.textContent = msg; t.className = "toast" + (err ? " err" : ""); t.hidden = false;
+    const t = $("#toast"); if (!t) { console.error(msg); return; } t.textContent = msg; t.className = "toast" + (err ? " err" : ""); t.hidden = false;
     clearTimeout(toastT); toastT = setTimeout(() => (t.hidden = true), err ? 6000 : 3000);
   }
   function overlay(txt) { const o = $("#overlay"); if (txt) { $("#overlayTxt").textContent = txt; o.hidden = false; } else o.hidden = true; }
@@ -253,8 +253,9 @@
     arr.forEach((p, i) => {
       html += `<span class="chip">${esc(p.nombre)}${p.email ? "" : " <em>sin correo</em>"}<button type="button" data-k="${kind}" data-i="${i}" aria-label="Quitar">✕</button></span>`;
     });
+    if (!box) { console.error("Falta el contenedor de chips:", kind); return; }
     box.innerHTML = html;
-    $$("button", box).forEach((b) => (b.onclick = () => { S[b.dataset.k].splice(+b.dataset.i, 1); renderChips(b.dataset.k); }));
+    $("button", box).forEach((b) => (b.onclick = () => { S[b.dataset.k].splice(+b.dataset.i, 1); renderChips(b.dataset.k); }));
   }
   function addChip(kind, input) {
     const nombre = input.value.replace(/\s+/g, " ").trim();
@@ -271,7 +272,7 @@
   /* ---------------- fotos ---------------- */
   let slotActivo = null;
   function renderFotos() {
-    const box = $("#fotos"); box.innerHTML = "";
+    const box = $("#fotos"); if (!box) { console.error("Falta #fotos en index.html"); return; } box.innerHTML = "";
     S.fotos.forEach((f, i) => {
       const d = document.createElement("div");
       d.className = "slot" + (f ? " full" : "");
