@@ -97,7 +97,7 @@
 
   /* ---------------- voz ---------------- */
   let rec = null, recBtn = null;
-  function stopRec() { if (rec) { try { rec.onend = null; rec.stop(); } catch (e) {} } if (recBtn) { recBtn.classList.remove("rec"); const sp = $("span", recBtn); if (sp) sp.textContent = "Hablar"; } $(".mic-state").forEach((s) => (s.textContent = "")); rec = null; recBtn = null; }
+  function stopRec() { if (rec) { try { rec.onend = null; rec.stop(); } catch (e) {} } if (recBtn) { recBtn.classList.remove("rec"); const sp = $("span", recBtn); if (sp) sp.textContent = "Hablar"; } $$(".mic-state").forEach((s) => (s.textContent = "")); rec = null; recBtn = null; }
   function toggleMic(btn) {
     if (recBtn === btn) return stopRec();
     stopRec();
