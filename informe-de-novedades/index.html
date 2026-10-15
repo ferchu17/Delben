@@ -43,7 +43,7 @@
     <div class="grid2">
       <div class="field c-green">
         <label for="de">De <span class="req">*</span></label>
-        <input id="de" list="dl-quien-retira" placeholder="Buscá y elegí quién redacta…" autocomplete="off" required><datalist id="dl-quien-retira"></datalist>
+        <input id="de" placeholder="Escribí apellido o nombre y elegí una persona…" autocomplete="off" autocapitalize="words" required aria-autocomplete="list" aria-controls="sugerenciasDe"><div id="sugerenciasDe" class="suggestions" hidden></div><div id="detalleDe" class="hint" aria-live="polite"></div>
       </div>
       <div class="field c-orange">
         <label for="objetivo">Objetivo / servicio <span class="req">*</span></label>
@@ -79,7 +79,7 @@
     <div class="field c-green big">
       <div class="lab-row">
         <label for="informe">Día, hora, lugar del hecho, quién, qué, cómo y por qué <span class="req">*</span></label>
-        <button type="button" class="mic" data-target="informe" title="Dictar por voz">🎤 <span>Hablar</span></button>
+        <div class="field-tools"><button type="button" class="mic" data-target="informe" title="Dictar por voz">🎤 <span>Hablar</span></button><button type="button" class="btn small ghost spell-btn" data-target="informe">ABC ✓ Corregir</button></div>
       </div>
       <textarea id="informe" lang="es-AR" spellcheck="true" autocorrect="on" autocapitalize="sentences" rows="9" placeholder="Escribí o tocá 🎤 y contá lo que pasó…"></textarea>
       <div class="mic-state" data-for="informe"></div>
@@ -88,7 +88,7 @@
     <div class="field c-orange big">
       <div class="lab-row">
         <label for="medidas">Medidas tomadas</label>
-        <button type="button" class="mic" data-target="medidas" title="Dictar por voz">🎤 <span>Hablar</span></button>
+        <div class="field-tools"><button type="button" class="mic" data-target="medidas" title="Dictar por voz">🎤 <span>Hablar</span></button><button type="button" class="btn small ghost spell-btn" data-target="medidas">ABC ✓ Corregir</button></div>
       </div>
       <textarea id="medidas" lang="es-AR" spellcheck="true" autocorrect="on" autocapitalize="sentences" rows="5" placeholder="¿Qué se hizo al respecto? Escribí o dictá…"></textarea>
       <div class="mic-state" data-for="medidas"></div>
