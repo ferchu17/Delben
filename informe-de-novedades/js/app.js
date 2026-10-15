@@ -544,8 +544,12 @@
       S.usuarios = r.usuarios || []; S.quienesRetiran = r.quienesRetiran || r.quienRetira || []; S.objetivos = r.objetivos || [];
       $("#numInforme").textContent = r.siguiente || "—";
       $("#sugerenciasDe").hidden = true;
-      $("#dl-objetivos").innerHTML = S.objetivos.map((o) => `<option value="${esc(o.nombre)}">`).join("");
-      $("#dl-personas").innerHTML = directorio().map((p) => `<option value="${esc(p.nombre)}">`).join("");
+      const listaObjetivos = $("#dl-objetivos");
+      if (listaObjetivos) listaObjetivos.innerHTML = S.objetivos.map((o) => `<option value="${esc(o.nombre)}">`).join("");
+      const listaPersonas = $("#dl-personas");
+      if (listaPersonas) listaPersonas.innerHTML = directorio().map((p) => `<option value="${esc(p.nombre)}">`).join("");
+      const sugerenciasVigilador = $("#sugerenciasVigilador");
+      if (!sugerenciasVigilador) console.warn("No se encontró el contenedor de sugerencias de vigiladores en el HTML.");
     } catch (e) { toast("No se pudieron cargar las listas: " + e.message, true); }
   }
   document.addEventListener("DOMContentLoaded", init);
