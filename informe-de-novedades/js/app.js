@@ -142,7 +142,7 @@
       renderChips("cc");
       return;
     }
-    const tokens = q.split(/\\s+/).filter(Boolean);
+    const tokens = q.split(/\s+/).filter(Boolean);
     const matches = S.quienesRetiran.filter(p => {
       const name = norm(p.nombre);
       return tokens.every(t => name.includes(t));
