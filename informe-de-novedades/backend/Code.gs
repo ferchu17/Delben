@@ -20,6 +20,9 @@ const CONFIG = {
   USUARIOS_COL_EMAIL:  '',   // ej: 'Correo'
   OBJETIVOS_COL_NOMBRE: '',  // ej: 'Objetivo'
   OBJETIVOS_COL_EMAIL:  '',  // ej: 'Mail'
+  QUIENRETIRA_COL_NOMBRE:  '',  // ej: 'Apellido y nombre'
+  QUIENRETIRA_COL_EMPRESA: '',  // ej: 'Empresa'
+  QUIENRETIRA_COL_LEGAJO:  '',  // ej: 'Legajo'
 
   LOGO_APP_ID: '1vP4JEsIwr37oQxkWtBD5bmjvWpetuBCf',   // logo DelBen en Drive
 
@@ -43,7 +46,7 @@ function doPost(e) {
     if (CONFIG.TOKEN && req.token !== CONFIG.TOKEN) return json_({ ok: false, error: 'No autorizado' });
     switch (req.action) {
       case 'logo':       return json_(logo_());
-      case 'listas':     return json_({ ok: true, usuarios: leerUsuarios_(), quienRetira: leerquienRetir_(), objetivos: leerObjetivos_(), siguiente: siguienteNumero_() });
+      case 'listas':     return json_(listas_());
       case 'reservar':   return json_(reservar_(req));
       case 'finalizar':  return json_(finalizar_(req));
       case 'buscar':     return json_(buscar_(req));
@@ -65,6 +68,20 @@ function logo_() {
   return { ok: true, src: 'data:' + b.getContentType() + ';base64,' + Utilities.base64Encode(b.getBytes()) };
 }
 
+// Cada lista se lee por separado: si una falla, las otras (y el N° siguiente) siguen llegando.
+function listas_() {
+  const out = { ok: true, errores: [] };
+  const intentar = function (clave, fn, vacio) {
+    try { out[clave] = fn(); }
+    catch (e) { out[clave] = vacio; out.errores.push(clave + ': ' + (e && e.message || e)); }
+  };
+  intentar('usuarios',    leerUsuarios_,    []);
+  intentar('quienRetira', leerquienRetir_,  []);
+  intentar('objetivos',   leerObjetivos_,   []);
+  intentar('siguiente',   siguienteNumero_, '0001');
+  return out;
+}
+
 /* ------------------------- Hojas y listas ------------------------- */
 
 function ss_() { return SpreadsheetApp.openById(CONFIG.SPREADSHEET_ID); }
@@ -78,7 +95,7 @@ function hojaInformes_() {
 }
 
 function norm_(s) {
-  return String(s == null ? '' : s).toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').trim();
+  return String(s == null ? '' : s).toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
 }
 
 // Busca la fila de encabezados (entre las primeras 5) y devuelve {rows, head, headerRow}
@@ -119,17 +136,29 @@ function leerUsuarios_() {
   return out.sort((a, b) => a.nombre.localeCompare(b.nombre, 'es'));
 }
 
-// Lista del campo "De": se toma exclusivamente de la pestaña indicada por el usuario.
+// Lista del campo "De" y del personal (vigiladores): pestaña "quienRetira".
+// Devuelve { nombre, empresa, legajo }.
 function leerquienRetir_() {
-  const sh = ss_().getSheetByName(CONFIG.HOJA_quienRetira);
-  if (!sh) throw new Error('No existe la pestaña "' + CONFIG.HOJA_quienRetira + '"');
+  const ss = ss_();
+  const esperado = norm_(CONFIG.HOJA_quienRetira).replace(/\s+/g, '');
+
+  // Acepta "quienRetira" o "quien retira", sin distinguir mayúsculas ni tildes.
+  const sh = ss.getSheets().find(s => norm_(s.getName()).replace(/\s+/g, '') === esperado);
+  if (!sh) {
+    throw new Error('No se encontró la pestaña "' + CONFIG.HOJA_quienRetira + '" en la planilla. Verificá el nombre de la hoja.');
+  }
+
   const vals = sh.getDataRange().getDisplayValues();
   if (!vals.length) return [];
+
+  const reNombre = /^(nombre|nombres|apellido y nombre|apellidos y nombres|nombre y apellido|nombre completo|quienretira|quien retira|personal|empleado|vigilador|persona)$/;
   let headerRow = 0, colNombre = -1;
-  // Detectar encabezado de nombre si existe; si no, usar la primera columna con datos.
+
   for (let r = 0; r < Math.min(5, vals.length); r++) {
     const heads = vals[r].map(norm_);
-    const c = heads.findIndex(h => /^(nombre|nombres|apellido y nombre|nombre y apellido|nombre completo|quienRetira|quienRetira|personal|empleado|vigilador|persona)$/.test(h));
+    let c = -1;
+    if (CONFIG.QUIENRETIRA_COL_NOMBRE) c = heads.indexOf(norm_(CONFIG.QUIENRETIRA_COL_NOMBRE));
+    if (c < 0) c = heads.findIndex(h => reNombre.test(h));
     if (c >= 0) { headerRow = r; colNombre = c; break; }
   }
   if (colNombre < 0) {
@@ -137,16 +166,30 @@ function leerquienRetir_() {
     colNombre = vals[0].findIndex(v => String(v || '').trim() !== '');
     if (colNombre < 0) colNombre = 0;
   }
-  const seen = {};
-  return vals.slice(headerRow + 1)
-    .map(row => String(row[colNombre] || '').replace(/\\s+/g, ' ').trim())
-    .filter(name => {
-      const k = norm_(name);
-      if (!name || /^(nombre|nombres|apellido|personal|empleado|vigilador|persona)$/.test(k) || seen[k]) return false;
-      seen[k] = true; return true;
-    })
-    .sort((a, b) => a.localeCompare(b, 'es'))
-    .map(nombre => ({ nombre }));
+
+  const heads = vals[headerRow].map(norm_);
+  let colEmpresa = CONFIG.QUIENRETIRA_COL_EMPRESA ? heads.indexOf(norm_(CONFIG.QUIENRETIRA_COL_EMPRESA)) : -1;
+  if (colEmpresa < 0) colEmpresa = heads.findIndex(h => /empresa|razon social|firma/.test(h));
+  let colLegajo = CONFIG.QUIENRETIRA_COL_LEGAJO ? heads.indexOf(norm_(CONFIG.QUIENRETIRA_COL_LEGAJO)) : -1;
+  if (colLegajo < 0) colLegajo = heads.findIndex(h => /legajo|^leg\.?$|n.*legajo/.test(h));
+
+  const vistos = {}, out = [];
+  vals.slice(headerRow + 1).forEach(row => {
+    const nombre = String(row[colNombre] || '').replace(/\s+/g, ' ').trim();
+    const clave = norm_(nombre);
+    if (!nombre || /^(nombre|nombres|apellido|personal|empleado|vigilador|persona)$/.test(clave)) return;
+    // Clave única: nombre + legajo, así dos "Martínez" distintos no se pisan.
+    const legajo = colLegajo >= 0 ? String(row[colLegajo] || '').trim() : '';
+    const k = clave + '|' + legajo;
+    if (vistos[k]) return;
+    vistos[k] = true;
+    out.push({
+      nombre: nombre,
+      empresa: colEmpresa >= 0 ? String(row[colEmpresa] || '').trim() : '',
+      legajo: legajo
+    });
+  });
+  return out.sort((a, b) => a.nombre.localeCompare(b.nombre, 'es'));
 }
 
 function leerObjetivos_() {
@@ -347,5 +390,10 @@ function reenviar_(req) {
 function probarListas() {
   Logger.log('Encabezados usuarios: ' + JSON.stringify(tabla_(CONFIG.HOJA_USUARIOS).headRaw.filter(h => !/contrase|clave|pass/i.test(h))));
   Logger.log('Encabezados objetivos: ' + JSON.stringify(tabla_(CONFIG.HOJA_OBJETIVOS).headRaw));
-  Logger.log(JSON.stringify({ usuarios: leerUsuarios_().slice(0, 5), objetivos: leerObjetivos_().slice(0, 5), siguiente: siguienteNumero_() }, null, 2));
+  Logger.log(JSON.stringify({
+    usuarios: leerUsuarios_().slice(0, 5),
+    quienRetira: leerquienRetir_().slice(0, 5),
+    objetivos: leerObjetivos_().slice(0, 5),
+    siguiente: siguienteNumero_()
+  }, null, 2));
 }
