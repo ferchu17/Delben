@@ -171,47 +171,57 @@
     return Array.from(unicas.values());
   }
 
-  function mostrarSugerenciasDe() {
-    const input = $("#de"), box = $("#sugerenciasDe"), detalle = $("#detalleDe");
-    const q = norm(input.value);
-    detalle.textContent = "";
+  function pintarLista(input, box, opciones, elegir, consulta, detalle) {
+    if (!input || !box) return;
+    const q = norm(consulta || "");
     if (!q) { box.hidden = true; box.innerHTML = ""; return; }
-    const personas = personasDe();
-    const exact = personas.find(p => norm(p.nombre) === q);
-    if (exact) {
-      input.value = exact.nombre;
-      box.hidden = true; box.innerHTML = "";
-      detalle.textContent = "Seleccionado: " + exact.nombre;
-      renderChips("cc");
-      return;
-    }
     const tokens = q.split(/\s+/).filter(Boolean);
-    const matches = personas.filter(p => {
-      const name = norm(p.nombre);
-      return tokens.every(t => name.includes(t));
-    }).slice(0, 12);
-    box.innerHTML = matches.length
-      ? matches.map((p,i) => '<button type="button" role="option" aria-selected="false" class="suggestion" data-index="' + i + '">' + esc(p.nombre) + '</button>').join("")
-      : '<div class="suggestion-empty">No hay coincidencias. Probá con otro apellido.</div>';
+    const matches = opciones.filter(p => tokens.every(t => norm(p.nombre).includes(t))).slice(0, 10);
+    box.innerHTML = matches.length ? matches.map((p,i) =>
+      '<button type="button" role="option" aria-selected="false" class="suggestion" data-index="' + i + '"><strong>' + esc(p.nombre) + '</strong>' +
+      ([p.legajo ? "Legajo: " + p.legajo : "", p.empresa ? "Empresa: " + p.empresa : ""].filter(Boolean).length
+        ? '<small>' + esc([p.legajo ? "Legajo: " + p.legajo : "", p.empresa ? "Empresa: " + p.empresa : ""].filter(Boolean).join(" · ")) + '</small>' : '') + '</button>').join("")
+      : '<div class="suggestion-empty">No hay coincidencias. Seguí escribiendo.</div>';
     box.hidden = false;
-    // pointerdown ocurre antes de que el teclado móvil quite el foco del input.
-    // Delegar el evento en la caja evita que el toque se pierda en navegadores móviles.
-    const elegir = (e) => {
+    const select = (e) => {
       const b = e.target.closest(".suggestion[data-index]");
       if (!b || !box.contains(b)) return;
-      e.preventDefault();
-      const chosen = matches[Number(b.dataset.index)];
-      if (!chosen) return;
-      input.value = chosen.nombre;
-      box.hidden = true; box.innerHTML = "";
-      detalle.textContent = "Seleccionado: " + chosen.nombre;
-      input.dispatchEvent(new Event("change", { bubbles: true }));
-      renderChips("cc");
+      e.preventDefault(); e.stopPropagation();
+      const p = matches[Number(b.dataset.index)];
+      if (!p) return;
+      elegir(p); box.hidden = true; box.innerHTML = "";
+      if (detalle) detalle.textContent = "Seleccionado: " + p.nombre;
     };
-    box.onpointerdown = elegir;
-    box.onclick = elegir;
+    box.onpointerdown = select; box.onclick = select;
   }
 
+  function mostrarSugerenciasDe() {
+    const input = $("#de"), box = $("#sugerenciasDe"), detalle = $("#detalleDe");
+    const q = input.value;
+    const personas = personasDe();
+    const exact = personas.find(p => norm(p.nombre) === norm(q));
+    if (exact) { box.hidden = true; box.innerHTML = ""; detalle.textContent = "Seleccionado: " + exact.nombre; return; }
+    pintarLista(input, box, personas, p => {
+      input.value = p.nombre;
+      input.dispatchEvent(new Event("change", { bubbles: true }));
+      renderChips("cc");
+    }, q, detalle);
+  }
+
+  function mostrarSugerenciasObjetivo() {
+    const input = $("#objetivo"), box = $("#sugerenciasObjetivo");
+    const opciones = S.objetivos.map(o => typeof o === "string" ? {nombre:o} : o).filter(o => o && o.nombre);
+    pintarLista(input, box, opciones, p => { input.value = p.nombre; input.dispatchEvent(new Event("change", {bubbles:true})); }, input.value);
+  }
+
+  function mostrarSugerenciasDestinatario(kind) {
+    const input = $(kind === "para" ? "#inPara" : "#inCc");
+    const box = $(kind === "para" ? "#sugerenciasPara" : "#sugerenciasCc");
+    pintarLista(input, box, directorio(), p => {
+      input.value = p.nombre;
+      addChip(kind, input);
+    }, input.value);
+  }
   function mostrarSugerenciasVigilador() {
     const campo = $("#informe"), box = $("#sugerenciasVigilador");
     if (!campo || !box) { console.error("Falta el campo o la lista de sugerencias de vigiladores"); return; }
@@ -587,6 +597,10 @@
     $("#inPara").addEventListener("change", (e) => { if (buscarPersona(e.target.value)) addChip("para", e.target); });
     $("#inCc").addEventListener("change", (e) => { if (buscarPersona(e.target.value)) addChip("cc", e.target); });
     $("#de").addEventListener("input", mostrarSugerenciasDe);
+    $("#objetivo").addEventListener("input", mostrarSugerenciasObjetivo);
+    $("#objetivo").addEventListener("focus", mostrarSugerenciasObjetivo);
+    $("#inPara").addEventListener("input", () => mostrarSugerenciasDestinatario("para"));
+    $("#inCc").addEventListener("input", () => mostrarSugerenciasDestinatario("cc"));
     $("#informe").addEventListener("input", mostrarSugerenciasVigilador);
     $("#de").addEventListener("focus", mostrarSugerenciasDe);
     $("#de").addEventListener("change", () => { mostrarSugerenciasDe(); renderChips("cc"); });
@@ -598,8 +612,7 @@
     $("#btnBuscar").onclick = buscar; $("#q").addEventListener("keydown", (e) => { if (e.key === "Enter") buscar(); });
     renderFotos(); renderChips("para"); renderChips("cc");
 
-    try { await cargarListasUI(); $("#sugerenciasDe").hidden = true; }
-    catch (e) { toast("No se pudieron cargar las listas: " + e.message, true); }
+    cargarListasUI().then(() => { $("#sugerenciasDe").hidden = true; }).catch(e => toast("No se pudieron cargar las listas: " + e.message, true));
     document.addEventListener("visibilitychange", recargarAlVolver);
     window.addEventListener("pageshow", recargarAlVolver);
     window.addEventListener("online", recargarAlVolver);
