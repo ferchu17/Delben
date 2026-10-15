@@ -271,7 +271,7 @@
     });
     if (!box) { console.error("Falta el contenedor de chips:", kind); return; }
     box.innerHTML = html;
-    $("button", box).forEach((b) => (b.onclick = () => { S[b.dataset.k].splice(+b.dataset.i, 1); renderChips(b.dataset.k); }));
+    $$("button", box).forEach((b) => (b.onclick = () => { S[b.dataset.k].splice(+b.dataset.i, 1); renderChips(b.dataset.k); }));
   }
   function addChip(kind, input) {
     const nombre = input.value.replace(/\s+/g, " ").trim();
