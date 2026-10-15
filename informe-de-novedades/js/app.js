@@ -49,7 +49,13 @@
       method: "POST", headers: { "Content-Type": "text/plain;charset=utf-8" },
       body: JSON.stringify(Object.assign({ action, token: CFG.TOKEN }, payload || {}))
     });
-    const j = await r.json();
+    const raw = await r.text();
+    let j;
+    try { j = JSON.parse(raw); }
+    catch (_) {
+      const muestra = String(raw || "").replace(/\\s+/g, " ").slice(0, 180);
+      throw new Error("El backend devolvió HTML en vez de JSON. Revisá que la implementación de Apps Script esté activa y accesible. Respuesta: " + muestra);
+    }
     if (!j.ok) throw new Error(j.error || "Error del servidor");
     return j;
   }
@@ -474,7 +480,8 @@
 
     try {
       const r = await api("listas");
-      S.usuarios = r.usuarios || []; S.quienesRetiran = r.quienesRetiran || r.quienRetira || []; S.objetivos = r.objetivos || []; $("#numInforme").textContent = r.siguiente;
+      S.usuarios = r.usuarios || []; S.quienesRetiran = r.quienesRetiran || r.quienRetira || []; S.objetivos = r.objetivos || [];
+      $("#numInforme").textContent = r.siguiente || "—";
       $("#sugerenciasDe").hidden = true;
       $("#dl-objetivos").innerHTML = S.objetivos.map((o) => `<option value="${esc(o.nombre)}">`).join("");
       $("#dl-personas").innerHTML = directorio().map((p) => `<option value="${esc(p.nombre)}">`).join("");
