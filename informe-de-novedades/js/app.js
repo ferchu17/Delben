@@ -50,6 +50,7 @@
       body: JSON.stringify(Object.assign({ action, token: CFG.TOKEN }, payload || {}))
     });
     const raw = await r.text();
+    if (!r.ok) throw new Error("Apps Script respondió HTTP " + r.status + ". " + String(raw || "").replace(/\\s+/g, " ").slice(0, 180));
     let j;
     try { j = JSON.parse(raw); }
     catch (_) {
