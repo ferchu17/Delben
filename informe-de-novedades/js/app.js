@@ -141,12 +141,24 @@
   }
 
   /* ---------------- selector de personal y corrector móvil ---------------- */
+  function personasDe() {
+    const unicas = new Map();
+    S.quienesRetiran.concat(S.usuarios).forEach((p) => {
+      if (!p || !p.nombre) return;
+      const k = norm(p.nombre);
+      const previo = unicas.get(k) || {};
+      unicas.set(k, Object.assign({}, previo, p, { nombre: previo.nombre || p.nombre, email: p.email || previo.email || "", empresa: p.empresa || previo.empresa || "", legajo: p.legajo || previo.legajo || "" }));
+    });
+    return Array.from(unicas.values());
+  }
+
   function mostrarSugerenciasDe() {
     const input = $("#de"), box = $("#sugerenciasDe"), detalle = $("#detalleDe");
     const q = norm(input.value);
     detalle.textContent = "";
     if (!q) { box.hidden = true; box.innerHTML = ""; return; }
-    const exact = S.quienesRetiran.find(p => norm(p.nombre) === q);
+    const personas = personasDe();
+    const exact = personas.find(p => norm(p.nombre) === q);
     if (exact) {
       input.value = exact.nombre;
       box.hidden = true; box.innerHTML = "";
@@ -155,7 +167,7 @@
       return;
     }
     const tokens = q.split(/\s+/).filter(Boolean);
-    const matches = S.quienesRetiran.filter(p => {
+    const matches = personas.filter(p => {
       const name = norm(p.nombre);
       return tokens.every(t => name.includes(t));
     }).slice(0, 12);
@@ -267,7 +279,7 @@
     S[kind].push({ nombre: f ? f.nombre : nombre, email: f ? f.email : "" });
     input.value = ""; renderChips(kind);
   }
-  function autor() { const v = norm($("#de").value); if (!v) return null; const q = S.quienesRetiran.find(p => norm(p.nombre) === v); if (!q) return null; const u = S.usuarios.find(p => norm(p.nombre) === v); return { nombre: q.nombre, email: (u && u.email) || q.email || "" }; }
+  function autor() { const v = norm($("#de").value); if (!v) return null; const q = personasDe().find(p => norm(p.nombre) === v); if (!q) return null; return { nombre: q.nombre, email: q.email || "" }; }
 
   /* ---------------- fotos ---------------- */
   let slotActivo = null;
@@ -332,7 +344,7 @@
   }
   function validar(d) {
     if (!d.de) return "Elegí quién redacta el informe (De)";
-    if (!S.quienesRetiran.some(p => norm(p.nombre) === norm(d.de))) return "Elegí un nombre de la lista «quien retira» en el campo De";
+    if (!personasDe().some(p => norm(p.nombre) === norm(d.de))) return "Elegí un nombre de la lista en el campo De";
     if (!S.para.length) return "Agregá al menos una persona en «Para»";
     if (!d.asunto) return "Falta el asunto";
     if (!d.objetivo) return "Falta el objetivo / servicio";
