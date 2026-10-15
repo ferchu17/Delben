@@ -305,9 +305,9 @@
     if (S[kind].length >= max) return toast("Máximo " + max + " personas", true);
     if (S[kind].some((p) => norm(p.nombre) === norm(nombre))) { input.value = ""; return; }
     const f = buscarPersona(nombre);
-    if (!f) { toast("Elegí una persona de la lista para asegurar que tenga un correo válido.", true); input.focus(); return; }
-    if (!f.email || !okMail(f.email)) { toast("La persona seleccionada no tiene un correo válido cargado.", true); return; }
-    S[kind].push({ nombre: f.nombre, email: f.email });
+    if (!f) { toast("Primero elegí una persona de las opciones que aparecen debajo del campo.", true); input.focus(); return; }
+    // Se puede agregar aunque falte correo; la validación del envío indicará el dato faltante.
+    S[kind].push({ nombre: f.nombre, email: f.email || "" });
     input.value = ""; renderChips(kind);
   }
   function autor() { const v = norm($("#de").value); if (!v) return null; const q = personasDe().find(p => norm(p.nombre) === v); if (!q) return null; return { nombre: q.nombre, email: q.email || "" }; }
