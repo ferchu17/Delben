@@ -422,7 +422,7 @@
 
     try {
       const r = await api("listas");
-      S.usuarios = r.usuarios; S.quienesRetiran = r.quienesRetiran || []; S.objetivos = r.objetivos; $("#numInforme").textContent = r.siguiente;
+      S.usuarios = r.usuarios || []; S.quienesRetiran = r.quienesRetiran || r.quienRetira || []; S.objetivos = r.objetivos || []; $("#numInforme").textContent = r.siguiente;
       $("#dl-quien-retira").innerHTML = S.quienesRetiran.map(u => `<option value="${esc(u.nombre)}"></option>`).join("");
       $("#dl-objetivos").innerHTML = S.objetivos.map((o) => `<option value="${esc(o.nombre)}">`).join("");
       $("#dl-personas").innerHTML = directorio().map((p) => `<option value="${esc(p.nombre)}">`).join("");
