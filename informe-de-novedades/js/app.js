@@ -43,16 +43,31 @@
     ]
   };
 
+  let listasPromise = null;
+  let ultimoCargaListas = 0;
   async function api(action, payload) {
     if (DEMO) return demo(action, payload || {});
     // La carga inicial de listas usa GET: la API publica ya expone ?action=listas
     // y así evitamos que un POST cross-origin impida inicializar toda la pantalla.
-    const r = action === "listas"
-      ? await fetch(CFG.API_URL + "?action=listas", { method: "GET", cache: "no-store" })
-      : await fetch(CFG.API_URL, {
-          method: "POST", headers: { "Content-Type": "text/plain;charset=utf-8" },
-          body: JSON.stringify(Object.assign({ action, token: CFG.TOKEN }, payload || {}))
-        });
+    if (action === "listas") {
+      if (!listasPromise || Date.now() - ultimoCargaListas > 60000) {
+        ultimoCargaListas = Date.now();
+        listasPromise = fetch(CFG.API_URL + "?action=listas", { method: "GET", cache: "no-store", redirect: "follow" })
+          .then(async (response) => {
+            const raw = await response.text();
+            if (!response.ok) throw new Error("Apps Script respondió HTTP " + response.status + ". " + String(raw || "").replace(/\\s+/g, " ").slice(0, 180));
+            let data;
+            try { data = JSON.parse(raw); } catch (_) { throw new Error("El backend no devolvió JSON válido (HTTP " + response.status + ")."); }
+            if (!data.ok) throw new Error(data.error || "Error del servidor");
+            return data;
+          }).catch((err) => { listasPromise = null; throw err; });
+      }
+      return listasPromise;
+    }
+    const r = await fetch(CFG.API_URL, {
+      method: "POST", headers: { "Content-Type": "text/plain;charset=utf-8" },
+      body: JSON.stringify(Object.assign({ action, token: CFG.TOKEN }, payload || {}))
+    });
     const raw = await r.text();
     if (!r.ok) throw new Error("Apps Script respondió HTTP " + r.status + ". " + String(raw || "").replace(/\\s+/g, " ").slice(0, 180));
     let j;
@@ -436,7 +451,30 @@
   }
 
   async function cargarNumero() {
-    try { const r = await api("listas"); $("#numInforme").textContent = r.siguiente || "—"; } catch (e) {}
+    try { const r = await api("listas"); $("#numInforme").textContent = r.siguiente || "—"; }
+    catch (e) { $("#numInforme").textContent = "—"; }
+  }
+
+  async function cargarListasUI() {
+    const r = await api("listas");
+    S.usuarios = Array.isArray(r.usuarios) ? r.usuarios : [];
+    S.quienesRetiran = Array.isArray(r.quienesRetiran || r.quienRetira) ? (r.quienesRetiran || r.quienRetira) : [];
+    S.objetivos = Array.isArray(r.objetivos) ? r.objetivos : [];
+    $("#numInforme").textContent = r.siguiente || "—";
+    const listaObjetivos = $("#dl-objetivos");
+    if (listaObjetivos) listaObjetivos.innerHTML = S.objetivos.map((o) => `<option value="${esc(o.nombre)}">`).join("");
+    const listaPersonas = $("#dl-personas");
+    if (listaPersonas) listaPersonas.innerHTML = directorio().map((p) => `<option value="${esc(p.nombre)}">`).join("");
+    renderChips("para"); renderChips("cc");
+  }
+
+  let initEnCurso = false, ultimoInit = 0;
+  async function recargarAlVolver() {
+    if (document.visibilityState !== "visible" || initEnCurso || Date.now() - ultimoInit < 12000) return;
+    ultimoInit = Date.now(); initEnCurso = true; listasPromise = null;
+    try { await cargarListasUI(); }
+    catch (e) { toast("No se pudieron actualizar las listas: " + e.message, true); }
+    finally { initEnCurso = false; }
   }
 
   /* ---------------- buscador ---------------- */
@@ -558,18 +596,11 @@
     $("#btnBuscar").onclick = buscar; $("#q").addEventListener("keydown", (e) => { if (e.key === "Enter") buscar(); });
     renderFotos(); renderChips("para"); renderChips("cc");
 
-    try {
-      const r = await api("listas");
-      S.usuarios = r.usuarios || []; S.quienesRetiran = r.quienesRetiran || r.quienRetira || []; S.objetivos = r.objetivos || [];
-      $("#numInforme").textContent = r.siguiente || "—";
-      $("#sugerenciasDe").hidden = true;
-      const listaObjetivos = $("#dl-objetivos");
-      if (listaObjetivos) listaObjetivos.innerHTML = S.objetivos.map((o) => `<option value="${esc(o.nombre)}">`).join("");
-      const listaPersonas = $("#dl-personas");
-      if (listaPersonas) listaPersonas.innerHTML = directorio().map((p) => `<option value="${esc(p.nombre)}">`).join("");
-      const sugerenciasVigilador = $("#sugerenciasVigilador");
-      if (!sugerenciasVigilador) console.warn("No se encontró el contenedor de sugerencias de vigiladores en el HTML.");
-    } catch (e) { toast("No se pudieron cargar las listas: " + e.message, true); }
+    try { await cargarListasUI(); $("#sugerenciasDe").hidden = true; }
+    catch (e) { toast("No se pudieron cargar las listas: " + e.message, true); }
+    document.addEventListener("visibilitychange", recargarAlVolver);
+    window.addEventListener("pageshow", recargarAlVolver);
+    window.addEventListener("online", recargarAlVolver);
   }
   document.addEventListener("DOMContentLoaded", init);
 
