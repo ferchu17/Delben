@@ -8,7 +8,7 @@ const CONFIG = {
   SPREADSHEET_ID: '1Z06eLpbng51tYcycQlr0fLNI1OYmOpnmQp94YHY_coY',
   HOJA_INFORMES:  'informes_novedades',
   HOJA_USUARIOS:  'Usuarios y contraseñas',
-  HOJA_QUIEN_RETIRA: 'quienRetira',
+  HOJA_quienRetira: 'quienRetira',
   HOJA_OBJETIVOS: 'objetivos',
   CARPETA_ID:     '1NXkehdUKNsGKs_yjyfzHev82v_cBH9jz',   // carpeta de Drive donde se guardan los PDF
 
@@ -43,12 +43,7 @@ function doPost(e) {
     if (CONFIG.TOKEN && req.token !== CONFIG.TOKEN) return json_({ ok: false, error: 'No autorizado' });
     switch (req.action) {
       case 'logo':       return json_(logo_());
-      case 'listas': {
-        const usuarios = leerUsuarios_();
-        const objetivos = leerObjetivos_();
-        const quienesRetiran = leerQuienesRetiran_();
-        return json_({ ok: true, usuarios: usuarios, quienesRetiran: quienesRetiran, objetivos: objetivos, siguiente: siguienteNumero_() });
-      }
+      case 'listas':     return json_({ ok: true, usuarios: leerUsuarios_(), quienRetira: leerquienRetir_(), objetivos: leerObjetivos_(), siguiente: siguienteNumero_() });
       case 'reservar':   return json_(reservar_(req));
       case 'finalizar':  return json_(finalizar_(req));
       case 'buscar':     return json_(buscar_(req));
@@ -73,32 +68,6 @@ function logo_() {
 /* ------------------------- Hojas y listas ------------------------- */
 
 function ss_() { return SpreadsheetApp.openById(CONFIG.SPREADSHEET_ID); }
-
-// Busca pestañas ignorando mayúsculas, tildes y espacios sobrantes.
-function buscarHoja_(nombre) {
-  const ss = ss_();
-
-  // Primero buscar el nombre EXACTO informado: "quienRetira" (sin espacio).
-  // getSheetByName distingue el nombre real de la pestaña sin normalizarlo.
-  let sh = ss.getSheetByName(String(nombre || ''));
-  if (sh) return sh;
-
-  // Como respaldo, comparar sin distinguir mayúsculas, tildes ni espacios sobrantes.
-  const buscado = norm_(nombre).replace(/\s+/g, ' ');
-  sh = ss.getSheets().find(s => norm_(s.getName()).replace(/\s+/g, ' ') === buscado);
-  if (sh) return sh;
-
-  // Para "quienRetira", admitir solo variantes de escritura del mismo nombre,
-  // sin exigir que la pestaña contenga un espacio.
-  if (buscado === 'quienretira' || buscado === 'quien retira') {
-    sh = ss.getSheets().find(s => {
-      const n = norm_(s.getName()).replace(/\s+/g, '');
-      return n === 'quienretira';
-    });
-    if (sh) return sh;
-  }
-  return null;
-}
 
 function hojaInformes_() {
   const ss = ss_();
@@ -151,19 +120,16 @@ function leerUsuarios_() {
 }
 
 // Lista del campo "De": se toma exclusivamente de la pestaña indicada por el usuario.
-function leerQuienesRetiran_() {
-  const sh = buscarHoja_(CONFIG.HOJA_QUIEN_RETIRA);
-  if (!sh) {
-    const nombres = ss_().getSheets().map(s => s.getName()).join(', ');
-    throw new Error('No encuentro la pestaña de quién retira. Pestañas disponibles: ' + nombres);
-  }
+function leerquienRetir_() {
+  const sh = ss_().getSheetByName(CONFIG.HOJA_quienRetira);
+  if (!sh) throw new Error('No existe la pestaña "' + CONFIG.HOJA_quienRetira + '"');
   const vals = sh.getDataRange().getDisplayValues();
   if (!vals.length) return [];
   let headerRow = 0, colNombre = -1;
   // Detectar encabezado de nombre si existe; si no, usar la primera columna con datos.
   for (let r = 0; r < Math.min(5, vals.length); r++) {
     const heads = vals[r].map(norm_);
-    const c = heads.findIndex(h => /^(nombre|nombres|apellido y nombre|nombre y apellido|nombre completo|quien retira|quién retira|personal|empleado|vigilador|persona)$/.test(h));
+    const c = heads.findIndex(h => /^(nombre|nombres|apellido y nombre|nombre y apellido|nombre completo|quienRetira|quienRetira|personal|empleado|vigilador|persona)$/.test(h));
     if (c >= 0) { headerRow = r; colNombre = c; break; }
   }
   if (colNombre < 0) {
@@ -173,7 +139,7 @@ function leerQuienesRetiran_() {
   }
   const seen = {};
   return vals.slice(headerRow + 1)
-    .map(row => String(row[colNombre] || '').replace(/\s+/g, ' ').trim())
+    .map(row => String(row[colNombre] || '').replace(/\\s+/g, ' ').trim())
     .filter(name => {
       const k = norm_(name);
       if (!name || /^(nombre|nombres|apellido|personal|empleado|vigilador|persona)$/.test(k) || seen[k]) return false;
