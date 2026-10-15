@@ -183,6 +183,7 @@
 
   function mostrarSugerenciasVigilador() {
     const campo = $("#informe"), box = $("#sugerenciasVigilador");
+    if (!campo || !box) { console.error("Falta el campo o la lista de sugerencias de vigiladores"); return; }
     const cursor = campo.selectionStart;
     const antes = campo.value.slice(0, cursor);
     // Activar solo cuando se escribe "vigilador" seguido de un apellido/nombre.
@@ -243,6 +244,7 @@
 
   function renderChips(kind) {
     const arr = S[kind], box = $(kind === "para" ? "#chipsPara" : "#chipsCc");
+    if (!box) { console.error("Falta el contenedor de destinatarios:", kind); return; }
     let html = "";
     if (kind === "cc") {
       const a = autor();
