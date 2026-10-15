@@ -33,6 +33,14 @@
       { id: 2, numero: "0002", fecha: "07/10/2026", de: "Fernando Jacino", para: "Celso Canaveta; Gustavo San Martín", asunto: "Portón de acceso con falla", objetivo: "Depósito Central", informe: "El portón vehicular de acceso presenta falla en el motor desde las 22:40 del día 06/10. Quedó abierto manualmente.", medidas: "Se dio aviso a mantenimiento y se reforzó la guardia en el acceso.", link: "" },
       { id: 3, numero: "0003", fecha: "12/10/2026", de: "Gustavo San Martín", para: "Fernando Jacino", asunto: "Ronda de control sin novedades", objetivo: "Planta Norte", informe: "Se realizó ronda completa de control a las 14:00. Sin novedades. Se verificaron cierres y luminarias.", medidas: "Sin medidas adicionales.", link: "" }
     ],
+    personal: [
+      { nombre: "Martínez Juan Carlos", empresa: "KTL Seguridad", legajo: "1021", email: "" },
+      { nombre: "Martínez Ana Laura", empresa: "KTL Seguridad", legajo: "1187", email: "" },
+      { nombre: "Martínez Pablo", empresa: "Del Ben SRL", legajo: "2045", email: "" },
+      { nombre: "Gómez María", empresa: "KTL Seguridad", legajo: "1310", email: "maria@ejemplo.com" },
+      { nombre: "San Martín Gustavo", empresa: "KTL Seguridad", legajo: "900", email: "gustavo@ejemplo.com" },
+      { nombre: "Jacino Fernando", empresa: "KTL Seguridad", legajo: "801", email: "fjacino@ejemplo.com" }
+    ],
     users: [
       { nombre: "Celso Canaveta", email: "celso@ejemplo.com" }, { nombre: "Fernando Jacino", email: "fjacino@ejemplo.com" },
       { nombre: "Gustavo San Martín", email: "gustavo@ejemplo.com" }, { nombre: "María Gómez", email: "" }, { nombre: "Laura Benítez", email: "laura@ejemplo.com" }
@@ -83,7 +91,7 @@
   async function demo(action, p) {
     await new Promise((r) => setTimeout(r, 350));
     const pad = (n) => String(n).padStart(4, "0");
-    if (action === "listas") return { ok: true, usuarios: DEMO_DB.users, objetivos: DEMO_DB.objetivos, siguiente: pad(DEMO_DB.next) };
+    if (action === "listas") return { ok: true, usuarios: DEMO_DB.users, quienRetira: DEMO_DB.personal, objetivos: DEMO_DB.objetivos, siguiente: pad(DEMO_DB.next), errores: [] };
     if (action === "reservar") {
       const d = p.data, it = { id: DEMO_DB.next, numero: pad(DEMO_DB.next), fecha: d.fecha, de: d.de, para: d.para.join("; "), asunto: d.asunto, objetivo: d.objetivo, informe: d.informe, medidas: d.medidas, link: "" };
       DEMO_DB.items.push(it); DEMO_DB.next++; return { ok: true, id: it.id, numero: it.numero };
@@ -111,8 +119,30 @@
   }
 
   /* ---------------- voz ---------------- */
-  let rec = null, recBtn = null;
-  function stopRec() { if (rec) { try { rec.onend = null; rec.stop(); } catch (e) {} } if (recBtn) { recBtn.classList.remove("rec"); const sp = $("span", recBtn); if (sp) sp.textContent = "Hablar"; } $$(".mic-state").forEach((s) => (s.textContent = "")); rec = null; recBtn = null; }
+  let rec = null, recBtn = null, recInput = null;
+  function micApagar() {
+    if (recBtn) { recBtn.classList.remove("rec"); const sp = $("span", recBtn); if (sp) sp.textContent = "Hablar"; }
+    if (recInput) { recInput.el.removeEventListener("input", recInput.fn); }
+    rec = null; recBtn = null; recInput = null;
+  }
+  function stopRec() {
+    if (rec) { const r = rec; rec = null; try { r.onend = null; r.stop(); } catch (e) {} }
+    micApagar(); $$(".mic-state").forEach((s) => (s.textContent = ""));
+  }
+  // Une dos textos con un solo espacio y mayúscula inicial después de punto.
+  function unirTexto(a, b) {
+    b = String(b || "").replace(/^\s+|[ \t]+$/g, ""); if (!b) return a;
+    if (!a.trim()) return b.charAt(0).toUpperCase() + b.slice(1);
+    const limpio = a.replace(/[ \t]+$/, "");
+    if (/[.!?]$/.test(limpio) || /\n$/.test(limpio)) b = b.charAt(0).toUpperCase() + b.slice(1);
+    if (/^[.,;:?!)]/.test(b) || /\n$/.test(limpio)) return limpio + b;
+    return limpio + " " + b;
+  }
+  // Comandos de voz al final de una frase: "punto", "coma", "punto y aparte", "nueva línea".
+  function comandosVoz(t) {
+    return t.replace(/\s*\b(punto y aparte|punto aparte)\s*$/i, ".\n").replace(/\s*\b(nueva línea|nuevo renglón|nueva linea)\s*$/i, "\n")
+      .replace(/\s+punto y coma\s*$/i, ";").replace(/\s+dos puntos\s*$/i, ":").replace(/\s+coma\s*$/i, ",").replace(/\s+punto\s*$/i, ".");
+  }
   function toggleMic(btn) {
     if (recBtn === btn) return stopRec();
     stopRec();
@@ -120,55 +150,64 @@
     const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
     if (!window.isSecureContext) { toast("El dictado requiere una conexión segura HTTPS.", true); if (state) state.textContent = "Abrí la aplicación desde su dirección HTTPS."; return; }
     if (!SR) { toast("Este navegador o la APK no admite dictado integrado. Usá el micrófono 🎤 del teclado para dictar en el campo.", true); if (state) state.textContent = "El reconocimiento de voz no está disponible en este entorno."; return; }
-    const r = new SR(); r.lang = "es-AR"; r.continuous = true; r.interimResults = true; r.maxAlternatives = 1;
-    const base = target.value ? target.value.replace(/\s+$/, "") + " " : "";
-    // El navegador vuelve a entregar resultados anteriores en cada evento.
-    // Guardarlos por índice evita concatenar dos veces el mismo fragmento.
-    const segmentos = [];
+    // Una frase por vez (continuous=false) y se reinicia sola hasta que toques de nuevo:
+    // evita el texto repetido que genera el modo continuo en Chrome de Android.
+    const r = new SR(); r.lang = "es-AR"; r.continuous = false; r.interimResults = true; r.maxAlternatives = 1;
+    let base = target.value, fatal = false;
+    const nota = (m) => { if (state) state.textContent = m; };
     r.onresult = (ev) => {
-      for (let i = 0; i < ev.results.length; i++) {
-        segmentos[i] = ev.results[i][0].transcript;
-      }
-      target.value = (base + segmentos.filter(Boolean).join(" ")).replace(/\s+/g, " ").trimStart();
+      let fin = "", parcial = "";
+      for (let i = ev.resultIndex; i < ev.results.length; i++) { const t = ev.results[i][0].transcript; if (ev.results[i].isFinal) fin += t; else parcial += t; }
+      if (fin.trim()) { base = unirTexto(base, comandosVoz(fin.trim())); target.value = base; }
+      else target.value = unirTexto(base, parcial);
       target.dispatchEvent(new Event("input", { bubbles: true }));
       if (target.tagName === "TEXTAREA") target.scrollTop = target.scrollHeight;
+      if (fin.trim()) { personalEnDictado(target, fin); nota("🔴 Escuchando… hablá y hacé pausas para cerrar cada frase"); }
     };
     r.onerror = (e) => {
       const messages = {
-        "not-allowed": "Permiso de micrófono denegado. Revisá los permisos del sitio o de la APK.",
+        "not-allowed": "Permiso de micrófono denegado. Habilitalo en el candado de la barra de direcciones o en los permisos de la app.",
         "service-not-allowed": "El servicio de reconocimiento de voz está bloqueado en este dispositivo.",
         "audio-capture": "No se encontró un micrófono disponible.",
-        "network": "El reconocimiento de voz necesita conexión a Internet.",
-        "no-speech": "No se detectó voz. Tocá Hablar e intentá nuevamente.",
-        "language-not-supported": "Este dispositivo no admite dictado en español.",
-        "aborted": "Dictado cancelado."
+        "network": "El dictado del navegador no pudo conectar con el servicio de voz. Usá Chrome actualizado (no Brave, Opera ni el navegador interno de otra app) o el micrófono 🎤 del teclado.",
+        "language-not-supported": "Este dispositivo no admite dictado en español."
       };
-      if (state) state.textContent = messages[e.error] || ("Error de micrófono: " + e.error);
-      if (e.error !== "aborted") toast(messages[e.error] || ("Error de micrófono: " + e.error), true);
+      if (e.error === "no-speech" || e.error === "aborted") return;          // se reinicia solo
+      fatal = true; nota(messages[e.error] || ("Error de micrófono: " + e.error)); toast(messages[e.error] || ("Error de micrófono: " + e.error), true);
     };
     r.onend = () => {
-      if (rec === r) {
-        rec = null;
-        if (recBtn) { recBtn.classList.remove("rec"); const sp = $("span", recBtn); if (sp) sp.textContent = "Hablar"; }
-        recBtn = null;
-        if (state && !state.textContent.startsWith("Error") && !state.textContent.includes("denegado")) state.textContent = "Dictado finalizado.";
-      }
+      if (rec !== r) return;
+      if (!fatal) { setTimeout(() => { if (rec !== r) return; try { r.start(); } catch (e) { micApagar(); } }, 250); return; }
+      const msg = state ? state.textContent : "";
+      micApagar(); if (state && !fatal) state.textContent = "Dictado finalizado."; else if (state) state.textContent = msg;
     };
-    try { r.start(); } catch (e) { toast("No se pudo iniciar el dictado. Volvé a tocar el micrófono.", true); return; }
+    // si escribís con el teclado mientras dictás, se conserva lo escrito
+    const fn = (ev) => { if (ev.isTrusted) base = target.value; };
+    target.addEventListener("input", fn); recInput = { el: target, fn };
+    try { r.start(); } catch (e) { toast("No se pudo iniciar el dictado. Volvé a tocar el micrófono.", true); recInput = null; target.removeEventListener("input", fn); return; }
     rec = r; recBtn = btn; btn.classList.add("rec"); const sp = $("span", btn); if (sp) sp.textContent = "Escuchando… tocá para parar";
-    state.textContent = "🔴 Escuchando…";
+    nota("🔴 Escuchando…");
   }
 
   /* ---------------- selector de personal y corrector móvil ---------------- */
+  // "Apellido Nombre" y "Nombre Apellido" son la misma persona: se compara por conjunto de palabras.
+  const claveNombre = (n) => norm(n).split(/[^a-zñ]+/).filter(Boolean).sort().join(" ");
+  function emailDeUsuarios(nombre) {
+    const k = claveNombre(nombre);
+    const u = S.usuarios.find((x) => x && x.nombre && claveNombre(x.nombre) === k);
+    return u ? (u.email || "") : "";
+  }
+  // De / Para / Con copia: salen de la pestaña quienRetira (si falla, de Usuarios para no dejar el formulario vacío).
   function personasDe() {
-    const unicas = new Map();
-    S.quienesRetiran.concat(S.usuarios).forEach((p) => {
+    const base = S.quienesRetiran.length ? S.quienesRetiran : S.usuarios;
+    const vistos = new Set(), out = [];
+    base.forEach((p) => {
       if (!p || !p.nombre) return;
-      const k = norm(p.nombre);
-      const previo = unicas.get(k) || {};
-      unicas.set(k, Object.assign({}, previo, p, { nombre: previo.nombre || p.nombre, email: p.email || previo.email || "", empresa: p.empresa || previo.empresa || "", legajo: p.legajo || previo.legajo || "" }));
+      const k = norm(p.nombre) + "|" + (p.legajo || "");
+      if (vistos.has(k)) return; vistos.add(k);
+      out.push({ nombre: p.nombre, email: p.email || emailDeUsuarios(p.nombre), empresa: p.empresa || "", legajo: p.legajo || "" });
     });
-    return Array.from(unicas.values());
+    return out;
   }
 
   function pintarLista(input, box, opciones, elegir, consulta, detalle) {
@@ -222,65 +261,81 @@
       addChip(kind, input);
     }, input.value);
   }
-  function mostrarSugerenciasVigilador() {
-    const campo = $("#informe"), box = $("#sugerenciasVigilador");
-    if (!campo || !box) { console.error("Falta el campo o la lista de sugerencias de vigiladores"); return; }
-    const cursor = campo.selectionStart;
-    const antes = campo.value.slice(0, cursor);
-    // Activar solo cuando se escribe "vigilador" seguido de un apellido/nombre.
-    const m = antes.match(/\bvigilador(?:a)?\s*[,;:]?\s+([\p{L}][\p{L}\s.'-]*)$/iu);
-    if (!m || !S.quienesRetiran.length) { box.hidden = true; box.innerHTML = ""; return; }
-    const consulta = norm(m[1]).trim();
-    if (consulta.length < 2) { box.hidden = true; box.innerHTML = ""; return; }
-    const tokens = consulta.split(/\s+/).filter(Boolean);
-    const matches = S.quienesRetiran.filter(p => {
-      const nombre = norm(p.nombre);
-      return tokens.every(t => nombre.includes(t));
-    }).slice(0, 8);
-    if (!matches.length) { box.hidden = true; box.innerHTML = ""; return; }
-    box.innerHTML = matches.map((p,i) => {
-      const datos = [p.legajo ? "Legajo: " + p.legajo : "", p.empresa ? "Empresa: " + p.empresa : ""].filter(Boolean).join(" · ");
-      return '<button type="button" role="option" class="suggestion" data-index="' + i + '"><strong>' + esc(p.nombre) + '</strong>' + (datos ? '<small>' + esc(datos) + '</small>' : '') + '</button>';
-    }).join("");
+  /* ---------- personal mencionado en el texto ---------- */
+  const tokensNombre = (p) => norm(p.nombre).split(/[^a-zñ]+/).filter(Boolean);
+  const detallePersonal = (p) => [p.empresa ? "Empresa: " + p.empresa : "", p.legajo ? "Legajo: " + p.legajo : ""].filter(Boolean).join(" – ");
+  const textoPersonal = (p) => p.nombre + (detallePersonal(p) ? " (" + detallePersonal(p) + ")" : "");
+
+  function cajaPersonal(campo) {
+    let box = document.getElementById("sug-" + campo.id);
+    if (!box) {
+      box = document.createElement("div"); box.id = "sug-" + campo.id; box.className = "suggestions suggestions-personal"; box.hidden = true; box.setAttribute("role", "listbox");
+      const ref = campo.closest(".hl-wrap") || campo; ref.parentNode.insertBefore(box, ref.nextSibling);
+    }
+    return box;
+  }
+  function ocultarPersonal(campo) { const b = cajaPersonal(campo); b.hidden = true; b.innerHTML = ""; }
+
+  // Muestra al personal que coincide con la palabra [ini, fin) del campo.
+  function ofrecerPersonal(campo, ini, fin) {
+    const box = cajaPersonal(campo), pers = S.quienesRetiran;
+    const palabra = campo.value.slice(ini, fin), q = norm(palabra);
+    if (!pers.length || q.length < 3) return ocultarPersonal(campo);
+    const cap = /^\p{Lu}/u.test(palabra);
+    // Palabra completa igual a un apellido/nombre (4+ letras) o, si empieza con mayúscula, prefijo.
+    const coinc = pers.filter((p) => tokensNombre(p).some((t) => (q.length >= 4 && t === q) || (cap && t.startsWith(q)))).slice(0, 8);
+    if (!coinc.length) return ocultarPersonal(campo);
+    box.innerHTML = '<div class="sug-head"><span>👤 ¿De quién hablás? Tocá a la persona</span><button type="button" data-no="1">Ninguno</button></div>' +
+      coinc.map((p, i) => '<button type="button" role="option" class="suggestion" data-i="' + i + '"><strong>' + esc(p.nombre) + '</strong>' + (detallePersonal(p) ? "<small>" + esc(detallePersonal(p)) + "</small>" : "") + "</button>").join("");
     box.hidden = false;
     const elegir = (e) => {
-      const b = e.target.closest(".suggestion[data-index]");
-      if (!b || !box.contains(b)) return;
-      e.preventDefault();
-      const p = matches[Number(b.dataset.index)];
-      if (!p) return;
-      const desde = cursor - m[0].length;
-      const empresa = p.empresa ? " · Empresa: " + p.empresa : "";
-      const legajo = p.legajo ? " · Legajo: " + p.legajo : "";
-      const texto = "vigilador " + p.nombre + (legajo || empresa ? " (" + [p.legajo ? "Legajo: " + p.legajo : "", p.empresa ? "Empresa: " + p.empresa : ""].filter(Boolean).join(" · ") + ")" : "");
-      campo.value = campo.value.slice(0, desde) + texto + campo.value.slice(cursor);
-      const pos = desde + texto.length;
-      campo.focus(); campo.setSelectionRange(pos, pos);
-      campo.dispatchEvent(new Event("input", { bubbles: true }));
-      box.hidden = true; box.innerHTML = "";
+      const b = e.target.closest("button"); if (!b || !box.contains(b)) return;
+      e.preventDefault(); e.stopPropagation();
+      if (b.dataset.no) return ocultarPersonal(campo);
+      const p = coinc[+b.dataset.i]; if (!p) return;
+      const t = textoPersonal(p), v = campo.value;
+      campo.value = v.slice(0, ini) + t + v.slice(fin);
+      const pos = ini + t.length; campo.focus(); campo.setSelectionRange(pos, pos);
+      ocultarPersonal(campo); campo.dispatchEvent(new Event("input", { bubbles: true }));
     };
-    box.onpointerdown = elegir;
     box.onclick = elegir;
   }
-
-  function abrirCorrector(id) {
-    const campo = $("#" + id);
-    if (!campo) return;
-    openModal('<h2>Corrector ortográfico</h2><p class="hint">Revisá el texto en español. Las palabras que el navegador detecte como incorrectas pueden aparecer subrayadas en rojo. Tocá una palabra subrayada para ver las sugerencias del teclado/navegador.</p><textarea id="textoCorrector" lang="es-AR" spellcheck="true" autocorrect="on" autocapitalize="sentences" rows="10"></textarea><div class="actions"><button type="button" class="btn send" id="aplicarCorreccion">Aplicar texto</button><button type="button" class="btn ghost" id="cancelarCorreccion">Cancelar</button></div>');
-    const editor = $("#textoCorrector");
-    editor.value = campo.value;
-    $("#aplicarCorreccion").onclick = () => {
-      campo.value = editor.value;
-      campo.dispatchEvent(new Event("input", { bubbles: true }));
-      closeModal();
-      toast("Texto actualizado. Revisá las palabras marcadas antes de enviar.");
+  // Mientras se escribe: mira la palabra que está justo antes del cursor.
+  function sugerirPersonal(campo) {
+    const cur = campo.selectionStart, m = campo.value.slice(0, cur).match(/([\p{L}'’-]{3,})$/u);
+    if (!m) return ocultarPersonal(campo);
+    ofrecerPersonal(campo, cur - m[1].length, cur);
+  }
+  // Al dictar: busca en la frase recién dicha un apellido del personal.
+  function personalEnDictado(campo, frase) {
+    const pals = String(frase).match(/[\p{L}'’-]{4,}/gu) || [];
+    const set = new Set(); S.quienesRetiran.forEach((p) => tokensNombre(p).forEach((t) => { if (t.length >= 4) set.add(t); }));
+    const hallada = pals.find((w) => set.has(norm(w)));
+    if (!hallada) return;
+    const v = campo.value, i = v.toLowerCase().lastIndexOf(hallada.toLowerCase());
+    if (i >= 0) ofrecerPersonal(campo, i, i + hallada.length);
+  }
+  // Botón "Personal": búsqueda manual con lista (sin teclado complicado).
+  function buscarPersonal(id) {
+    const campo = $("#" + id); if (!campo) return;
+    openModal('<h2 style="margin:0 0 4px;color:var(--green-d)">👤 Buscar personal</h2><p class="hint">Escribí el apellido o el nombre y tocá a la persona para agregarla al texto.</p><input id="bpIn" placeholder="Ej: Martínez" autocomplete="off" autocapitalize="words"><div id="bpList" class="suggestions" style="border:0;box-shadow:none;max-height:50vh"></div>');
+    const inp = $("#bpIn"), list = $("#bpList");
+    const pintar = () => {
+      const tk = norm(inp.value).split(/\s+/).filter(Boolean);
+      const r = tk.length ? S.quienesRetiran.filter((p) => tk.every((t) => norm(p.nombre).includes(t))).slice(0, 12) : [];
+      list.innerHTML = r.length ? r.map((p, i) => '<button type="button" class="suggestion" data-i="' + i + '"><strong>' + esc(p.nombre) + "</strong>" + (detallePersonal(p) ? "<small>" + esc(detallePersonal(p)) + "</small>" : "") + "</button>").join("") : (tk.length ? '<div class="suggestion-empty">No hay coincidencias.</div>' : "");
+      list.onclick = (e) => {
+        const b = e.target.closest(".suggestion[data-i]"); if (!b) return; const p = r[+b.dataset.i]; if (!p) return;
+        const t = textoPersonal(p), pos = campo.selectionStart == null ? campo.value.length : campo.selectionStart;
+        campo.value = campo.value.slice(0, pos) + (pos && !/\s$/.test(campo.value.slice(0, pos)) ? " " : "") + t + campo.value.slice(pos);
+        closeModal(); campo.focus(); campo.dispatchEvent(new Event("input", { bubbles: true }));
+      };
     };
-    $("#cancelarCorreccion").onclick = closeModal;
-    editor.focus();
+    inp.addEventListener("input", pintar); inp.focus();
   }
 
   /* ---------------- destinatarios (chips) ---------------- */
-  function directorio() { return S.usuarios.filter((p) => p && p.nombre); }
+  function directorio() { return personasDe(); }
   function buscarPersona(nombre) { const n = norm(nombre); return directorio().find((p) => norm(p.nombre) === n); }
 
   function renderChips(kind) {
@@ -299,16 +354,20 @@
     $$("button", box).forEach((b) => (b.onclick = () => { S[b.dataset.k].splice(+b.dataset.i, 1); renderChips(b.dataset.k); }));
   }
   function addChip(kind, input) {
-    const nombre = input.value.replace(/\s+/g, " ").trim();
+    let nombre = input.value.replace(/\s+/g, " ").trim();
     if (!nombre) return;
     const max = kind === "para" ? CFG.MAX_PARA : CFG.MAX_CC;
     if (S[kind].length >= max) return toast("Máximo " + max + " personas", true);
+    // Clientes u otras personas: se puede escribir "Nombre <correo>" o solo el correo.
+    let escrito = "";
+    const mm = nombre.match(/^(.*?)\s*<([^>]+)>$/);
+    if (mm && okMail(mm[2])) { nombre = mm[1] || mm[2]; escrito = mm[2]; } else if (okMail(nombre)) escrito = nombre;
     if (S[kind].some((p) => norm(p.nombre) === norm(nombre))) { input.value = ""; return; }
     const f = buscarPersona(nombre);
-    if (!f) { toast("Primero elegí una persona de las opciones que aparecen debajo del campo.", true); input.focus(); return; }
-    // Se puede agregar aunque falte correo; la validación del envío indicará el dato faltante.
-    S[kind].push({ nombre: f.nombre, email: f.email || "" });
+    // Si no está en la lista se agrega igual (cliente): el correo se pide al enviar.
+    S[kind].push({ nombre: f ? f.nombre : nombre, email: escrito || (f ? f.email : "") });
     input.value = ""; renderChips(kind);
+    const box = $(kind === "para" ? "#sugerenciasPara" : "#sugerenciasCc"); if (box) { box.hidden = true; box.innerHTML = ""; }
   }
   function autor() { const v = norm($("#de").value); if (!v) return null; const q = personasDe().find(p => norm(p.nombre) === v); if (!q) return null; return { nombre: q.nombre, email: q.email || "" }; }
 
@@ -414,6 +473,9 @@
     const d = leerForm(), err = validar(d);
     if (err) return toast(err, true);
     const au = autor();
+    if ((await Corrector.revisarTodo()) > 0) {
+      if (confirm("Hay " + Corrector.pendientes() + " posibles errores de ortografía.\n\nAceptar = revisarlos ahora\nCancelar = enviar así")) { Corrector.abrir(Corrector.primerCampoConErrores()); return; }
+    }
     const faltan = [au].concat(S.para, S.cc).filter((p) => p && !okMail(p.email));
     if (faltan.length && !(await pedirCorreos(faltan))) return;
 
@@ -459,6 +521,7 @@
     ["asunto", "objetivo", "informe", "medidas", "inPara", "inCc"].forEach((i) => ($("#" + i).value = ""));
     $("#de").value = ""; S.para = []; S.cc = []; S.fotos = [null, null, null, null];
     $("#fecha").value = hoyISO(); renderChips("para"); renderChips("cc"); renderFotos(); cargarNumero();
+    ["informe", "medidas"].forEach((id) => { Corrector.refrescar(id); ocultarPersonal($("#" + id)); });
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
 
@@ -473,6 +536,8 @@
     S.quienesRetiran = Array.isArray(r.quienesRetiran || r.quienRetira) ? (r.quienesRetiran || r.quienRetira) : [];
     S.objetivos = Array.isArray(r.objetivos) ? r.objetivos : [];
     $("#numInforme").textContent = r.siguiente || "—";
+    Corrector.setConocidos(S.quienesRetiran.map((p) => p.nombre).concat(S.objetivos.map((o) => o.nombre)));
+    if (Array.isArray(r.errores) && r.errores.length) toast("Aviso del servidor: " + r.errores.join(" | "), true);
     const listaObjetivos = $("#dl-objetivos");
     if (listaObjetivos) listaObjetivos.innerHTML = S.objetivos.map((o) => `<option value="${esc(o.nombre)}">`).join("");
     const listaPersonas = $("#dl-personas");
@@ -594,17 +659,23 @@
     $("#addPara").onclick = () => addChip("para", $("#inPara")); $("#addCc").onclick = () => addChip("cc", $("#inCc"));
     $("#inPara").addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); addChip("para", e.target); } });
     $("#inCc").addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); addChip("cc", e.target); } });
-    $("#inPara").addEventListener("change", (e) => { if (buscarPersona(e.target.value)) addChip("para", e.target); });
-    $("#inCc").addEventListener("change", (e) => { if (buscarPersona(e.target.value)) addChip("cc", e.target); });
+    $("#inPara").addEventListener("change", (e) => { if (buscarPersona(e.target.value) || okMail(e.target.value)) addChip("para", e.target); });
+    $("#inCc").addEventListener("change", (e) => { if (buscarPersona(e.target.value) || okMail(e.target.value)) addChip("cc", e.target); });
     $("#de").addEventListener("input", mostrarSugerenciasDe);
     $("#objetivo").addEventListener("input", mostrarSugerenciasObjetivo);
     $("#objetivo").addEventListener("focus", mostrarSugerenciasObjetivo);
     $("#inPara").addEventListener("input", () => mostrarSugerenciasDestinatario("para"));
     $("#inCc").addEventListener("input", () => mostrarSugerenciasDestinatario("cc"));
-    $("#informe").addEventListener("input", mostrarSugerenciasVigilador);
+    ["informe", "medidas"].forEach((id) => {
+      const el = $("#" + id);
+      el.addEventListener("input", (ev) => { if (ev.isTrusted) sugerirPersonal(el); });
+      Corrector.attach(el, $('.spell-btn[data-target="' + id + '"]'));
+    });
+    $$(".pers-btn").forEach((b) => b.addEventListener("click", () => buscarPersonal(b.dataset.target)));
     $("#de").addEventListener("focus", mostrarSugerenciasDe);
     $("#de").addEventListener("change", () => { mostrarSugerenciasDe(); renderChips("cc"); });
-    $$(".spell-btn").forEach((b) => b.addEventListener("click", () => abrirCorrector(b.dataset.target)));
+    Corrector.init({ toast });
+    $$(".spell-btn").forEach((b) => b.addEventListener("click", () => Corrector.abrir(b.dataset.target)));
     $("#fileInput").onchange = (e) => { onFiles(e.target.files); e.target.value = ""; };
     $("#cameraInput").onchange = (e) => { onFiles(e.target.files); e.target.value = ""; };
     $("#masFotos").onclick = () => { S.fotos.push(null, null, null, null); renderFotos(); toast("Se agregaron 4 recuadros más"); };

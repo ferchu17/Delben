@@ -162,3 +162,37 @@ textarea{resize:vertical;line-height:1.45;min-height:110px}
 .suggestions .suggestion small{display:block;margin-top:3px;color:#5b6b70;font-size:12px;font-weight:400}
 .suggestions .suggestion:active,.suggestions .suggestion:focus{background:#e8f5ed;outline:2px solid var(--green);outline-offset:-2px}
 .field{overflow:visible}
+
+/* ---------- Corrector: subrayado rojo + panel táctil ---------- */
+.hl-wrap{position:relative;border-radius:10px;background:#fff}
+.hl-back,.hl-wrap textarea.hl-text{box-sizing:border-box;width:100%;margin:0;font:inherit;font-size:16px;line-height:1.45;letter-spacing:normal;padding:11px 12px;border:1.5px solid transparent;border-radius:10px;white-space:pre-wrap;overflow-wrap:break-word;word-break:normal;tab-size:4}
+.hl-back{position:absolute;left:0;top:0;right:0;bottom:0;color:transparent;overflow:hidden;pointer-events:none}
+.hl-wrap textarea.hl-text{position:relative;display:block;background:transparent;border-color:#d3dcd6;resize:none;overflow:hidden;min-height:120px}
+.hl-wrap textarea.hl-text:focus{border-color:var(--c,var(--green))}
+.hl-back .err{color:transparent;text-decoration:underline wavy #e11d2e;-webkit-text-decoration:underline wavy #e11d2e;text-decoration-thickness:2px;text-underline-offset:3px}
+.badge-err{display:inline-block;min-width:20px;padding:0 6px;margin-left:4px;border-radius:999px;background:#e11d2e;color:#fff;font-size:12px;line-height:20px;text-align:center}
+.cs{position:fixed;inset:0;z-index:200;background:rgba(15,35,30,.55);display:flex;align-items:flex-end;justify-content:center}
+.cs[hidden]{display:none}
+.cs-box{background:#fff;width:100%;max-width:640px;max-height:92vh;overflow:auto;border-radius:20px 20px 0 0;padding:16px 16px calc(18px + env(safe-area-inset-bottom));box-shadow:0 -10px 40px rgba(0,0,0,.3);border-top:6px solid var(--blue)}
+@media(min-width:700px){.cs{align-items:center}.cs-box{border-radius:20px}}
+.cs-top{display:flex;align-items:center;gap:10px;margin-bottom:10px}
+.cs-top b{flex:1;color:var(--blue)}
+.cs-n{background:#e11d2e;color:#fff;border-radius:999px;padding:3px 12px;font-weight:800;font-size:13px}
+.cs-x{border:0;background:#eef3ef;border-radius:50%;width:40px;height:40px;font-size:18px}
+.cs-ctx{background:#f7faf8;border:1px solid var(--line);border-radius:12px;padding:12px;font-size:16px;line-height:1.5;white-space:pre-wrap;overflow-wrap:anywhere}
+.cs-ctx mark{background:#ffe3e6;color:#b00020;font-weight:800;border-radius:4px;padding:0 3px;text-decoration:underline wavy #e11d2e}
+.cs-msg{margin:8px 2px;font-size:13px;color:var(--muted)}
+.cs-sug{display:grid;gap:8px}
+.cs-sug button{min-height:52px;font:inherit;font-size:18px;font-weight:700;text-align:left;padding:10px 16px;border-radius:12px;border:2px solid var(--green);background:#f1fbf5;color:var(--green-d)}
+.cs-sug button:active{background:#d9f3e4}
+.cs-nosug{color:var(--muted);font-size:14px;padding:4px}
+.cs-manual{display:flex;gap:8px;margin-top:10px}
+.cs-manual input{flex:1}
+.cs-act{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:12px}
+.cs-act button{min-height:48px;font:inherit;font-weight:700;border-radius:12px;border:2px solid #cfd8d3;background:#fff;color:var(--ink)}
+.cs-wait,.cs-fin{text-align:center;padding:26px 0}
+.cs-fin .tick{width:64px;height:64px;border-radius:50%;margin:0 auto 8px;display:flex;align-items:center;justify-content:center;font-size:32px;color:#fff;background:linear-gradient(135deg,var(--green),var(--teal))}
+.sug-head{display:flex;justify-content:space-between;align-items:center;padding:6px 8px;font-size:13px;font-weight:800;color:var(--green-d)}
+.sug-head button{border:0;background:#eef3ef;border-radius:999px;padding:6px 12px;font:inherit;font-size:13px;font-weight:700}
+.btn.tiny{padding:9px 14px;font-size:14px}
+@media(max-width:640px){.lab-row{flex-direction:column;gap:8px}.lab-row .field-tools{width:100%;justify-content:flex-start}}

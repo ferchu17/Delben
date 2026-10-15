@@ -78,19 +78,18 @@
     <div class="field c-green big">
       <div class="lab-row">
         <label for="informe">Día, hora, lugar del hecho, quién, qué, cómo y por qué <span class="req">*</span></label>
-        <div class="field-tools"><button type="button" class="mic" data-target="informe" title="Dictar por voz">🎤 <span>Hablar</span></button><button type="button" class="btn small ghost spell-btn" data-target="informe">ABC ✓ Corregir</button></div>
+        <div class="field-tools"><button type="button" class="mic" data-target="informe" title="Dictar por voz">🎤 <span>Hablar</span></button><button type="button" class="btn small ghost pers-btn" data-target="informe">👤 Personal</button><button type="button" class="btn small ghost spell-btn" data-target="informe">ABC ✓ Corregir</button></div>
       </div>
-      <textarea id="informe" lang="es-AR" spellcheck="true" autocorrect="on" autocapitalize="sentences" rows="9" placeholder="Escribí o tocá 🎤 y contá lo que pasó…"></textarea>
-      <div id="sugerenciasVigilador" class="suggestions suggestions-personal" hidden role="listbox" aria-label="Vigiladores coincidentes"></div>
+      <textarea id="informe" lang="es-AR" spellcheck="false" autocorrect="on" autocapitalize="sentences" rows="9" placeholder="Escribí o tocá 🎤 y contá lo que pasó…"></textarea>
       <div class="mic-state" data-for="informe"></div>
     </div>
 
     <div class="field c-orange big">
       <div class="lab-row">
         <label for="medidas">Medidas tomadas</label>
-        <div class="field-tools"><button type="button" class="mic" data-target="medidas" title="Dictar por voz">🎤 <span>Hablar</span></button><button type="button" class="btn small ghost spell-btn" data-target="medidas">ABC ✓ Corregir</button></div>
+        <div class="field-tools"><button type="button" class="mic" data-target="medidas" title="Dictar por voz">🎤 <span>Hablar</span></button><button type="button" class="btn small ghost pers-btn" data-target="medidas">👤 Personal</button><button type="button" class="btn small ghost spell-btn" data-target="medidas">ABC ✓ Corregir</button></div>
       </div>
-      <textarea id="medidas" lang="es-AR" spellcheck="true" autocorrect="on" autocapitalize="sentences" rows="5" placeholder="¿Qué se hizo al respecto? Escribí o dictá…"></textarea>
+      <textarea id="medidas" lang="es-AR" spellcheck="false" autocorrect="on" autocapitalize="sentences" rows="5" placeholder="¿Qué se hizo al respecto? Escribí o dictá…"></textarea>
       <div class="mic-state" data-for="medidas"></div>
     </div>
 
@@ -150,6 +149,7 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js"></script>
 <script src="js/config.js"></script>
 <script src="js/pdf.js"></script>
-<script src="js/app.js?v=20261015k"></script>
+<script src="js/corrector.js?v=20261015m"></script>
+<script src="js/app.js?v=20261015m"></script>
 </body>
 </html>

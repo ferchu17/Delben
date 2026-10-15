@@ -27,6 +27,7 @@ const CONFIG = {
   QUIENRETIRA_COL_NOMBRE:  '',  // ej: 'Apellido y nombre'
   QUIENRETIRA_COL_EMPRESA: '',  // ej: 'Empresa'
   QUIENRETIRA_COL_LEGAJO:  '',  // ej: 'Legajo'
+  QUIENRETIRA_COL_EMAIL:   '',  // ej: 'Correo' (opcional: si no existe, el correo se busca en Usuarios o se pide al enviar)
 
   LOGO_APP_ID: '1vP4JEsIwr37oQxkWtBD5bmjvWpetuBCf',   // logo DelBen en Drive
 
@@ -204,6 +205,9 @@ function leerquienRetir_() {
   let colLegajo = CONFIG.QUIENRETIRA_COL_LEGAJO ? heads.indexOf(norm_(CONFIG.QUIENRETIRA_COL_LEGAJO)) : -1;
   if (colLegajo < 0) colLegajo = heads.findIndex(h => /legajo|^leg\.?$|n.*legajo/.test(h));
 
+  let colMail = CONFIG.QUIENRETIRA_COL_EMAIL ? heads.indexOf(norm_(CONFIG.QUIENRETIRA_COL_EMAIL)) : -1;
+  if (colMail < 0) colMail = heads.findIndex(h => /mail|correo/.test(h));
+
   const vistos = {}, out = [];
   vals.slice(headerRow + 1).forEach(row => {
     const nombre = String(row[colNombre] || '').replace(/\s+/g, ' ').trim();
@@ -217,7 +221,8 @@ function leerquienRetir_() {
     out.push({
       nombre: nombre,
       empresa: colEmpresa >= 0 ? String(row[colEmpresa] || '').trim() : '',
-      legajo: legajo
+      legajo: legajo,
+      email: colMail >= 0 ? String(row[colMail] || '').trim() : ''
     });
   });
   return out.sort((a, b) => a.nombre.localeCompare(b.nombre, 'es'));
