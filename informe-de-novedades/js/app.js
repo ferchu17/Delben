@@ -461,7 +461,10 @@
     $("#inCc").addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); addChip("cc", e.target); } });
     $("#inPara").addEventListener("change", (e) => { if (buscarPersona(e.target.value)) addChip("para", e.target); });
     $("#inCc").addEventListener("change", (e) => { if (buscarPersona(e.target.value)) addChip("cc", e.target); });
-    $("#de").addEventListener("input", mostrarSugerenciasDe);\n    $("#de").addEventListener("focus", mostrarSugerenciasDe);\n    $("#de").addEventListener("change", () => { mostrarSugerenciasDe(); renderChips("cc"); });\n    $(".spell-btn").forEach((b) => b.addEventListener("click", () => abrirCorrector(b.dataset.target)));
+    $("#de").addEventListener("input", mostrarSugerenciasDe);
+    $("#de").addEventListener("focus", mostrarSugerenciasDe);
+    $("#de").addEventListener("change", () => { mostrarSugerenciasDe(); renderChips("cc"); });
+    $(".spell-btn").forEach((b) => b.addEventListener("click", () => abrirCorrector(b.dataset.target)));
     $("#fileInput").onchange = (e) => { onFiles(e.target.files); e.target.value = ""; };
     $("#cameraInput").onchange = (e) => { onFiles(e.target.files); e.target.value = ""; };
     $("#masFotos").onclick = () => { S.fotos.push(null, null, null, null); renderFotos(); toast("Se agregaron 4 recuadros más"); };
