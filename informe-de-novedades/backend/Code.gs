@@ -40,13 +40,32 @@ const HEADERS = ['id', 'informe_N', 'fecha', 'de', 'para', 'asunto', 'objetivo',
 
 /* ------------------------- Entradas web ------------------------- */
 
-function doGet() {
-  return json_({ ok: true, msg: 'API Informe de Novedades funcionando' });
+function doGet(e) {
+  // Diagnóstico y prueba de lectura: abrir /exec?action=listas debe devolver JSON.
+  try {
+    const action = e && e.parameter && e.parameter.action;
+    if (action === 'listas') return json_(listas_());
+    if (action === 'logo') return json_(logo_());
+    return json_({
+      ok: true,
+      msg: 'API Informe de Novedades funcionando',
+      version: '2026-10-15-post-json',
+      pruebaPost: 'Enviar POST JSON con action=listas'
+    });
+  } catch (err) {
+    return json_({ ok: false, error: String(err && err.message || err) });
+  }
 }
 
 function doPost(e) {
   try {
+    if (!e || !e.postData || !e.postData.contents) {
+      return json_({ ok: false, error: 'La petición POST llegó vacía. Se esperaba un cuerpo JSON.' });
+    }
     const req = JSON.parse(e.postData.contents);
+    if (!req || typeof req !== 'object' || Array.isArray(req)) {
+      return json_({ ok: false, error: 'El cuerpo recibido no es un objeto JSON.' });
+    }
     if (CONFIG.TOKEN && req.token !== CONFIG.TOKEN) return json_({ ok: false, error: 'No autorizado' });
     switch (req.action) {
       case 'logo':       return json_(logo_());
@@ -56,7 +75,7 @@ function doPost(e) {
       case 'buscar':     return json_(buscar_(req));
       case 'pdf':        return json_(obtenerPdf_(req));
       case 'reenviar':   return json_(reenviar_(req));
-      default:           return json_({ ok: false, error: 'Acción desconocida' });
+      default:           return json_({ ok: false, error: 'Acción desconocida: ' + String(req.action || '(vacía)') });
     }
   } catch (err) {
     return json_({ ok: false, error: String(err && err.message || err) });
