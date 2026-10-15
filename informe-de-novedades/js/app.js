@@ -181,6 +181,46 @@
     box.onclick = elegir;
   }
 
+  function mostrarSugerenciasVigilador() {
+    const campo = $("#informe"), box = $("#sugerenciasVigilador");
+    const cursor = campo.selectionStart;
+    const antes = campo.value.slice(0, cursor);
+    // Activar solo cuando se escribe "vigilador" seguido de un apellido/nombre.
+    const m = antes.match(/\\bvigilador(?:a)?\\s+([\\p{L}][\\p{L}\\s.'-]*)$/iu);
+    if (!m || !S.quienesRetiran.length) { box.hidden = true; box.innerHTML = ""; return; }
+    const consulta = norm(m[1]).trim();
+    if (consulta.length < 2) { box.hidden = true; box.innerHTML = ""; return; }
+    const tokens = consulta.split(/\\s+/).filter(Boolean);
+    const matches = S.quienesRetiran.filter(p => {
+      const nombre = norm(p.nombre);
+      return tokens.every(t => nombre.includes(t));
+    }).slice(0, 8);
+    if (!matches.length) { box.hidden = true; box.innerHTML = ""; return; }
+    box.innerHTML = matches.map((p,i) => {
+      const datos = [p.legajo ? "Legajo: " + p.legajo : "", p.empresa ? "Empresa: " + p.empresa : ""].filter(Boolean).join(" · ");
+      return '<button type="button" role="option" class="suggestion" data-index="' + i + '"><strong>' + esc(p.nombre) + '</strong>' + (datos ? '<small>' + esc(datos) + '</small>' : '') + '</button>';
+    }).join("");
+    box.hidden = false;
+    const elegir = (e) => {
+      const b = e.target.closest(".suggestion[data-index]");
+      if (!b || !box.contains(b)) return;
+      e.preventDefault();
+      const p = matches[Number(b.dataset.index)];
+      if (!p) return;
+      const desde = cursor - m[0].length;
+      const empresa = p.empresa ? " · Empresa: " + p.empresa : "";
+      const legajo = p.legajo ? " · Legajo: " + p.legajo : "";
+      const texto = "vigilador " + p.nombre + (legajo || empresa ? " (" + [p.legajo ? "Legajo: " + p.legajo : "", p.empresa ? "Empresa: " + p.empresa : ""].filter(Boolean).join(" · ") + ")" : "");
+      campo.value = campo.value.slice(0, desde) + texto + campo.value.slice(cursor);
+      const pos = desde + texto.length;
+      campo.focus(); campo.setSelectionRange(pos, pos);
+      campo.dispatchEvent(new Event("input", { bubbles: true }));
+      box.hidden = true; box.innerHTML = "";
+    };
+    box.onpointerdown = elegir;
+    box.onclick = elegir;
+  }
+
   function abrirCorrector(id) {
     const campo = $("#" + id);
     if (!campo) return;
@@ -488,6 +528,7 @@
     $("#inPara").addEventListener("change", (e) => { if (buscarPersona(e.target.value)) addChip("para", e.target); });
     $("#inCc").addEventListener("change", (e) => { if (buscarPersona(e.target.value)) addChip("cc", e.target); });
     $("#de").addEventListener("input", mostrarSugerenciasDe);
+    $("#informe").addEventListener("input", mostrarSugerenciasVigilador);
     $("#de").addEventListener("focus", mostrarSugerenciasDe);
     $("#de").addEventListener("change", () => { mostrarSugerenciasDe(); renderChips("cc"); });
     $$(".spell-btn").forEach((b) => b.addEventListener("click", () => abrirCorrector(b.dataset.target)));
