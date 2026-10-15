@@ -45,10 +45,14 @@
 
   async function api(action, payload) {
     if (DEMO) return demo(action, payload || {});
-    const r = await fetch(CFG.API_URL, {
-      method: "POST", headers: { "Content-Type": "text/plain;charset=utf-8" },
-      body: JSON.stringify(Object.assign({ action, token: CFG.TOKEN }, payload || {}))
-    });
+    // La carga inicial de listas usa GET: la API publica ya expone ?action=listas
+    // y así evitamos que un POST cross-origin impida inicializar toda la pantalla.
+    const r = action === "listas"
+      ? await fetch(CFG.API_URL + "?action=listas", { method: "GET", cache: "no-store" })
+      : await fetch(CFG.API_URL, {
+          method: "POST", headers: { "Content-Type": "text/plain;charset=utf-8" },
+          body: JSON.stringify(Object.assign({ action, token: CFG.TOKEN }, payload || {}))
+        });
     const raw = await r.text();
     if (!r.ok) throw new Error("Apps Script respondió HTTP " + r.status + ". " + String(raw || "").replace(/\\s+/g, " ").slice(0, 180));
     let j;
