@@ -4,7 +4,7 @@
 window.APP_CONFIG = {
   // URL de la implementación web de Apps Script (termina en /exec).
   // Si queda vacía, la app corre en MODO DEMO (datos de ejemplo, no guarda nada).
-  API_URL: "https://script.google.com/macros/s/AKfycbyQ_wZdb0LzmL61rsAQoCkbMM6JdRr6prsQSw92wyeqh3v3zlna4ykk9tQxS0diJGi-0Q/exec",
+  API_URL: "https://script.google.com/macros/s/AKfycbzGboBpezEv9q9yJBRFaSIGfua4NP1sqZCVuzVXDe-hqCkrlN6f8YQnG8Y2S6ZOo4HJVw/exec",
 
   // Mismo valor que CONFIG.TOKEN en backend/Code.gs (opcional, recomendado).
   TOKEN: "",
