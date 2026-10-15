@@ -270,7 +270,7 @@
   }
 
   /* ---------------- destinatarios (chips) ---------------- */
-  function directorio() { return S.usuarios.concat(S.objetivos); }
+  function directorio() { return S.usuarios.filter((p) => p && p.nombre); }
   function buscarPersona(nombre) { const n = norm(nombre); return directorio().find((p) => norm(p.nombre) === n); }
 
   function renderChips(kind) {
@@ -295,7 +295,9 @@
     if (S[kind].length >= max) return toast("Máximo " + max + " personas", true);
     if (S[kind].some((p) => norm(p.nombre) === norm(nombre))) { input.value = ""; return; }
     const f = buscarPersona(nombre);
-    S[kind].push({ nombre: f ? f.nombre : nombre, email: f ? f.email : "" });
+    if (!f) { toast("Elegí una persona de la lista para asegurar que tenga un correo válido.", true); input.focus(); return; }
+    if (!f.email || !okMail(f.email)) { toast("La persona seleccionada no tiene un correo válido cargado.", true); return; }
+    S[kind].push({ nombre: f.nombre, email: f.email });
     input.value = ""; renderChips(kind);
   }
   function autor() { const v = norm($("#de").value); if (!v) return null; const q = personasDe().find(p => norm(p.nombre) === v); if (!q) return null; return { nombre: q.nombre, email: q.email || "" }; }
