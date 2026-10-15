@@ -47,8 +47,7 @@
       </div>
       <div class="field c-orange">
         <label for="objetivo">Objetivo / servicio <span class="req">*</span></label>
-        <input id="objetivo" list="dl-objetivos" placeholder="Elegí o escribí el objetivo" autocomplete="off">
-        <datalist id="dl-objetivos"></datalist>
+        <input id="objetivo" placeholder="Escribí el servicio y elegilo de la lista" autocomplete="off" aria-autocomplete="list" aria-controls="sugerenciasObjetivo"><div id="sugerenciasObjetivo" class="suggestions" hidden role="listbox"></div>
       </div>
     </div>
 
@@ -56,7 +55,7 @@
       <label>Para <span class="req">*</span> <small>(podés sumar varias personas)</small></label>
       <div class="chips" id="chipsPara"></div>
       <div class="chip-add">
-        <input id="inPara" list="dl-personas" placeholder="Elegí o escribí un nombre" autocomplete="off">
+        <input id="inPara" placeholder="Escribí un nombre y elegilo de la lista" autocomplete="off" aria-autocomplete="list" aria-controls="sugerenciasPara"><div id="sugerenciasPara" class="suggestions" hidden role="listbox"></div>
         <button type="button" class="btn small" id="addPara">＋ Agregar</button>
       </div>
     </div>
@@ -65,11 +64,11 @@
       <label>Con copia <small>(opcional · el autor recibe copia siempre)</small></label>
       <div class="chips" id="chipsCc"></div>
       <div class="chip-add">
-        <input id="inCc" list="dl-personas" placeholder="Otra persona que reciba copia" autocomplete="off">
+        <input id="inCc" placeholder="Escribí un nombre y elegilo de la lista" autocomplete="off" aria-autocomplete="list" aria-controls="sugerenciasCc"><div id="sugerenciasCc" class="suggestions" hidden role="listbox"></div>
         <button type="button" class="btn small ghost" id="addCc">＋ Agregar</button>
       </div>
     </div>
-    <datalist id="dl-personas"></datalist>
+
 
     <div class="field c-red">
       <label for="asunto">Asunto <span class="req">*</span></label>
@@ -151,6 +150,6 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js"></script>
 <script src="js/config.js"></script>
 <script src="js/pdf.js"></script>
-<script src="js/app.js?v=20261015i"></script>
+<script src="js/app.js?v=20261015j"></script>
 </body>
 </html>
