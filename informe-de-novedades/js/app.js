@@ -92,14 +92,15 @@
   }
 
   /* ---------------- voz ---------------- */
-  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
   let rec = null, recBtn = null;
-  function stopRec() { if (rec) { try { rec.onend = null; rec.stop(); } catch (e) {} } if (recBtn) { recBtn.classList.remove("rec"); const sp = $("span", recBtn); if (sp) sp.textContent = "Hablar"; } const st = $$(".mic-state"); st.forEach((s) => (s.textContent = "")); rec = null; recBtn = null; }
+  function stopRec() { if (rec) { try { rec.onend = null; rec.stop(); } catch (e) {} } if (recBtn) { recBtn.classList.remove("rec"); const sp = $("span", recBtn); if (sp) sp.textContent = "Hablar"; } const st = $(".mic-state"); st.forEach((s) => (s.textContent = "")); rec = null; recBtn = null; }
   function toggleMic(btn) {
     if (recBtn === btn) return stopRec();
     stopRec();
     const target = document.getElementById(btn.dataset.target), state = $(`.mic-state[data-for="${btn.dataset.target}"]`);
-    if (!SR) { toast("Tu navegador no permite dictado en esta pantalla. Usá el micrófono del teclado del celular 🎤", true); return; }
+    const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!window.isSecureContext) { toast("El dictado requiere una conexión segura HTTPS.", true); if (state) state.textContent = "Abrí la aplicación desde su dirección HTTPS."; return; }
+    if (!SR) { toast("Este navegador o la APK no admite dictado integrado. Usá el micrófono 🎤 del teclado para dictar en el campo.", true); if (state) state.textContent = "El reconocimiento de voz no está disponible en este entorno."; return; }
     const r = new SR(); r.lang = "es-AR"; r.continuous = true; r.interimResults = true; r.maxAlternatives = 1;
     const base = target.value ? target.value.replace(/\s+$/, "") + " " : "";
     // El navegador vuelve a entregar resultados anteriores en cada evento.
@@ -114,7 +115,17 @@
       if (target.tagName === "TEXTAREA") target.scrollTop = target.scrollHeight;
     };
     r.onerror = (e) => {
-      if (state) state.textContent = e.error === "not-allowed" ? "Permiso de micrófono denegado" : "Error de micrófono: " + e.error;
+      const messages = {
+        "not-allowed": "Permiso de micrófono denegado. Revisá los permisos del sitio o de la APK.",
+        "service-not-allowed": "El servicio de reconocimiento de voz está bloqueado en este dispositivo.",
+        "audio-capture": "No se encontró un micrófono disponible.",
+        "network": "El reconocimiento de voz necesita conexión a Internet.",
+        "no-speech": "No se detectó voz. Tocá Hablar e intentá nuevamente.",
+        "language-not-supported": "Este dispositivo no admite dictado en español.",
+        "aborted": "Dictado cancelado."
+      };
+      if (state) state.textContent = messages[e.error] || ("Error de micrófono: " + e.error);
+      if (e.error !== "aborted") toast(messages[e.error] || ("Error de micrófono: " + e.error), true);
     };
     r.onend = () => {
       if (rec === r) {
@@ -149,17 +160,25 @@
       return tokens.every(t => name.includes(t));
     }).slice(0, 12);
     box.innerHTML = matches.length
-      ? matches.map((p,i) => '<button type="button" class="suggestion" data-index="' + i + '">' + esc(p.nombre) + '</button>').join("")
+      ? matches.map((p,i) => '<button type="button" role="option" aria-selected="false" class="suggestion" data-index="' + i + '">' + esc(p.nombre) + '</button>').join("")
       : '<div class="suggestion-empty">No hay coincidencias. Probá con otro apellido.</div>';
     box.hidden = false;
-    $(".suggestion", box).forEach((b) => b.addEventListener("click", () => {
+    // pointerdown ocurre antes de que el teclado móvil quite el foco del input.
+    // Delegar el evento en la caja evita que el toque se pierda en navegadores móviles.
+    const elegir = (e) => {
+      const b = e.target.closest(".suggestion[data-index]");
+      if (!b || !box.contains(b)) return;
+      e.preventDefault();
       const chosen = matches[Number(b.dataset.index)];
       if (!chosen) return;
       input.value = chosen.nombre;
       box.hidden = true; box.innerHTML = "";
       detalle.textContent = "Seleccionado: " + chosen.nombre;
+      input.dispatchEvent(new Event("change", { bubbles: true }));
       renderChips("cc");
-    }));
+    };
+    box.onpointerdown = elegir;
+    box.onclick = elegir;
   }
 
   function abrirCorrector(id) {
