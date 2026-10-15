@@ -122,6 +122,55 @@
     state.textContent = "🔴 Escuchando…";
   }
 
+  /* ---------------- selector de personal y corrector móvil ---------------- */
+  function mostrarSugerenciasDe() {
+    const input = $("#de"), box = $("#sugerenciasDe"), detalle = $("#detalleDe");
+    const q = norm(input.value);
+    detalle.textContent = "";
+    if (!q) { box.hidden = true; box.innerHTML = ""; return; }
+    const exact = S.quienesRetiran.find(p => norm(p.nombre) === q);
+    if (exact) {
+      input.value = exact.nombre;
+      box.hidden = true; box.innerHTML = "";
+      detalle.textContent = "Seleccionado: " + exact.nombre;
+      renderChips("cc");
+      return;
+    }
+    const tokens = q.split(/\\s+/).filter(Boolean);
+    const matches = S.quienesRetiran.filter(p => {
+      const name = norm(p.nombre);
+      return tokens.every(t => name.includes(t));
+    }).slice(0, 12);
+    box.innerHTML = matches.length
+      ? matches.map((p,i) => '<button type="button" class="suggestion" data-index="' + i + '">' + esc(p.nombre) + '</button>').join("")
+      : '<div class="suggestion-empty">No hay coincidencias. Probá con otro apellido.</div>';
+    box.hidden = false;
+    $(".suggestion", box).forEach((b) => b.addEventListener("click", () => {
+      const chosen = matches[Number(b.dataset.index)];
+      if (!chosen) return;
+      input.value = chosen.nombre;
+      box.hidden = true; box.innerHTML = "";
+      detalle.textContent = "Seleccionado: " + chosen.nombre;
+      renderChips("cc");
+    }));
+  }
+
+  function abrirCorrector(id) {
+    const campo = $("#" + id);
+    if (!campo) return;
+    openModal('<h2>Corrector ortográfico</h2><p class="hint">Revisá el texto en español. Las palabras que el navegador detecte como incorrectas pueden aparecer subrayadas en rojo. Tocá una palabra subrayada para ver las sugerencias del teclado/navegador.</p><textarea id="textoCorrector" lang="es-AR" spellcheck="true" autocorrect="on" autocapitalize="sentences" rows="10"></textarea><div class="actions"><button type="button" class="btn send" id="aplicarCorreccion">Aplicar texto</button><button type="button" class="btn ghost" id="cancelarCorreccion">Cancelar</button></div>');
+    const editor = $("#textoCorrector");
+    editor.value = campo.value;
+    $("#aplicarCorreccion").onclick = () => {
+      campo.value = editor.value;
+      campo.dispatchEvent(new Event("input", { bubbles: true }));
+      closeModal();
+      toast("Texto actualizado. Revisá las palabras marcadas antes de enviar.");
+    };
+    $("#cancelarCorreccion").onclick = closeModal;
+    editor.focus();
+  }
+
   /* ---------------- destinatarios (chips) ---------------- */
   function directorio() { return S.usuarios.concat(S.objetivos); }
   function buscarPersona(nombre) { const n = norm(nombre); return directorio().find((p) => norm(p.nombre) === n); }
@@ -302,7 +351,7 @@
   }
 
   async function cargarNumero() {
-    try { const r = await api("listas"); $("#numInforme").textContent = r.siguiente; } catch (e) {}
+    try { const r = await api("listas"); $("#numInforme").textContent = r.siguiente || "—"; } catch (e) {}
   }
 
   /* ---------------- buscador ---------------- */
@@ -412,7 +461,7 @@
     $("#inCc").addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); addChip("cc", e.target); } });
     $("#inPara").addEventListener("change", (e) => { if (buscarPersona(e.target.value)) addChip("para", e.target); });
     $("#inCc").addEventListener("change", (e) => { if (buscarPersona(e.target.value)) addChip("cc", e.target); });
-    $("#de").onchange = () => renderChips("cc");
+    $("#de").addEventListener("input", mostrarSugerenciasDe);\n    $("#de").addEventListener("focus", mostrarSugerenciasDe);\n    $("#de").addEventListener("change", () => { mostrarSugerenciasDe(); renderChips("cc"); });\n    $(".spell-btn").forEach((b) => b.addEventListener("click", () => abrirCorrector(b.dataset.target)));
     $("#fileInput").onchange = (e) => { onFiles(e.target.files); e.target.value = ""; };
     $("#cameraInput").onchange = (e) => { onFiles(e.target.files); e.target.value = ""; };
     $("#masFotos").onclick = () => { S.fotos.push(null, null, null, null); renderFotos(); toast("Se agregaron 4 recuadros más"); };
@@ -423,7 +472,7 @@
     try {
       const r = await api("listas");
       S.usuarios = r.usuarios || []; S.quienesRetiran = r.quienesRetiran || r.quienRetira || []; S.objetivos = r.objetivos || []; $("#numInforme").textContent = r.siguiente;
-      $("#dl-quien-retira").innerHTML = S.quienesRetiran.map(u => `<option value="${esc(u.nombre)}"></option>`).join("");
+      $("#sugerenciasDe").hidden = true;
       $("#dl-objetivos").innerHTML = S.objetivos.map((o) => `<option value="${esc(o.nombre)}">`).join("");
       $("#dl-personas").innerHTML = directorio().map((p) => `<option value="${esc(p.nombre)}">`).join("");
     } catch (e) { toast("No se pudieron cargar las listas: " + e.message, true); }
