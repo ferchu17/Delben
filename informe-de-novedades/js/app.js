@@ -470,7 +470,7 @@
     $("#de").addEventListener("input", mostrarSugerenciasDe);
     $("#de").addEventListener("focus", mostrarSugerenciasDe);
     $("#de").addEventListener("change", () => { mostrarSugerenciasDe(); renderChips("cc"); });
-    $(".spell-btn").forEach((b) => b.addEventListener("click", () => abrirCorrector(b.dataset.target)));
+    $$(".spell-btn").forEach((b) => b.addEventListener("click", () => abrirCorrector(b.dataset.target)));
     $("#fileInput").onchange = (e) => { onFiles(e.target.files); e.target.value = ""; };
     $("#cameraInput").onchange = (e) => { onFiles(e.target.files); e.target.value = ""; };
     $("#masFotos").onclick = () => { S.fotos.push(null, null, null, null); renderFotos(); toast("Se agregaron 4 recuadros más"); };
