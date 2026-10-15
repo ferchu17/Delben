@@ -186,7 +186,7 @@
     const cursor = campo.selectionStart;
     const antes = campo.value.slice(0, cursor);
     // Activar solo cuando se escribe "vigilador" seguido de un apellido/nombre.
-    const m = antes.match(/\bvigilador(?:a)?\s+([\p{L}][\p{L}\s.'-]*)$/iu);
+    const m = antes.match(/\bvigilador(?:a)?\s*[,;:]?\s+([\p{L}][\p{L}\s.'-]*)$/iu);
     if (!m || !S.quienesRetiran.length) { box.hidden = true; box.innerHTML = ""; return; }
     const consulta = norm(m[1]).trim();
     if (consulta.length < 2) { box.hidden = true; box.innerHTML = ""; return; }
