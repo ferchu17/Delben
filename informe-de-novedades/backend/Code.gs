@@ -10,6 +10,10 @@ const CONFIG = {
   HOJA_USUARIOS:  'Usuarios y contraseñas',
   HOJA_quienRetira: 'quienRetira',
   HOJA_OBJETIVOS: 'objetivos',
+
+  // Se identifican por el gid de la URL (…/edit?gid=XXXX), así no importa cómo se llame la pestaña.
+  USUARIOS_GID:  310678371,    // encabezados: id | nombre | usuario | password | rol | correo
+  OBJETIVOS_GID: 1642036355,   // encabezados: id | nombre | dir | localidad | jurisdiccion | empresa
   CARPETA_ID:     '1NXkehdUKNsGKs_yjyfzHev82v_cBH9jz',   // carpeta de Drive donde se guardan los PDF
 
   // Opcional: si lo completás, la app tiene que mandar el mismo valor (js/config.js → TOKEN)
@@ -99,9 +103,17 @@ function norm_(s) {
 }
 
 // Busca la fila de encabezados (entre las primeras 5) y devuelve {rows, head, headerRow}
-function tabla_(nombreHoja) {
-  const sh = ss_().getSheetByName(nombreHoja);
-  if (!sh) throw new Error('No existe la pestaña "' + nombreHoja + '"');
+function hojaPor_(nombreHoja, gid) {
+  const ss = ss_();
+  let sh = null;
+  if (gid) sh = ss.getSheets().find(s => s.getSheetId() === Number(gid)) || null;
+  if (!sh && nombreHoja) sh = ss.getSheetByName(nombreHoja);
+  if (!sh) throw new Error('No existe la pestaña "' + nombreHoja + '" (gid ' + gid + ')');
+  return sh;
+}
+
+function tabla_(nombreHoja, gid) {
+  const sh = hojaPor_(nombreHoja, gid);
   const vals = sh.getDataRange().getValues();
   let h = 0;
   for (let i = 0; i < Math.min(5, vals.length); i++) {
@@ -118,7 +130,7 @@ function idx_(head, exacto, regex) {
 
 // IMPORTANTE: nunca se devuelve ninguna columna de contraseña, solo nombre y correo.
 function leerUsuarios_() {
-  const t = tabla_(CONFIG.HOJA_USUARIOS);
+  const t = tabla_(CONFIG.HOJA_USUARIOS, CONFIG.USUARIOS_GID);
   const iMail = idx_(t.head, CONFIG.USUARIOS_COL_EMAIL, /mail|correo/);
   let iFull = idx_(t.head, CONFIG.USUARIOS_COL_NOMBRE, /nombre\s*y\s*apellido|apellido\s*y\s*nombre|nombre completo|^persona$/);
   let iNom = -1, iApe = -1;
@@ -193,7 +205,7 @@ function leerquienRetir_() {
 }
 
 function leerObjetivos_() {
-  const t = tabla_(CONFIG.HOJA_OBJETIVOS);
+  const t = tabla_(CONFIG.HOJA_OBJETIVOS, CONFIG.OBJETIVOS_GID);
   const iMail = idx_(t.head, CONFIG.OBJETIVOS_COL_EMAIL, /mail|correo/);
   const iNom = idx_(t.head, CONFIG.OBJETIVOS_COL_NOMBRE, /objetivo|servicio|nombre|puesto|cliente/);
   const col = iNom >= 0 ? iNom : 0;
@@ -388,8 +400,8 @@ function reenviar_(req) {
 /* ------------------------- Utilidad de prueba -------------------------
    Ejecutala una vez desde el editor para aceptar los permisos y ver las listas. */
 function probarListas() {
-  Logger.log('Encabezados usuarios: ' + JSON.stringify(tabla_(CONFIG.HOJA_USUARIOS).headRaw.filter(h => !/contrase|clave|pass/i.test(h))));
-  Logger.log('Encabezados objetivos: ' + JSON.stringify(tabla_(CONFIG.HOJA_OBJETIVOS).headRaw));
+  Logger.log('Encabezados usuarios: ' + JSON.stringify(tabla_(CONFIG.HOJA_USUARIOS, CONFIG.USUARIOS_GID).headRaw.filter(h => !/contrase|clave|pass/i.test(h))));
+  Logger.log('Encabezados objetivos: ' + JSON.stringify(tabla_(CONFIG.HOJA_OBJETIVOS, CONFIG.OBJETIVOS_GID).headRaw));
   Logger.log(JSON.stringify({
     usuarios: leerUsuarios_().slice(0, 5),
     quienRetira: leerquienRetir_().slice(0, 5),
