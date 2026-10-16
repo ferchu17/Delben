@@ -55,23 +55,15 @@
   let ultimoCargaListas = 0;
   async function api(action, payload) {
     if (DEMO) return demo(action, payload || {});
-    // La carga inicial de listas usa GET: la API publica ya expone ?action=listas
-    // y así evitamos que un POST cross-origin impida inicializar toda la pantalla.
+    // Listas y número se piden por GET (más simple y rápido desde el celular), cada uno por separado.
     if (action === "listas") {
       if (!listasPromise || Date.now() - ultimoCargaListas > 60000) {
         ultimoCargaListas = Date.now();
-        listasPromise = fetch(CFG.API_URL + "?action=listas", { method: "GET", cache: "no-store", redirect: "follow" })
-          .then(async (response) => {
-            const raw = await response.text();
-            if (!response.ok) throw new Error("Apps Script respondió HTTP " + response.status + ". " + String(raw || "").replace(/\\s+/g, " ").slice(0, 180));
-            let data;
-            try { data = JSON.parse(raw); } catch (_) { throw new Error("El backend no devolvió JSON válido (HTTP " + response.status + ")."); }
-            if (!data.ok) throw new Error(data.error || "Error del servidor");
-            return data;
-          }).catch((err) => { listasPromise = null; throw err; });
+        listasPromise = getJSON("listas", 90000).catch((err) => { listasPromise = null; throw err; });
       }
       return listasPromise;
     }
+    if (action === "numero") return getJSON("numero", 30000);
     const r = await fetch(CFG.API_URL, {
       method: "POST", headers: { "Content-Type": "text/plain;charset=utf-8" },
       body: JSON.stringify(Object.assign({ action, token: CFG.TOKEN }, payload || {}))
@@ -88,9 +80,30 @@
     return j;
   }
 
+  // GET al Apps Script con tiempo límite y un mensaje que dice qué pasó.
+  async function getJSON(action, ms) {
+    const ctl = window.AbortController ? new AbortController() : null;
+    const t = ctl ? setTimeout(() => ctl.abort(), ms) : null;
+    let response, raw;
+    try {
+      response = await fetch(CFG.API_URL + "?action=" + action + "&t=" + Date.now(), { method: "GET", cache: "no-store", redirect: "follow", signal: ctl ? ctl.signal : undefined });
+      raw = await response.text();
+    } catch (e) {
+      if (e && e.name === "AbortError") throw new Error("El servidor tardó demasiado en responder (más de " + Math.round(ms / 1000) + " s). Tocá Reintentar.");
+      throw new Error(navigator.onLine === false ? "El celular no tiene conexión a Internet." : "No se pudo conectar con el servidor (Apps Script). Revisá la conexión y tocá Reintentar.");
+    } finally { if (t) clearTimeout(t); }
+    if (!response.ok) throw new Error("El Apps Script respondió con error HTTP " + response.status + ". Revisá que la implementación esté activa (Implementar › Gestionar implementaciones).");
+    let data;
+    try { data = JSON.parse(raw); }
+    catch (_) { throw new Error("El Apps Script devolvió una página en vez de datos: suele ser que falta aceptar permisos o publicar la Nueva versión. En el editor ejecutá probarListas y después Implementar › Gestionar implementaciones › Nueva versión."); }
+    if (!data.ok) throw new Error("Error del servidor: " + (data.error || "sin detalle"));
+    return data;
+  }
+
   async function demo(action, p) {
     await new Promise((r) => setTimeout(r, 350));
     const pad = (n) => String(n).padStart(4, "0");
+    if (action === "numero") return { ok: true, siguiente: pad(DEMO_DB.next) };
     if (action === "listas") return { ok: true, usuarios: DEMO_DB.users, quienRetira: DEMO_DB.personal, personal: DEMO_DB.personal, objetivos: DEMO_DB.objetivos, siguiente: pad(DEMO_DB.next), errores: [] };
     if (action === "reservar") {
       const d = p.data, it = { id: DEMO_DB.next, numero: pad(DEMO_DB.next), fecha: d.fecha, de: d.de, para: d.para.join("; "), asunto: d.asunto, objetivo: d.objetivo, informe: d.informe, medidas: d.medidas, link: "" };
@@ -128,7 +141,7 @@
   function stopRec() {
     $$(".mic.rec").forEach((b) => { b.classList.remove("rec"); const sp = $("span", b); if (sp) sp.textContent = "Hablar"; });
     if (rec) { const r = rec; rec = null; try { r.onend = null; r.stop(); } catch (e) {} }
-    micApagar(); $$(".mic-state").forEach((s) => (s.textContent = ""));
+    micApagar();
   }
   // Une dos textos con un solo espacio y mayúscula inicial después de punto.
   function unirTexto(a, b) {
@@ -144,51 +157,73 @@
     return t.replace(/\s*\b(punto y aparte|punto aparte)\s*$/i, ".\n").replace(/\s*\b(nueva línea|nuevo renglón|nueva linea)\s*$/i, "\n")
       .replace(/\s+punto y coma\s*$/i, ";").replace(/\s+dos puntos\s*$/i, ":").replace(/\s+coma\s*$/i, ",").replace(/\s+punto\s*$/i, ".");
   }
-  // Dictado: mismo funcionamiento que la versión del 15/10 (la que andaba en el celular).
+  // Dictado por voz con el botón 🎤 de la pantalla. Mismo funcionamiento que el 15/10, con diagnóstico visible.
+  const ES_WEBVIEW = /; wv\)/.test(navigator.userAgent) || (/Android/.test(navigator.userAgent) && /Version\/[\d.]+/.test(navigator.userAgent) && !/SamsungBrowser/.test(navigator.userAgent));
+  const ABRIR_EN_CHROME = "Abrí la app en Chrome: " + location.origin + location.pathname + " (desde Chrome, menú ⋮ › Agregar a pantalla principal, así queda el ícono y el micrófono funciona).";
   function toggleMic(btn) {
     if (recBtn === btn) return stopRec();
     stopRec();
     const target = document.getElementById(btn.dataset.target), state = $(`.mic-state[data-for="${btn.dataset.target}"]`);
+    const nota = (m, err) => { if (state) { state.textContent = m; state.style.color = err ? "#b42318" : ""; } if (err) toast(m, true); };
     const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-    if (!window.isSecureContext) { toast("El dictado requiere una conexión segura HTTPS.", true); if (state) state.textContent = "Abrí la aplicación desde su dirección HTTPS."; return; }
-    if (!SR) { toast("Este navegador o la APK no admite dictado integrado. Usá el micrófono 🎤 del teclado para dictar en el campo.", true); if (state) state.textContent = "El reconocimiento de voz no está disponible en este entorno."; return; }
+    nota("Iniciando micrófono…");
+    if (!window.isSecureContext) return nota("El dictado necesita abrir la app con https://. " + ABRIR_EN_CHROME, true);
+    if (!SR) return nota(ES_WEBVIEW
+      ? "Esta app instalada no trae el dictado de voz de Chrome, por eso el 🎤 de la pantalla no puede andar acá. " + ABRIR_EN_CHROME
+      : "Este navegador no tiene dictado de voz. Usá Google Chrome actualizado. " + ABRIR_EN_CHROME, true);
+
     const r = new SR(); r.lang = "es-AR"; r.continuous = true; r.interimResults = true; r.maxAlternatives = 1;
     const base = target.value ? target.value.replace(/\s+$/, "") + " " : "";
-    // El navegador vuelve a entregar resultados anteriores en cada evento.
-    // Guardarlos por índice evita concatenar dos veces el mismo fragmento.
+    // El navegador vuelve a entregar resultados anteriores en cada evento: se guardan por índice.
     const segmentos = [];
+    let eventos = 0, huboTexto = false, fallo = false;
+    const vivo = () => { eventos++; };
+    r.onstart = () => { vivo(); nota("🔴 Escuchando… hablá ahora (tocá el botón para terminar)"); };
+    r.onaudiostart = () => { vivo(); nota("🔴 Micrófono activo, te escucho…"); };
+    r.onspeechstart = () => { vivo(); nota("🔴 Te oigo…"); };
     r.onresult = (ev) => {
-      for (let i = 0; i < ev.results.length; i++) {
-        segmentos[i] = ev.results[i][0].transcript;
-      }
-      target.value = (base + segmentos.filter(Boolean).join(" ")).replace(/\s+/g, " ").trimStart();
+      vivo(); huboTexto = true;
+      for (let i = 0; i < ev.results.length; i++) segmentos[i] = ev.results[i][0].transcript;
+      target.value = (base + segmentos.filter(Boolean).join(" ")).replace(/[ \t]+/g, " ").trimStart();
       target.dispatchEvent(new Event("input", { bubbles: true }));
       if (target.tagName === "TEXTAREA") target.scrollTop = target.scrollHeight;
+      nota("🔴 Escuchando… texto recibido");
     };
     r.onerror = (e) => {
+      vivo(); fallo = true;
       const messages = {
-        "not-allowed": "Permiso de micrófono denegado. Revisá los permisos del sitio o de la APK.",
-        "service-not-allowed": "El servicio de reconocimiento de voz está bloqueado en este dispositivo.",
-        "audio-capture": "No se encontró un micrófono disponible.",
-        "network": "El reconocimiento de voz necesita conexión a Internet.",
-        "no-speech": "No se detectó voz. Tocá Hablar e intentá nuevamente.",
-        "language-not-supported": "Este dispositivo no admite dictado en español.",
-        "aborted": "Dictado cancelado."
+        "not-allowed": "El micrófono está bloqueado para esta página. En Chrome: tocá el candado 🔒 al lado de la dirección › Permisos › Micrófono › Permitir. Si usás el ícono instalado: Ajustes del celular › Aplicaciones › Chrome › Permisos › Micrófono › Permitir.",
+        "service-not-allowed": ES_WEBVIEW ? "Esta app instalada no permite el dictado de voz. " + ABRIR_EN_CHROME : "El servicio de voz de Google está desactivado. Ajustes › Aplicaciones › Google › Permisos › Micrófono › Permitir, y que la app Google esté actualizada.",
+        "audio-capture": "No se pudo usar el micrófono: puede estar ocupado por otra app (llamada, grabadora, WhatsApp). Cerrala y volvé a tocar 🎤.",
+        "network": "El dictado necesita Internet y no pudo conectar con el servicio de voz de Google. Revisá la conexión.",
+        "no-speech": "No se escuchó ninguna voz. Tocá 🎤 Hablar y hablá cerca del celular.",
+        "language-not-supported": "El celular no tiene el dictado en español instalado (Ajustes › Google › Voz).",
+        "aborted": "Dictado detenido."
       };
-      if (state) state.textContent = messages[e.error] || ("Error de micrófono: " + e.error);
-      if (e.error !== "aborted") toast(messages[e.error] || ("Error de micrófono: " + e.error), true);
+      nota(messages[e.error] || ("Error del micrófono: " + e.error), e.error !== "aborted");
     };
     r.onend = () => {
-      if (rec === r) {
-        rec = null;
-        if (recBtn) { recBtn.classList.remove("rec"); const sp = $("span", recBtn); if (sp) sp.textContent = "Hablar"; }
-        recBtn = null;
-        if (state && !state.textContent.startsWith("Error") && !state.textContent.includes("denegado")) state.textContent = "Dictado finalizado.";
-      }
+      vivo(); clearTimeout(perro);
+      if (rec !== r) return;
+      rec = null;
+      if (recBtn) { recBtn.classList.remove("rec"); const sp = $("span", recBtn); if (sp) sp.textContent = "Hablar"; }
+      recBtn = null;
+      if (!fallo) nota(huboTexto ? "Dictado terminado. Tocá 🎤 Hablar para seguir dictando." : "Terminó sin texto. Tocá 🎤 Hablar y hablá enseguida.");
     };
-    try { r.start(); } catch (e) { toast("No se pudo iniciar el dictado. Volvé a tocar el micrófono.", true); return; }
+    // Si en 7 segundos no llegó ninguna señal, el servicio de voz no está respondiendo en este celular/app.
+    const perro = setTimeout(() => {
+      if (rec !== r || eventos) return;
+      fallo = true; try { r.abort(); } catch (e) {}
+      rec = null; btn.classList.remove("rec"); const sp = $("span", btn); if (sp) sp.textContent = "Hablar"; recBtn = null;
+      nota(ES_WEBVIEW
+        ? "El dictado no responde dentro de esta app instalada. " + ABRIR_EN_CHROME
+        : "El servicio de voz del celular no respondió. Revisá que la app Google esté instalada y actualizada, y que Chrome tenga permiso de micrófono.", true);
+    }, 7000);
+    try { r.start(); }
+    catch (e) { clearTimeout(perro); return nota("No se pudo iniciar el dictado (" + (e && e.message || e) + "). Volvé a tocar 🎤.", true); }
     rec = r; recBtn = btn; btn.classList.add("rec"); const sp = $("span", btn); if (sp) sp.textContent = "Escuchando… tocá para parar";
-    if (state) state.textContent = "🔴 Escuchando…";
+    // Si el permiso ya figura como denegado, se avisa enseguida.
+    try { navigator.permissions && navigator.permissions.query({ name: "microphone" }).then((p) => { if (p.state === "denied" && rec === r) nota("El micrófono está bloqueado para esta página. En Chrome: candado 🔒 › Permisos › Micrófono › Permitir.", true); }).catch(() => {}); } catch (e) {}
   }
 
   /* ---------------- selector de personal y corrector móvil ---------------- */
@@ -578,20 +613,50 @@
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
 
+  // Aviso fijo arriba del formulario (no se va solo como el cartel rojo).
+  function avisoCarga(clave, tipo, msg) {
+    let box = $("#avisoCarga");
+    if (!box) {
+      box = document.createElement("div"); box.id = "avisoCarga";
+      const ref = $(".paper-head"); if (ref && ref.parentNode) ref.parentNode.insertBefore(box, ref.nextSibling); else document.body.prepend(box);
+    }
+    avisos[clave] = msg ? { tipo, msg } : null;
+    const lista = Object.keys(avisos).filter((k) => avisos[k]);
+    box.hidden = !lista.length;
+    box.innerHTML = lista.map((k) => '<div class="aviso-carga ' + avisos[k].tipo + '"><span>' + esc(avisos[k].msg) + '</span>' +
+      (avisos[k].tipo === "error" ? '<button type="button" class="btn small" data-reintentar="' + k + '">↻ Reintentar</button>' : '') + '</div>').join("");
+    $$("button[data-reintentar]", box).forEach((b) => (b.onclick = () => { if (b.dataset.reintentar === "numero") cargarNumero(); else { listasPromise = null; cargarListasUI(); } }));
+  }
+  const avisos = {};
+
+  // N° de informe: pedido aparte, no frena a los listados (el número definitivo se asigna al enviar igual).
   async function cargarNumero() {
-    try { const r = await api("listas"); $("#numInforme").textContent = r.siguiente || "—"; }
-    catch (e) { $("#numInforme").textContent = "—"; }
+    const el = $("#numInforme"); el.textContent = "····";
+    try {
+      const r = await api("numero");
+      if (!r.siguiente) throw new Error("sin número");                   // Apps Script viejo: lo toma de las listas
+      el.textContent = r.siguiente; avisoCarga("numero");
+    } catch (e) {
+      try { const l = await api("listas"); if (l.siguiente) { el.textContent = l.siguiente; avisoCarga("numero"); return; } } catch (e2) {}
+      el.textContent = "—";
+      avisoCarga("numero", "error", "No se pudo traer el N° de informe (" + e.message + "). Igual podés cargar el informe: el número se asigna al enviar.");
+    }
   }
 
   async function cargarListasUI() {
-    const r = await api("listas");
+    avisoCarga("listas", "info", "Cargando listados (personal, objetivos, destinatarios)…");
+    let r;
+    try { r = await api("listas"); }
+    catch (e) { avisoCarga("listas", "error", "No se pudieron cargar los listados: " + e.message); throw e; }
     S.usuarios = Array.isArray(r.usuarios) ? r.usuarios : [];
     S.quienesRetiran = Array.isArray(r.quienesRetiran || r.quienRetira) ? (r.quienesRetiran || r.quienRetira) : [];
     S.objetivos = Array.isArray(r.objetivos) ? r.objetivos : [];
     S.personal = Array.isArray(r.personal) ? r.personal : [];
-    $("#numInforme").textContent = r.siguiente || "—";
-    Corrector.setConocidos(S.quienesRetiran.map((p) => p.nombre).concat(S.personal.map((p) => p.nombre), S.objetivos.map((o) => o.nombre)));
-    if (Array.isArray(r.errores) && r.errores.length) toast("Aviso del servidor: " + r.errores.join(" | "), true);
+    if (r.siguiente && /^[·—-]*$/.test($("#numInforme").textContent.trim())) { $("#numInforme").textContent = r.siguiente; avisoCarga("numero"); }
+    try { Corrector.setConocidos(S.quienesRetiran.map((p) => p.nombre).concat(S.personal.map((p) => p.nombre), S.objetivos.map((o) => o.nombre))); } catch (e) { console.error(e); }
+    const errs = Array.isArray(r.errores) ? r.errores : [];
+    if (errs.length) avisoCarga("listas", "error", "Algunos listados no se pudieron leer: " + errs.join(" | "));
+    else avisoCarga("listas");
     const listaObjetivos = $("#dl-objetivos");
     if (listaObjetivos) listaObjetivos.innerHTML = S.objetivos.map((o) => `<option value="${esc(o.nombre)}">`).join("");
     const listaPersonas = $("#dl-personas");
@@ -603,8 +668,8 @@
   async function recargarAlVolver() {
     if (document.visibilityState !== "visible" || initEnCurso || Date.now() - ultimoInit < 12000) return;
     ultimoInit = Date.now(); initEnCurso = true; listasPromise = null;
-    try { await cargarListasUI(); }
-    catch (e) { toast("No se pudieron actualizar las listas: " + e.message, true); }
+    if (/^[·—-]*$/.test($("#numInforme").textContent.trim())) cargarNumero();
+    try { await cargarListasUI(); } catch (e) {}
     finally { initEnCurso = false; }
   }
 
@@ -737,7 +802,8 @@
     $("#btnBuscar").onclick = buscar; $("#q").addEventListener("keydown", (e) => { if (e.key === "Enter") buscar(); });
     renderFotos(); renderChips("para"); renderChips("cc");
 
-    cargarListasUI().then(() => { $("#sugerenciasDe").hidden = true; }).catch(e => toast("No se pudieron cargar las listas: " + e.message, true));
+    cargarListasUI().then(() => { $("#sugerenciasDe").hidden = true; }).catch(() => {});   // el aviso fijo ya muestra el error
+    cargarNumero();
     document.addEventListener("visibilitychange", recargarAlVolver);
     window.addEventListener("pageshow", recargarAlVolver);
     window.addEventListener("online", recargarAlVolver);

@@ -201,3 +201,11 @@ textarea{resize:vertical;line-height:1.45;min-height:110px}
 .chip-add>input{flex:1 1 0;min-width:0}
 .chip-add>.btn{flex:0 0 auto}
 .chip-add>.suggestions{order:5;flex:0 0 100%;width:100%;margin-top:4px}
+/* aviso fijo de carga de número y listados */
+#avisoCarga{display:flex;flex-direction:column;gap:8px;margin:10px 0}
+#avisoCarga[hidden]{display:none}
+.aviso-carga{display:flex;align-items:center;gap:10px;justify-content:space-between;padding:10px 12px;border-radius:10px;font-size:14px;line-height:1.35}
+.aviso-carga.info{background:#eef6ff;color:#1d4f86;border:1px solid #bcd6f3}
+.aviso-carga.error{background:#fdecee;color:#9f1d2b;border:1px solid #f3bcc3}
+.aviso-carga .btn{flex:0 0 auto;white-space:nowrap}
+.mic-state{min-height:1.3em}

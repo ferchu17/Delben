@@ -48,6 +48,7 @@ function doGet(e) {
   try {
     const action = e && e.parameter && e.parameter.action;
     if (action === 'listas') return json_(listas_());
+    if (action === 'numero') return json_({ ok: true, siguiente: siguienteNumero_() });
     if (action === 'logo') return json_(logo_());
     return json_({
       ok: true,
@@ -73,6 +74,7 @@ function doPost(e) {
     switch (req.action) {
       case 'logo':       return json_(logo_());
       case 'listas':     return json_(listas_());
+      case 'numero':     return json_({ ok: true, siguiente: siguienteNumero_() });
       case 'reservar':   return json_(reservar_(req));
       case 'finalizar':  return json_(finalizar_(req));
       case 'buscar':     return json_(buscar_(req));
@@ -104,7 +106,7 @@ function listas_() {
   intentar('usuarios',    leerUsuarios_,    []);
   intentar('quienRetira', leerquienRetir_,  []);
   intentar('objetivos',   leerObjetivos_,   []);
-  intentar('personal',    leerPersonal_,    []);
+  intentar('personal',    personalCache_,   []);
   intentar('siguiente',   siguienteNumero_, '0001');
   return out;
 }
@@ -203,6 +205,28 @@ function leerPersonal_() {
     out.push({ nombre: nombre, legajo: legajo, empresa: EMPRESAS_SIGLA_[emp] || emp });
   });
   return out.sort((a, b) => a.nombre.localeCompare(b.nombre, 'es'));
+}
+
+// El listado de personal es grande: se guarda 10 minutos en caché (en partes) para que la app cargue rápido.
+function personalCache_() {
+  const cache = CacheService.getScriptCache();
+  try {
+    const n = Number(cache.get('pers_n') || 0);
+    if (n > 0) {
+      const partes = cache.getAll(Array.from({ length: n }, (_, i) => 'pers_' + i));
+      const txt = Array.from({ length: n }, (_, i) => partes['pers_' + i]).join('');
+      if (Object.keys(partes).length === n) return JSON.parse(txt);
+    }
+  } catch (e) {}
+  const lista = leerPersonal_();
+  try {
+    const txt = JSON.stringify(lista), TAM = 90000, obj = {};
+    let i = 0;
+    for (let k = 0; k < txt.length; k += TAM, i++) obj['pers_' + i] = txt.slice(k, k + TAM);
+    obj.pers_n = String(i);
+    cache.putAll(obj, 600);
+  } catch (e) {}
+  return lista;
 }
 
 // Lista del campo "De" y del personal (vigiladores): pestaña "quienRetira".
