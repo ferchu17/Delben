@@ -300,6 +300,23 @@ function slug_(s) {
   return norm_(s).replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '').slice(0, 40);
 }
 
+// Carpeta de los PDF: la configurada; si la cuenta no puede abrirla, se usa (o crea) "Informes de Novedades" en su Drive.
+function carpetaInformes_() {
+  try { return DriveApp.getFolderById(CONFIG.CARPETA_ID); }
+  catch (e) {
+    const it = DriveApp.getFoldersByName('Informes de Novedades');
+    const f = it.hasNext() ? it.next() : DriveApp.createFolder('Informes de Novedades');
+    console.warn('No se pudo abrir la carpeta ' + CONFIG.CARPETA_ID + ' (' + e.message + '). Se usa: ' + f.getUrl());
+    return f;
+  }
+}
+
+// Ejecutar a mano una vez para verificar el acceso a la carpeta de Drive.
+function probarCarpeta() {
+  try { const f = DriveApp.getFolderById(CONFIG.CARPETA_ID); Logger.log('OK carpeta configurada: ' + f.getName() + ' · ' + f.getUrl()); }
+  catch (e) { Logger.log('NO se puede abrir la carpeta configurada: ' + e.message + '\nSe usaría: ' + carpetaInformes_().getUrl()); }
+}
+
 function finalizar_(req) {
   const sh = hojaInformes_();
   const row = buscarFila_(sh, req.id);
@@ -314,7 +331,7 @@ function finalizar_(req) {
     file = DriveApp.getFileById(idDeUrl_(url));              // reintento: se reutiliza el PDF
   } else {
     const blob = Utilities.newBlob(Utilities.base64Decode(req.pdfBase64), 'application/pdf', nombre);
-    file = DriveApp.getFolderById(CONFIG.CARPETA_ID).createFile(blob);
+    file = carpetaInformes_().createFile(blob);
     url = file.getUrl();
     sh.getRange(row, COL.LINK + 1).setValue(url);
   }
