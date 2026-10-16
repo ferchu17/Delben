@@ -241,13 +241,17 @@ function leerTicket(token, dataUrl) {
   if (!key) throw new Error('Falta configurar la clave GEMINI_API_KEY. Cargá los datos a mano.');
   const parts = String(dataUrl).split(',');
   const mime = (parts[0].match(/data:(.*?);/) || [])[1] || 'image/jpeg';
+  const opciones = [CFG.SUPERVISOR_LABEL].concat(getObjetivos_());
   const prompt =
     'Sos un lector de tickets/facturas de combustible de Argentina. Leé la imagen y devolvé SOLO un JSON con estas claves:\n' +
     '{"fecha":"DD/MM/AAAA","numero":"punto de venta y número tal cual figura, ej 00014-00021464","proveedor":"razón social del EMISOR (la estación)",' +
     '"cuit":"CUIT del EMISOR con guiones, NO el del cliente","producto":"ej NAFTA SUPER, INFINIA, DIESEL","litros":numero,"precio_litro":numero,' +
-    '"total":numero}\n' +
+    '"total":numero,"servicio":"opción de la lista o null"}\n' +
     'Reglas: "total" es el TOTAL final pagado con IVA e impuestos incluidos. En los tickets argentinos la coma es decimal y el punto separa miles: ' +
-    'devolvé los números con punto decimal y sin separador de miles (ej 45956.19). Si un dato no se lee, poné null. No inventes datos.';
+    'devolvé los números con punto decimal y sin separador de miles (ej 45956.19). Si un dato no se lee, poné null. No inventes datos.\n' +
+    '"servicio": el supervisor suele escribir A MANO sobre el ticket a qué servicio corresponde la carga (ej. "Fincas", "San Francisco", "Laguna"). ' +
+    'Si hay una anotación así, devolvé la opción de esta lista que corresponda, copiada exactamente igual: ' + JSON.stringify(opciones) +
+    '. Si dice supervisor o propio, devolvé "' + CFG.SUPERVISOR_LABEL + '". Si no hay anotación a mano o no coincide claramente con ninguna, devolvé null.';
   const body = {
     contents: [{ parts: [{ text: prompt }, { inline_data: { mime_type: mime, data: parts[1] } }] }],
     generationConfig: { temperature: 0, responseMimeType: 'application/json' }
@@ -274,7 +278,8 @@ function leerTicket(token, dataUrl) {
     producto: d.producto ? String(d.producto).trim() : '',
     litros: d.litros === null || d.litros === undefined ? '' : num_(d.litros),
     precio: d.precio_litro === null || d.precio_litro === undefined ? '' : num_(d.precio_litro),
-    total: d.total === null || d.total === undefined ? '' : num_(d.total)
+    total: d.total === null || d.total === undefined ? '' : num_(d.total),
+    correspondeA: d.servicio ? (opciones.find(o => norm_(o) === norm_(d.servicio)) || '') : ''
   };
 }
 
@@ -612,8 +617,9 @@ function agregarComprobantes_(ss, nro, supervisor, tickets) {
     const col = (i % 2 === 0) ? 2 : 4;
     const rCap = 2 + Math.floor(i / 2) * 2;
     const rImg = rCap + 1;
+    // Una fila de 2 tickets por hoja A4 vertical (la fila de la foto ocupa casi toda la hoja)
     sh.setRowHeight(rCap, 40);
-    sh.setRowHeight(rImg, 500);
+    sh.setRowHeight(rImg, 980);
     const cap = '#' + (i + 1) + ' · ' + fmtD_(t['Fecha ticket']) + ' · N° ' + t['N° Comprobante'] +
       '\n' + t['Corresponde a'] + ' · ' + money_(num_(t['Total con IVA']));
     sh.getRange(rCap, col).setValue(cap).setFontFamily('Arial').setFontSize(9).setFontWeight('bold')
@@ -626,7 +632,7 @@ function agregarComprobantes_(ss, nro, supervisor, tickets) {
     try {
       const img = sh.insertImage(DriveApp.getFileById(fid).getBlob(), col, rImg, 5, 5);
       const w = img.getWidth(), h = img.getHeight();
-      const k = Math.min(360 / w, 488 / h);
+      const k = Math.min(360 / w, 968 / h);
       img.setWidth(Math.round(w * k)).setHeight(Math.round(h * k));
       img.setAnchorCellXOffset(Math.max(5, Math.round((370 - w * k) / 2)));
     } catch (e) {
