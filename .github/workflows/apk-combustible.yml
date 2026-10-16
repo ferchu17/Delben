@@ -1,0 +1,39 @@
+name: APK Control de Combustible
+
+# Arma la APK de Control de Combustible (abre la página con el motor de Chrome, así anda la cámara)
+# y la publica siempre en el mismo link:
+# https://github.com/ferchu17/Delben/releases/download/combustible-apk/Combustible.apk
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths: ["android-combustible/**", ".github/workflows/apk-combustible.yml"]
+
+permissions:
+  contents: write
+
+jobs:
+  apk:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-java@v5
+        with: { distribution: temurin, java-version: "17" }
+      - name: SDK de Android (ya viene en el servidor de GitHub)
+        run: echo "sdk.dir=$ANDROID_HOME" > android-combustible/local.properties && (yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses >/dev/null || true)
+      - uses: gradle/actions/setup-gradle@v4
+        with: { gradle-version: "8.7" }
+      - name: Compilar APK
+        env: { VERSION_CODE: "${{ github.run_number }}" }
+        run: gradle -p android-combustible :app:assembleRelease --no-daemon --stacktrace
+      - name: Renombrar
+        run: cp android-combustible/app/build/outputs/apk/release/app-release.apk Combustible.apk
+      - uses: actions/upload-artifact@v4
+        with: { name: Combustible-apk, path: Combustible.apk }
+      - name: Publicar en el link fijo
+        env: { GH_TOKEN: "${{ github.token }}" }
+        run: |
+          gh release view combustible-apk >/dev/null 2>&1 || \
+            gh release create combustible-apk --title "Control de Combustible (APK)" \
+              --notes "App de Android de Control de Combustible. Descargar Combustible.apk e instalar."
+          gh release upload combustible-apk Combustible.apk --clobber

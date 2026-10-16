@@ -40,6 +40,8 @@ jobs:
           python3 tools/armar_pagina.py sgi-app _site/sgi Admin
           # Informe de Novedades: app estática (HTML + JS), se copia tal cual
           cp -R informe-de-novedades _site/informe-de-novedades
+          # Control de Combustible: página que abre la app de Apps Script (el link /exec se pone en combustible/index.html)
+          cp -R combustible _site/combustible
           # Iconos de cada app (se ven en la pestaña del navegador)
           cp -R iconos _site/iconos
           # Portal DELBEN: página con todas las apps (https://ferchu17.github.io/Delben/portal/)

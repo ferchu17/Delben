@@ -1,0 +1,34 @@
+plugins { id 'com.android.application' }
+
+android {
+    namespace 'ar.com.delben.combustible'
+    compileSdk 34
+    defaultConfig {
+        applicationId 'ar.com.delben.combustible'
+        minSdk 21
+        targetSdk 34
+        versionCode Integer.parseInt(System.getenv('VERSION_CODE') ?: '1')
+        versionName '1.0.' + (System.getenv('VERSION_CODE') ?: '1')
+        // Dirección de la app (GitHub Pages)
+        manifestPlaceholders = [
+            hostName: 'ferchu17.github.io',
+            defaultUrl: 'https://ferchu17.github.io/Delben/combustible/'
+        ]
+    }
+    signingConfigs {
+        release {
+            storeFile file('../firma/combustible.keystore')
+            storePassword 'VPVHNYiYjWfxi5hsiSS9kkqo'
+            keyAlias 'combustible'
+            keyPassword 'VPVHNYiYjWfxi5hsiSS9kkqo'
+        }
+    }
+    buildTypes {
+        release { minifyEnabled false; signingConfig signingConfigs.release }
+    }
+    compileOptions { sourceCompatibility JavaVersion.VERSION_17; targetCompatibility JavaVersion.VERSION_17 }
+}
+
+dependencies {
+    implementation 'com.google.androidbrowserhelper:androidbrowserhelper:2.5.0'
+}

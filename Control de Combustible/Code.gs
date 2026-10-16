@@ -1,0 +1,771 @@
+/**
+ * DELBEN - Control de Combustible
+ * Proyecto de Apps Script independiente (Web App).
+ * Archivos: Code.gs, Index.html, appsscript.json
+ *
+ * Configuración necesaria (una sola vez):
+ *  - Configuración del proyecto > Propiedades del script > agregar GEMINI_API_KEY con tu clave de Gemini.
+ *  - Ejecutar la función autorizar() desde el editor para aceptar los permisos.
+ *  - Implementar > Nueva implementación > Aplicación web (Ejecutar como: Yo / Acceso: Cualquier persona).
+ */
+
+const CFG = {
+  STOCK_ID: '1Z06eLpbng51tYcycQlr0fLNI1OYmOpnmQp94YHY_coY',     // Stock Manager (usuarios y objetivos)
+  REG_ID: '1LNQm3eXJ_0vRj6f8IfEzf8lqhNqVZyr6uVmbO64FqyU',       // Rendicion de Combustible (registros)
+  FOLDER_ID: '1KbV6eLOB7brVS-WqmfKLphnIROqHtZYP',               // Carpeta de PDFs / Excel
+  TEMPLATE_ID: '1l-f0iZQGPRKqyQVZTMHC6blMTGwhiYt9kK9hFIi-fFQ',  // PLANTILLA - Rendicion Gastos de Combustible
+  LOGO_KTL_ID: '1wqKYz4bZkRAIIgvBoE_tychFVfBtneDT',             // Logo KTL Placa (6).jpg
+  LOGO_DELBEN_ID: '1bjLDdND-atVR4Gtbz6AjRg6hXXSLAstC',          // Delben_Combustible_logo_160.png (logo de la app)
+  FOTOS_FOLDER_NAME: 'Fotos de tickets',
+  MAIL_ADMIN: 'fjacyno@ktl-seguridad.com',
+  MAIL_NOMBRE: 'DELBEN - Control de Combustible',
+  GEMINI_MODEL: 'gemini-2.5-flash',
+  TZ: 'America/Argentina/Buenos_Aires',
+  HOJA_USUARIOS: 'Usuarios y contraseñas',
+  HOJA_OBJETIVOS: 'objetivos',
+  ROLES_CON_FONDO: ['supervisor', 'visor'],
+  FILAS_PLANILLA: 9,          // filas de tickets que trae la plantilla (19 a 27)
+  FILA_INICIO: 19,
+  SUPERVISOR_LABEL: 'SUPERVISOR'
+};
+
+const ESTADOS = ['Pendiente', 'Aprobado', 'Observado', 'Rechazado'];
+
+/* ======================= WEB APP ======================= */
+
+function doGet() {
+  const t = HtmlService.createTemplateFromFile('Index');
+  t.logoDelben = getLogoDelben_();
+  const out = t.evaluate()
+    .setTitle('DELBEN - Control de Combustible')
+    .addMetaTag('viewport', 'width=device-width, initial-scale=1, maximum-scale=1')
+    .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
+  try { out.setFaviconUrl('https://drive.google.com/thumbnail?id=' + CFG.LOGO_DELBEN_ID + '&sz=w128&ext=.png'); } catch (e) {}
+  return out;
+}
+
+function getLogoDelben_() {
+  const cache = CacheService.getScriptCache();
+  const c = cache.get('logo_app_combustible');
+  if (c) return c;
+  try {
+    const blob = DriveApp.getFileById(CFG.LOGO_DELBEN_ID).getBlob();
+    const data = 'data:' + blob.getContentType() + ';base64,' + Utilities.base64Encode(blob.getBytes());
+    if (data.length < 95000) cache.put('logo_app_combustible', data, 21600);
+    return data;
+  } catch (e) {
+    return '';
+  }
+}
+
+/** Ejecutar una vez desde el editor para aceptar todos los permisos. */
+function autorizar() {
+  SpreadsheetApp.openById(CFG.REG_ID).getName();
+  SpreadsheetApp.openById(CFG.STOCK_ID).getName();
+  DriveApp.getFolderById(CFG.FOLDER_ID).getName();
+  UrlFetchApp.fetch('https://www.google.com', { muteHttpExceptions: true });
+  MailApp.getRemainingDailyQuota();
+  // El logo de la app queda visible con el enlace para que se vea como ícono en la pestaña del navegador
+  DriveApp.getFileById(CFG.LOGO_DELBEN_ID).setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+  Logger.log('Permisos OK. Clave Gemini configurada: ' + !!PropertiesService.getScriptProperties().getProperty('GEMINI_API_KEY'));
+}
+
+/* ======================= SESIÓN ======================= */
+
+function login(usuario, password) {
+  usuario = String(usuario || '').trim();
+  password = String(password || '');
+  if (!usuario || !password) throw new Error('Ingresá usuario y contraseña.');
+  const u = getUsuarios_().find(r => norm_(r.usuario) === norm_(usuario) && String(r.password) === password);
+  if (!u) throw new Error('Usuario o contraseña incorrectos.');
+  const rol = rolApp_(u.rol);
+  if (!rol) throw new Error('Tu usuario no tiene acceso a Control de Combustible.');
+  const ses = { nombre: u.nombre, usuario: u.usuario, rol: rol, correo: primerCorreo_(u.correo) };
+  const token = Utilities.getUuid();
+  CacheService.getScriptCache().put('tk_' + token, JSON.stringify(ses), 21600);
+  ses.token = token;
+  return ses;
+}
+
+function checkSession(token) {
+  const s = ses_(token);
+  s.token = token;
+  return s;
+}
+
+function logout(token) {
+  CacheService.getScriptCache().remove('tk_' + token);
+  return true;
+}
+
+function ses_(token) {
+  const cache = CacheService.getScriptCache();
+  const raw = token ? cache.get('tk_' + token) : null;
+  if (!raw) throw new Error('SESION_VENCIDA');
+  cache.put('tk_' + token, raw, 21600);
+  return JSON.parse(raw);
+}
+
+function rolApp_(rol) {
+  const r = norm_(rol);
+  if (r === 'administrador') return 'admin';
+  if (r === 'visor') return 'visor';
+  if (r === 'supervisor') return 'supervisor';
+  return '';
+}
+
+function exigirAdmin_(s) {
+  if (s.rol !== 'admin') throw new Error('Solo el administrador puede hacer esto.');
+}
+
+function exigirRinde_(s) {
+  if (CFG.ROLES_CON_FONDO.indexOf(s.rol) < 0) throw new Error('Tu usuario no rinde combustible.');
+}
+
+/* ======================= DATOS BASE ======================= */
+
+function getUsuarios_() {
+  const sh = SpreadsheetApp.openById(CFG.STOCK_ID).getSheetByName(CFG.HOJA_USUARIOS);
+  return readSheet_(sh).rows.filter(r => String(r.usuario || '').trim());
+}
+
+function getSupervisores_() {
+  return getUsuarios_()
+    .filter(u => CFG.ROLES_CON_FONDO.indexOf(rolApp_(u.rol)) >= 0 && String(u.nombre || '').trim())
+    .map(u => ({ nombre: String(u.nombre).trim(), correo: primerCorreo_(u.correo), rol: String(u.rol) }))
+    .sort((a, b) => a.nombre.localeCompare(b.nombre));
+}
+
+function getObjetivos_() {
+  const sh = SpreadsheetApp.openById(CFG.STOCK_ID).getSheetByName(CFG.HOJA_OBJETIVOS);
+  const lista = readSheet_(sh).rows
+    .filter(r => String(r.nombre || '').trim())
+    .filter(r => !/^\s*baja/i.test(String(r.anotaciones || '')))
+    .map(r => String(r.nombre).trim());
+  return Array.from(new Set(lista)).sort((a, b) => a.localeCompare(b));
+}
+
+function regSheet_(name) {
+  const sh = SpreadsheetApp.openById(CFG.REG_ID).getSheetByName(name);
+  if (!sh) throw new Error('No existe la pestaña "' + name + '" en la planilla de registros.');
+  return sh;
+}
+
+/** Lee una hoja y devuelve {sh, headers, rows:[{header:valor, _r:filaReal}]} */
+function readSheet_(sh) {
+  const values = sh.getDataRange().getValues();
+  const headers = (values[0] || []).map(h => String(h).trim());
+  const rows = [];
+  for (let i = 1; i < values.length; i++) {
+    const row = values[i];
+    if (row.every(v => v === '' || v === null)) continue;
+    const o = { _r: i + 1 };
+    headers.forEach((h, j) => { if (h) o[h] = row[j]; });
+    rows.push(o);
+  }
+  return { sh: sh, headers: headers, rows: rows };
+}
+
+function appendObj_(t, obj, textCols) {
+  const r = t.sh.getLastRow() + 1;
+  const row = t.headers.map(h => (obj[h] === undefined || obj[h] === null) ? '' : obj[h]);
+  const rng = t.sh.getRange(r, 1, 1, t.headers.length);
+  (textCols || []).forEach(h => {
+    const j = t.headers.indexOf(h);
+    if (j >= 0) t.sh.getRange(r, j + 1).setNumberFormat('@');
+  });
+  rng.setValues([row]);
+  return r;
+}
+
+function setCell_(t, rowNum, header, value) {
+  const j = t.headers.indexOf(header);
+  if (j < 0) throw new Error('Falta la columna "' + header + '" en ' + t.sh.getName());
+  t.sh.getRange(rowNum, j + 1).setValue(value);
+}
+
+function nextId_(rows, field) {
+  let max = 0;
+  rows.forEach(r => { const n = parseInt(String(r[field]).replace(/\D/g, ''), 10); if (n > max) max = n; });
+  return max + 1;
+}
+
+/* ======================= SALDOS ======================= */
+
+function calcularSaldos_(asig, tickets) {
+  const m = {};
+  const get = n => { const k = norm_(n); if (!m[k]) m[k] = { nombre: String(n).trim(), asignado: 0, consumido: 0, sinRendir: 0, cantSinRendir: 0 }; return m[k]; };
+  asig.forEach(a => { if (String(a.Supervisor || '').trim()) get(a.Supervisor).asignado += num_(a.Monto); });
+  tickets.forEach(t => {
+    if (!String(t.Supervisor || '').trim()) return;
+    if (String(t.Estado) === 'Rechazado') return;
+    const s = get(t.Supervisor);
+    s.consumido += num_(t['Total con IVA']);
+    if (!String(t['N° Planilla'] || '').trim()) { s.sinRendir += num_(t['Total con IVA']); s.cantSinRendir++; }
+  });
+  Object.keys(m).forEach(k => { m[k].saldo = round2_(m[k].asignado - m[k].consumido); });
+  return m;
+}
+
+/* ======================= SUPERVISOR ======================= */
+
+function getSupervisorData(token) {
+  const s = ses_(token);
+  exigirRinde_(s);
+  const asig = readSheet_(regSheet_('Asignaciones')).rows.filter(a => norm_(a.Supervisor) === norm_(s.nombre));
+  const tks = readSheet_(regSheet_('Tickets')).rows.filter(t => norm_(t.Supervisor) === norm_(s.nombre));
+  const sal = calcularSaldos_(asig, tks)[norm_(s.nombre)] || { asignado: 0, consumido: 0, saldo: 0, sinRendir: 0, cantSinRendir: 0 };
+  const rend = readSheet_(regSheet_('Rendiciones')).rows
+    .filter(r => norm_(r.Supervisor) === norm_(s.nombre))
+    .map(r => {
+      const nro = String(r['N° Planilla']);
+      const tk = tks.filter(t => String(t['N° Planilla']) === nro && String(t.Estado) !== 'Rechazado');
+      return {
+        nro: r['N° Planilla'], fecha: fmtD_(r.Fecha), estado: String(r.Estado || ''),
+        cant: tk.length, total: round2_(tk.reduce((a, t) => a + num_(t['Total con IVA']), 0))
+      };
+    });
+  return {
+    saldo: sal,
+    asignaciones: asig.map(asigOut_).reverse(),
+    tickets: tks.map(ticketOut_).reverse(),
+    rendiciones: rend.reverse(),
+    objetivos: getObjetivos_()
+  };
+}
+
+/** Lee el ticket con Gemini y devuelve los datos para confirmar. */
+function leerTicket(token, dataUrl) {
+  ses_(token);
+  const key = PropertiesService.getScriptProperties().getProperty('GEMINI_API_KEY');
+  if (!key) throw new Error('Falta configurar la clave GEMINI_API_KEY. Cargá los datos a mano.');
+  const parts = String(dataUrl).split(',');
+  const mime = (parts[0].match(/data:(.*?);/) || [])[1] || 'image/jpeg';
+  const prompt =
+    'Sos un lector de tickets/facturas de combustible de Argentina. Leé la imagen y devolvé SOLO un JSON con estas claves:\n' +
+    '{"fecha":"DD/MM/AAAA","numero":"punto de venta y número tal cual figura, ej 00014-00021464","proveedor":"razón social del EMISOR (la estación)",' +
+    '"cuit":"CUIT del EMISOR con guiones, NO el del cliente","producto":"ej NAFTA SUPER, INFINIA, DIESEL","litros":numero,"precio_litro":numero,' +
+    '"total":numero}\n' +
+    'Reglas: "total" es el TOTAL final pagado con IVA e impuestos incluidos. En los tickets argentinos la coma es decimal y el punto separa miles: ' +
+    'devolvé los números con punto decimal y sin separador de miles (ej 45956.19). Si un dato no se lee, poné null. No inventes datos.';
+  const body = {
+    contents: [{ parts: [{ text: prompt }, { inline_data: { mime_type: mime, data: parts[1] } }] }],
+    generationConfig: { temperature: 0, responseMimeType: 'application/json' }
+  };
+  const url = 'https://generativelanguage.googleapis.com/v1beta/models/' + CFG.GEMINI_MODEL + ':generateContent?key=' + encodeURIComponent(key);
+  const res = UrlFetchApp.fetch(url, { method: 'post', contentType: 'application/json', payload: JSON.stringify(body), muteHttpExceptions: true });
+  if (res.getResponseCode() !== 200) {
+    console.error('Gemini ' + res.getResponseCode() + ': ' + res.getContentText());
+    throw new Error('No se pudo leer el ticket automáticamente (error ' + res.getResponseCode() + '). Cargá los datos a mano.');
+  }
+  let d;
+  try {
+    const j = JSON.parse(res.getContentText());
+    const txt = j.candidates[0].content.parts.map(p => p.text || '').join('').replace(/```json|```/g, '').trim();
+    d = JSON.parse(txt);
+  } catch (e) {
+    throw new Error('No se pudo interpretar el ticket. Cargá los datos a mano.');
+  }
+  return {
+    fecha: isoFromAny_(d.fecha),
+    numero: d.numero ? String(d.numero).trim() : '',
+    proveedor: d.proveedor ? String(d.proveedor).trim() : '',
+    cuit: d.cuit ? String(d.cuit).trim() : '',
+    producto: d.producto ? String(d.producto).trim() : '',
+    litros: d.litros === null || d.litros === undefined ? '' : num_(d.litros),
+    precio: d.precio_litro === null || d.precio_litro === undefined ? '' : num_(d.precio_litro),
+    total: d.total === null || d.total === undefined ? '' : num_(d.total)
+  };
+}
+
+function guardarTicket(token, t) {
+  const s = ses_(token);
+  exigirRinde_(s);
+  validarTicket_(t);
+  if (!t.foto) throw new Error('Falta la foto del ticket.');
+  const lock = LockService.getScriptLock();
+  lock.waitLock(30000);
+  try {
+    const tab = readSheet_(regSheet_('Tickets'));
+    chequearDuplicado_(tab.rows, t, null);
+    const id = nextId_(tab.rows, 'ID');
+    const fecha = dateFromIso_(t.fecha);
+    const foto = guardarFoto_(t.foto, fecha, s.nombre, t.numero, id);
+    appendObj_(tab, {
+      'ID': id,
+      'Fecha carga': new Date(),
+      'Supervisor': s.nombre,
+      'Corresponde a': String(t.correspondeA).trim(),
+      'Fecha ticket': fecha,
+      'N° Comprobante': String(t.numero).trim(),
+      'Proveedor': String(t.proveedor || '').trim(),
+      'CUIT Proveedor': String(t.cuit || '').trim(),
+      'Producto': String(t.producto || '').trim(),
+      'Litros': t.litros === '' ? '' : num_(t.litros),
+      'Precio x Litro': t.precio === '' ? '' : num_(t.precio),
+      'Total con IVA': num_(t.total),
+      'Link Foto': foto.getUrl(),
+      'Estado': 'Pendiente',
+      'Observacion Admin': '',
+      'N° Planilla': ''
+    }, ['N° Comprobante', 'CUIT Proveedor']);
+    return { id: id };
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+function eliminarTicket(token, id) {
+  const s = ses_(token);
+  const lock = LockService.getScriptLock();
+  lock.waitLock(30000);
+  try {
+    const tab = readSheet_(regSheet_('Tickets'));
+    const t = tab.rows.find(r => String(r.ID) === String(id));
+    if (!t) throw new Error('No se encontró el ticket.');
+    if (s.rol !== 'admin' && norm_(t.Supervisor) !== norm_(s.nombre)) throw new Error('Ese ticket no es tuyo.');
+    if (String(t['N° Planilla'] || '').trim()) throw new Error('El ticket ya está en la rendición N° ' + t['N° Planilla'] + ' y no se puede borrar.');
+    const fid = driveId_(t['Link Foto']);
+    if (fid) { try { DriveApp.getFileById(fid).setTrashed(true); } catch (e) {} }
+    tab.sh.deleteRow(t._r);
+    return true;
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+/** El supervisor envía su rendición: todos sus tickets sin rendir (no rechazados). */
+function enviarRendicion(token) {
+  const s = ses_(token);
+  exigirRinde_(s);
+  const lock = LockService.getScriptLock();
+  lock.waitLock(60000);
+  try {
+    const tTab = readSheet_(regSheet_('Tickets'));
+    const mios = tTab.rows.filter(t => norm_(t.Supervisor) === norm_(s.nombre) && !String(t['N° Planilla'] || '').trim() && String(t.Estado) !== 'Rechazado');
+    if (!mios.length) throw new Error('No tenés tickets pendientes de rendir.');
+    mios.sort((a, b) => dateVal_(a['Fecha ticket']) - dateVal_(b['Fecha ticket']));
+    const rTab = readSheet_(regSheet_('Rendiciones'));
+    const nro = nextId_(rTab.rows, 'N° Planilla');
+    const fecha = new Date();
+    const gen = generarArchivos_(nro, s.nombre, mios, fecha);
+    mios.forEach(t => setCell_(tTab, t._r, 'N° Planilla', nro));
+    const total = round2_(mios.reduce((a, t) => a + num_(t['Total con IVA']), 0));
+    appendObj_(rTab, {
+      'N° Planilla': nro, 'Fecha': fecha, 'Supervisor': s.nombre, 'Cant. Tickets': mios.length,
+      'Total': total, 'Link Excel': gen.xlsxUrl, 'Link PDF': gen.pdfUrl, 'Estado': 'Enviada'
+    });
+    SpreadsheetApp.flush();
+    enviarMail_(nro, s.nombre, s.correo, mios.length, total, gen.pdfBlob, false);
+    return { nro: nro, total: total, cant: mios.length, pdfUrl: gen.pdfUrl };
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+/** Devuelve la foto de un ticket como dataURL (para verla en la app). */
+function getFoto(token, id) {
+  const s = ses_(token);
+  const t = readSheet_(regSheet_('Tickets')).rows.find(r => String(r.ID) === String(id));
+  if (!t) throw new Error('No se encontró el ticket.');
+  if (s.rol === 'supervisor' && norm_(t.Supervisor) !== norm_(s.nombre)) throw new Error('Ese ticket no es tuyo.');
+  const fid = driveId_(t['Link Foto']);
+  if (!fid) throw new Error('El ticket no tiene foto.');
+  const b = DriveApp.getFileById(fid).getBlob();
+  return 'data:' + b.getContentType() + ';base64,' + Utilities.base64Encode(b.getBytes());
+}
+
+/* ======================= ADMINISTRADOR ======================= */
+
+function getAdminData(token) {
+  const s = ses_(token);
+  if (s.rol !== 'admin' && s.rol !== 'visor') throw new Error('Sin acceso.');
+  const asig = readSheet_(regSheet_('Asignaciones')).rows;
+  const tks = readSheet_(regSheet_('Tickets')).rows;
+  const rend = readSheet_(regSheet_('Rendiciones')).rows;
+  const sups = getSupervisores_();
+  const sal = calcularSaldos_(asig, tks);
+  const saldos = sups.map(u => sal[norm_(u.nombre)] || { nombre: u.nombre, asignado: 0, consumido: 0, saldo: 0, sinRendir: 0, cantSinRendir: 0 });
+  Object.keys(sal).forEach(k => { if (!saldos.some(x => norm_(x.nombre) === k)) saldos.push(sal[k]); });
+  return {
+    readOnly: s.rol !== 'admin',
+    supervisores: sups,
+    objetivos: getObjetivos_(),
+    saldos: saldos,
+    asignaciones: asig.map(asigOut_).reverse(),
+    tickets: tks.map(ticketOut_).reverse(),
+    rendiciones: rend.map(r => ({
+      nro: r['N° Planilla'], fecha: fmtD_(r.Fecha), supervisor: String(r.Supervisor || ''),
+      cant: num_(r['Cant. Tickets']), total: num_(r.Total), excel: String(r['Link Excel'] || ''),
+      pdf: String(r['Link PDF'] || ''), estado: String(r.Estado || '')
+    })).reverse()
+  };
+}
+
+function guardarAsignacion(token, a) {
+  const s = ses_(token);
+  exigirAdmin_(s);
+  const sup = getSupervisores_().find(u => norm_(u.nombre) === norm_(a.supervisor));
+  if (!sup) throw new Error('Elegí un supervisor de la lista.');
+  const monto = num_(a.monto);
+  if (!(monto > 0)) throw new Error('Ingresá un monto mayor a cero.');
+  if (!a.fecha) throw new Error('Ingresá la fecha.');
+  const lock = LockService.getScriptLock();
+  lock.waitLock(30000);
+  try {
+    const tab = readSheet_(regSheet_('Asignaciones'));
+    const id = nextId_(tab.rows, 'ID');
+    appendObj_(tab, {
+      'ID': id, 'Fecha': dateFromIso_(a.fecha), 'Supervisor': sup.nombre, 'Monto': monto,
+      'Observacion': String(a.observacion || '').trim(), 'Cargado por': s.nombre, 'Fecha carga': new Date()
+    });
+    return { id: id };
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+function eliminarAsignacion(token, id) {
+  const s = ses_(token);
+  exigirAdmin_(s);
+  const lock = LockService.getScriptLock();
+  lock.waitLock(30000);
+  try {
+    const tab = readSheet_(regSheet_('Asignaciones'));
+    const a = tab.rows.find(r => String(r.ID) === String(id));
+    if (!a) throw new Error('No se encontró la asignación.');
+    tab.sh.deleteRow(a._r);
+    return true;
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+/** El administrador corrige datos del ticket y/o cambia el estado. */
+function actualizarTicket(token, id, c) {
+  const s = ses_(token);
+  exigirAdmin_(s);
+  validarTicket_(c);
+  if (ESTADOS.indexOf(c.estado) < 0) throw new Error('Estado inválido.');
+  const lock = LockService.getScriptLock();
+  lock.waitLock(30000);
+  try {
+    const tab = readSheet_(regSheet_('Tickets'));
+    const t = tab.rows.find(r => String(r.ID) === String(id));
+    if (!t) throw new Error('No se encontró el ticket.');
+    chequearDuplicado_(tab.rows, c, String(id));
+    const r = t._r;
+    const nc = tab.headers.indexOf('N° Comprobante') + 1;
+    const cc = tab.headers.indexOf('CUIT Proveedor') + 1;
+    if (nc) tab.sh.getRange(r, nc).setNumberFormat('@');
+    if (cc) tab.sh.getRange(r, cc).setNumberFormat('@');
+    setCell_(tab, r, 'Corresponde a', String(c.correspondeA).trim());
+    setCell_(tab, r, 'Fecha ticket', dateFromIso_(c.fecha));
+    setCell_(tab, r, 'N° Comprobante', String(c.numero).trim());
+    setCell_(tab, r, 'Proveedor', String(c.proveedor || '').trim());
+    setCell_(tab, r, 'CUIT Proveedor', String(c.cuit || '').trim());
+    setCell_(tab, r, 'Producto', String(c.producto || '').trim());
+    setCell_(tab, r, 'Litros', c.litros === '' ? '' : num_(c.litros));
+    setCell_(tab, r, 'Precio x Litro', c.precio === '' ? '' : num_(c.precio));
+    setCell_(tab, r, 'Total con IVA', num_(c.total));
+    setCell_(tab, r, 'Estado', c.estado);
+    setCell_(tab, r, 'Observacion Admin', String(c.observacion || '').trim());
+    return true;
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+/** Vuelve a armar el Excel y el PDF de una rendición con los datos corregidos (excluye rechazados). */
+function regenerarRendicion(token, nro, reenviar) {
+  const s = ses_(token);
+  exigirAdmin_(s);
+  const lock = LockService.getScriptLock();
+  lock.waitLock(60000);
+  try {
+    const rTab = readSheet_(regSheet_('Rendiciones'));
+    const rend = rTab.rows.find(r => String(r['N° Planilla']) === String(nro));
+    if (!rend) throw new Error('No se encontró la rendición N° ' + nro);
+    const tks = readSheet_(regSheet_('Tickets')).rows
+      .filter(t => String(t['N° Planilla']) === String(nro) && String(t.Estado) !== 'Rechazado')
+      .sort((a, b) => dateVal_(a['Fecha ticket']) - dateVal_(b['Fecha ticket']));
+    if (!tks.length) throw new Error('La rendición no tiene tickets válidos.');
+    [rend['Link Excel'], rend['Link PDF']].forEach(u => { const id = driveId_(u); if (id) { try { DriveApp.getFileById(id).setTrashed(true); } catch (e) {} } });
+    const sup = String(rend.Supervisor);
+    const gen = generarArchivos_(nro, sup, tks, rend.Fecha instanceof Date ? rend.Fecha : new Date());
+    const total = round2_(tks.reduce((a, t) => a + num_(t['Total con IVA']), 0));
+    setCell_(rTab, rend._r, 'Cant. Tickets', tks.length);
+    setCell_(rTab, rend._r, 'Total', total);
+    setCell_(rTab, rend._r, 'Link Excel', gen.xlsxUrl);
+    setCell_(rTab, rend._r, 'Link PDF', gen.pdfUrl);
+    SpreadsheetApp.flush();
+    if (reenviar) {
+      const u = getSupervisores_().find(x => norm_(x.nombre) === norm_(sup));
+      enviarMail_(nro, sup, u ? u.correo : '', tks.length, total, gen.pdfBlob, true);
+    }
+    return { pdfUrl: gen.pdfUrl, excelUrl: gen.xlsxUrl, total: total };
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+function cambiarEstadoRendicion(token, nro, estado) {
+  const s = ses_(token);
+  exigirAdmin_(s);
+  const ok = ['Enviada', 'Revisada', 'Enviada a Finanzas'];
+  if (ok.indexOf(estado) < 0) throw new Error('Estado inválido.');
+  const tab = readSheet_(regSheet_('Rendiciones'));
+  const r = tab.rows.find(x => String(x['N° Planilla']) === String(nro));
+  if (!r) throw new Error('No se encontró la rendición.');
+  setCell_(tab, r._r, 'Estado', estado);
+  return true;
+}
+
+/* ======================= EXCEL + PDF ======================= */
+
+function generarArchivos_(nro, supervisor, tickets, fecha) {
+  const folder = DriveApp.getFolderById(CFG.FOLDER_ID);
+  const fechaTxt = Utilities.formatDate(fecha, CFG.TZ, 'dd-MM-yyyy');
+  const nombre = 'Rendicion Combustible N° ' + nro + ' - ' + supervisor + ' - ' + fechaTxt;
+  const copia = DriveApp.getFileById(CFG.TEMPLATE_ID).makeCopy(nombre, folder);
+  const ss = SpreadsheetApp.openById(copia.getId());
+  try {
+    const sh = ss.getSheets()[0];
+
+    // Logo KTL arriba a la derecha (columna H)
+    try {
+      const img = sh.insertImage(DriveApp.getFileById(CFG.LOGO_KTL_ID).getBlob(), 8, 1, 6, 8);
+      const h = 70;
+      img.setHeight(h).setWidth(Math.round(h * img.getWidth() / img.getHeight()));
+    } catch (e) { console.error('Logo KTL: ' + e); }
+
+    sh.getRange('C6').setValue(fecha).setNumberFormat('dd/MM/yyyy');
+    sh.getRange('G6').setValue(nro);
+    sh.getRange('C8').setValue(supervisor);
+
+    // Filas extra si hay más de 9 tickets (se insertan antes de la última fila de la tabla)
+    const extra = Math.max(0, tickets.length - CFG.FILAS_PLANILLA);
+    const ultimaTabla = CFG.FILA_INICIO + CFG.FILAS_PLANILLA - 1; // 27
+    if (extra > 0) {
+      sh.insertRowsAfter(ultimaTabla - 1, extra);
+      const alto = sh.getRowHeight(ultimaTabla - 1);
+      for (let i = 0; i < extra; i++) {
+        const r = ultimaTabla + i;
+        sh.getRange(ultimaTabla - 1, 1, 1, 9).copyTo(sh.getRange(r, 1, 1, 9), SpreadsheetApp.CopyPasteType.PASTE_FORMAT, false);
+        sh.setRowHeight(r, alto);
+        try { sh.getRange(r, 6, 1, 2).merge(); } catch (e) {}
+      }
+    }
+
+    const vals = tickets.map(t => [
+      'Combustible',
+      t['Fecha ticket'] instanceof Date ? t['Fecha ticket'] : dateFromAny_(t['Fecha ticket']),
+      String(t['N° Comprobante'] || ''),
+      String(t.Proveedor || ''),
+      String(t['Corresponde a'] || ''),
+      '',
+      num_(t['Total con IVA'])
+    ]);
+    if (vals.length) {
+      sh.getRange(CFG.FILA_INICIO, 4, vals.length, 1).setNumberFormat('@');
+      sh.getRange(CFG.FILA_INICIO, 2, vals.length, 7).setValues(vals);
+      sh.getRange(CFG.FILA_INICIO, 3, vals.length, 1).setNumberFormat('dd/MM/yyyy');
+    }
+    // Nombre del empleado sobre la firma (B33 en la plantilla)
+    sh.getRange(33 + extra, 2).setValue(supervisor);
+    SpreadsheetApp.flush();
+
+    // Excel (solo la planilla)
+    const token = ScriptApp.getOAuthToken();
+    const xlsx = UrlFetchApp.fetch('https://docs.google.com/spreadsheets/d/' + ss.getId() + '/export?format=xlsx',
+      { headers: { Authorization: 'Bearer ' + token } }).getBlob().setName(nombre + '.xlsx');
+    const xlsxFile = folder.createFile(xlsx);
+
+    // Hoja de comprobantes con las fotos (solo para el PDF)
+    agregarComprobantes_(ss, nro, supervisor, tickets);
+    SpreadsheetApp.flush();
+
+    const q = 'format=pdf&size=A4&portrait=true&fitw=true&gridlines=false&printtitle=false&sheetnames=false' +
+      '&pagenum=UNDEFINED&fzr=false&top_margin=0.4&bottom_margin=0.4&left_margin=0.4&right_margin=0.4&horizontal_alignment=CENTER';
+    const pdf = UrlFetchApp.fetch('https://docs.google.com/spreadsheets/d/' + ss.getId() + '/export?' + q,
+      { headers: { Authorization: 'Bearer ' + token } }).getBlob().setName(nombre + '.pdf');
+    const pdfFile = folder.createFile(pdf);
+
+    return { xlsxUrl: xlsxFile.getUrl(), pdfUrl: pdfFile.getUrl(), pdfBlob: pdf };
+  } finally {
+    try { copia.setTrashed(true); } catch (e) {}
+  }
+}
+
+function agregarComprobantes_(ss, nro, supervisor, tickets) {
+  const sh = ss.insertSheet('COMPROBANTES');
+  const maxC = sh.getMaxColumns();
+  if (maxC > 5) sh.deleteColumns(6, maxC - 5);
+  sh.setColumnWidth(1, 12); sh.setColumnWidth(2, 370); sh.setColumnWidth(3, 16); sh.setColumnWidth(4, 370); sh.setColumnWidth(5, 12);
+  sh.getRange('B1:D1').merge().setValue('COMPROBANTES - PLANILLA N° ' + nro + ' - ' + supervisor)
+    .setFontFamily('Arial').setFontSize(12).setFontWeight('bold').setHorizontalAlignment('center').setVerticalAlignment('middle');
+  sh.setRowHeight(1, 34);
+  const filasNec = 1 + Math.ceil(tickets.length / 2) * 2;
+  if (sh.getMaxRows() < filasNec + 1) sh.insertRowsAfter(sh.getMaxRows(), filasNec + 1 - sh.getMaxRows());
+
+  tickets.forEach((t, i) => {
+    const col = (i % 2 === 0) ? 2 : 4;
+    const rCap = 2 + Math.floor(i / 2) * 2;
+    const rImg = rCap + 1;
+    sh.setRowHeight(rCap, 40);
+    sh.setRowHeight(rImg, 500);
+    const cap = '#' + (i + 1) + ' · ' + fmtD_(t['Fecha ticket']) + ' · N° ' + t['N° Comprobante'] +
+      '\n' + t['Corresponde a'] + ' · ' + money_(num_(t['Total con IVA']));
+    sh.getRange(rCap, col).setValue(cap).setFontFamily('Arial').setFontSize(9).setFontWeight('bold')
+      .setWrap(true).setHorizontalAlignment('center').setVerticalAlignment('middle')
+      .setBorder(true, true, false, true, false, false);
+    sh.getRange(rImg, col).setBorder(false, true, true, true, false, false);
+    sh.getRange(rImg, 5).setValue('.').setFontColor('#ffffff'); // asegura que la fila entre en el PDF
+    const fid = driveId_(t['Link Foto']);
+    if (!fid) return;
+    try {
+      const img = sh.insertImage(DriveApp.getFileById(fid).getBlob(), col, rImg, 5, 5);
+      const w = img.getWidth(), h = img.getHeight();
+      const k = Math.min(360 / w, 488 / h);
+      img.setWidth(Math.round(w * k)).setHeight(Math.round(h * k));
+      img.setAnchorCellXOffset(Math.max(5, Math.round((370 - w * k) / 2)));
+    } catch (e) {
+      sh.getRange(rImg, col).setValue('No se pudo insertar la foto: ' + e.message).setWrap(true);
+    }
+  });
+}
+
+function enviarMail_(nro, supervisor, correoSup, cant, total, pdfBlob, corregida) {
+  const asunto = 'DELBEN - Rendición de Combustible N° ' + nro + ' - ' + supervisor + (corregida ? ' (corregida)' : '');
+  const html =
+    '<div style="font-family:Arial,sans-serif;font-size:14px;color:#222">' +
+    '<p>Se ' + (corregida ? 'corrigió' : 'generó') + ' la <b>Rendición de Gastos de Combustible N° ' + nro + '</b>.</p>' +
+    '<table style="border-collapse:collapse">' +
+    '<tr><td style="padding:4px 12px 4px 0"><b>Supervisor:</b></td><td>' + esc_(supervisor) + '</td></tr>' +
+    '<tr><td style="padding:4px 12px 4px 0"><b>Fecha:</b></td><td>' + Utilities.formatDate(new Date(), CFG.TZ, 'dd/MM/yyyy HH:mm') + '</td></tr>' +
+    '<tr><td style="padding:4px 12px 4px 0"><b>Tickets:</b></td><td>' + cant + '</td></tr>' +
+    '<tr><td style="padding:4px 12px 4px 0"><b>Total con IVA:</b></td><td>' + money_(total) + '</td></tr>' +
+    '</table><p>Se adjunta el PDF con la planilla y las fotos de los comprobantes.</p>' +
+    '<p style="color:#777;font-size:12px">DELBEN - Control de Combustible</p></div>';
+  const para = correoSup && correoSup !== CFG.MAIL_ADMIN ? correoSup : CFG.MAIL_ADMIN;
+  const opts = { to: para, subject: asunto, htmlBody: html, name: CFG.MAIL_NOMBRE, attachments: [pdfBlob] };
+  if (para !== CFG.MAIL_ADMIN) opts.cc = CFG.MAIL_ADMIN;
+  if (corregida) { opts.to = CFG.MAIL_ADMIN; delete opts.cc; if (correoSup && correoSup !== CFG.MAIL_ADMIN) opts.cc = correoSup; }
+  MailApp.sendEmail(opts);
+}
+
+/* ======================= AUXILIARES ======================= */
+
+function guardarFoto_(dataUrl, fecha, supervisor, numero, id) {
+  const parts = String(dataUrl).split(',');
+  const mime = (parts[0].match(/data:(.*?);/) || [])[1] || 'image/jpeg';
+  const ext = mime.indexOf('png') >= 0 ? 'png' : 'jpg';
+  const nombre = Utilities.formatDate(fecha, CFG.TZ, 'yyyy-MM-dd') + ' - ' + supervisor + ' - ' + String(numero).replace(/[\\/:*?"<>|]/g, '-') + ' - ID' + id + '.' + ext;
+  const blob = Utilities.newBlob(Utilities.base64Decode(parts[1]), mime, nombre);
+  return carpetaFotos_().createFile(blob);
+}
+
+function carpetaFotos_() {
+  const root = DriveApp.getFolderById(CFG.FOLDER_ID);
+  const it = root.getFoldersByName(CFG.FOTOS_FOLDER_NAME);
+  return it.hasNext() ? it.next() : root.createFolder(CFG.FOTOS_FOLDER_NAME);
+}
+
+function validarTicket_(t) {
+  if (!t) throw new Error('Faltan datos.');
+  if (!String(t.correspondeA || '').trim()) throw new Error('Elegí a quién corresponde el gasto.');
+  if (!t.fecha) throw new Error('Ingresá la fecha del ticket.');
+  if (!String(t.numero || '').trim()) throw new Error('Ingresá el N° de comprobante.');
+  if (!(num_(t.total) > 0)) throw new Error('Ingresá el total con IVA.');
+  const objs = getObjetivos_().map(norm_);
+  const ca = norm_(t.correspondeA);
+  if (ca !== norm_(CFG.SUPERVISOR_LABEL) && objs.indexOf(ca) < 0) throw new Error('"Corresponde a" tiene que ser un servicio de la lista o SUPERVISOR.');
+}
+
+function chequearDuplicado_(rows, t, exceptId) {
+  const n = digits_(t.numero);
+  const c = digits_(t.cuit);
+  const dup = rows.find(r =>
+    String(r.ID) !== String(exceptId) &&
+    String(r.Estado) !== 'Rechazado' &&
+    digits_(r['N° Comprobante']) === n &&
+    (!c || !digits_(r['CUIT Proveedor']) || digits_(r['CUIT Proveedor']) === c));
+  if (dup) throw new Error('Ese ticket ya fue cargado (ID ' + dup.ID + ', ' + dup.Supervisor + ', ' + fmtD_(dup['Fecha ticket']) + ').');
+}
+
+function ticketOut_(t) {
+  return {
+    id: t.ID, fechaCarga: fmtDT_(t['Fecha carga']), supervisor: String(t.Supervisor || ''),
+    correspondeA: String(t['Corresponde a'] || ''), fecha: fmtD_(t['Fecha ticket']), fechaIso: isoFromAny_(t['Fecha ticket']),
+    numero: String(t['N° Comprobante'] || ''), proveedor: String(t.Proveedor || ''), cuit: String(t['CUIT Proveedor'] || ''),
+    producto: String(t.Producto || ''), litros: t.Litros === '' ? '' : num_(t.Litros), precio: t['Precio x Litro'] === '' ? '' : num_(t['Precio x Litro']),
+    total: num_(t['Total con IVA']), foto: String(t['Link Foto'] || ''), estado: String(t.Estado || 'Pendiente'),
+    observacion: String(t['Observacion Admin'] || ''), planilla: String(t['N° Planilla'] || '')
+  };
+}
+
+function asigOut_(a) {
+  return {
+    id: a.ID, fecha: fmtD_(a.Fecha), supervisor: String(a.Supervisor || ''), monto: num_(a.Monto),
+    observacion: String(a.Observacion || ''), cargadoPor: String(a['Cargado por'] || ''), fechaCarga: fmtDT_(a['Fecha carga'])
+  };
+}
+
+function norm_(s) {
+  return String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/\s+/g, ' ').trim();
+}
+
+function num_(v) {
+  if (typeof v === 'number') return v;
+  let s = String(v === null || v === undefined ? '' : v).replace(/[^\d.,-]/g, '');
+  if (!s) return 0;
+  if (s.indexOf(',') >= 0 && s.indexOf('.') >= 0) {
+    s = s.lastIndexOf(',') > s.lastIndexOf('.') ? s.replace(/\./g, '').replace(',', '.') : s.replace(/,/g, '');
+  } else if (s.indexOf(',') >= 0) {
+    s = s.replace(',', '.');
+  }
+  const n = parseFloat(s);
+  return isNaN(n) ? 0 : n;
+}
+
+function round2_(n) { return Math.round(n * 100) / 100; }
+function digits_(s) { return String(s || '').replace(/\D/g, '').replace(/^0+/, ''); }
+function primerCorreo_(s) { return String(s || '').split(/[;,\s]+/).filter(x => x.indexOf('@') > 0)[0] || ''; }
+function esc_(s) { return String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c])); }
+
+function money_(n) {
+  const v = round2_(n || 0).toFixed(2).split('.');
+  return '$ ' + v[0].replace(/\B(?=(\d{3})+(?!\d))/g, '.') + ',' + v[1];
+}
+
+function driveId_(url) {
+  const m = String(url || '').match(/[-\w]{25,}/);
+  return m ? m[0] : '';
+}
+
+function dateFromIso_(s) {
+  const m = String(s || '').match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (!m) throw new Error('Fecha inválida.');
+  return new Date(+m[1], +m[2] - 1, +m[3], 12, 0, 0);
+}
+
+function dateFromAny_(v) {
+  if (v instanceof Date) return v;
+  const iso = isoFromAny_(v);
+  return iso ? dateFromIso_(iso) : '';
+}
+
+function isoFromAny_(v) {
+  if (!v) return '';
+  if (v instanceof Date) return Utilities.formatDate(v, CFG.TZ, 'yyyy-MM-dd');
+  const s = String(v).trim();
+  let m = s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
+  if (m) return m[1] + '-' + ('0' + m[2]).slice(-2) + '-' + ('0' + m[3]).slice(-2);
+  m = s.match(/^(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{2,4})/);
+  if (m) { const y = m[3].length === 2 ? '20' + m[3] : m[3]; return y + '-' + ('0' + m[2]).slice(-2) + '-' + ('0' + m[1]).slice(-2); }
+  return '';
+}
+
+function dateVal_(v) { const d = dateFromAny_(v); return d instanceof Date ? d.getTime() : 0; }
+function fmtD_(v) { return v instanceof Date ? Utilities.formatDate(v, CFG.TZ, 'dd/MM/yyyy') : String(v || ''); }
+function fmtDT_(v) { return v instanceof Date ? Utilities.formatDate(v, CFG.TZ, 'dd/MM/yyyy HH:mm') : String(v || ''); }

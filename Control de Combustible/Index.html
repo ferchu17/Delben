@@ -1,0 +1,858 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<base target="_top">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<title>DELBEN - Control de Combustible</title>
+<style>
+  :root{
+    --azul:#1d4f9f; --azul2:#163d7a; --verde:#2e9b3a; --rojo:#c62828; --naranja:#e08a00;
+    --fondo:#eef2f7; --card:#ffffff; --texto:#1f2933; --gris:#6b7785; --borde:#d6dde6;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0;background:var(--fondo);color:var(--texto);font-family:"Segoe UI",Roboto,Arial,sans-serif;font-size:15px}
+  button,input,select,textarea{font:inherit}
+  .hidden{display:none!important}
+
+  /* Login */
+  #login{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:16px}
+  .login-card{background:var(--card);width:100%;max-width:380px;border-radius:16px;padding:28px 24px;box-shadow:0 8px 28px rgba(0,0,0,.08);text-align:center}
+  .login-card img{width:140px;height:140px;object-fit:contain;border-radius:28px;box-shadow:0 6px 18px rgba(0,0,0,.18)}
+  .login-card h1{font-size:20px;margin:8px 0 2px;color:var(--azul2)}
+  .login-card p{margin:0 0 18px;color:var(--gris)}
+
+  /* Header */
+  header{background:var(--azul);color:#fff;display:flex;align-items:center;gap:10px;padding:10px 14px;position:sticky;top:0;z-index:20}
+  header img{width:44px;height:44px;border-radius:10px;object-fit:contain;box-shadow:0 1px 4px rgba(0,0,0,.25)}
+  header .tit{flex:1;min-width:0}
+  header .tit b{display:block;font-size:16px}
+  header .tit span{font-size:12px;opacity:.85;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:block}
+  header button{background:rgba(255,255,255,.15);border:0;color:#fff;border-radius:8px;padding:7px 12px;cursor:pointer}
+
+  nav{display:flex;gap:6px;overflow-x:auto;padding:10px 12px;background:#fff;border-bottom:1px solid var(--borde);position:sticky;top:60px;z-index:15}
+  nav button{flex:0 0 auto;border:1px solid var(--borde);background:#fff;color:var(--azul2);border-radius:20px;padding:7px 14px;cursor:pointer;font-weight:600;font-size:14px}
+  nav button.on{background:var(--azul);border-color:var(--azul);color:#fff}
+  nav .sep{flex:0 0 1px;background:var(--borde);margin:4px 2px}
+
+  main{max-width:1100px;margin:0 auto;padding:14px 12px 60px}
+  .card{background:var(--card);border-radius:14px;padding:16px;margin-bottom:14px;box-shadow:0 2px 10px rgba(0,0,0,.05)}
+  .card h2{margin:0 0 12px;font-size:17px;color:var(--azul2)}
+  .muted{color:var(--gris);font-size:13px}
+
+  .saldo{background:#fff;text-align:center;padding:24px 16px;border:3px solid var(--azul)}
+  .saldo .lbl{font-size:15px;font-weight:700;color:var(--azul2);text-transform:uppercase;letter-spacing:.4px}
+  .saldo .big{font-size:46px;font-weight:800;margin:8px 0 4px;color:var(--azul);line-height:1.1;word-break:break-word}
+  .saldo .sub{font-size:13px;color:var(--gris);margin-bottom:4px}
+  .saldo.neg{border-color:var(--rojo);background:#fff5f5}
+  .saldo.neg .lbl{color:var(--rojo)}
+  .saldo.neg .big{color:var(--rojo)}
+  .kpis{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:14px}
+  .kpis div{background:#f2f6fb;border-radius:10px;padding:8px 4px;font-size:12px;color:var(--gris)}
+  .kpis b{display:block;font-size:14px;margin-top:2px;color:var(--texto)}
+  .ing{color:var(--azul);font-weight:700} .egr{color:var(--rojo);font-weight:700}
+  tr.fin td{background:#f2f6fb;font-weight:800;font-size:15px}
+
+  label{display:block;font-size:13px;font-weight:600;color:var(--gris);margin:10px 0 4px}
+  input,select,textarea{width:100%;padding:10px 12px;border:1px solid var(--borde);border-radius:10px;background:#fff;color:var(--texto)}
+  input:focus,select:focus,textarea:focus{outline:2px solid rgba(29,79,159,.25);border-color:var(--azul)}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:0 12px}
+  .grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:0 12px}
+
+  .btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;border:0;border-radius:10px;padding:11px 16px;font-weight:600;cursor:pointer;background:var(--azul);color:#fff}
+  .btn.block{width:100%;margin-top:14px}
+  .btn.verde{background:var(--verde)} .btn.rojo{background:var(--rojo)} .btn.naranja{background:var(--naranja)}
+  .btn.gris{background:#e6ebf1;color:var(--texto)}
+  .btn.sm{padding:7px 11px;font-size:13px;border-radius:8px}
+  .btn:disabled{opacity:.55;cursor:default}
+  .fila-btn{display:flex;gap:8px;flex-wrap:wrap}
+
+  .foto-btns{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  .foto-btns label{margin:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;border:2px dashed var(--borde);border-radius:12px;padding:18px 8px;color:var(--azul2);cursor:pointer;font-size:14px;background:#f8fafc}
+  .foto-btns svg{width:30px;height:30px}
+  #prev{margin-top:12px;text-align:center}
+  #prev img{max-width:100%;max-height:380px;border-radius:10px;border:1px solid var(--borde)}
+  .leyendo{display:flex;align-items:center;gap:10px;justify-content:center;color:var(--azul2);font-weight:600;padding:10px}
+
+  /* Autocompletable */
+  .ac{position:relative}
+  .ac-list{position:absolute;left:0;right:0;top:100%;background:#fff;border:1px solid var(--borde);border-radius:10px;margin-top:4px;max-height:240px;overflow:auto;z-index:50;box-shadow:0 8px 24px rgba(0,0,0,.12)}
+  .ac-list div{padding:9px 12px;cursor:pointer;border-bottom:1px solid #f0f2f5}
+  .ac-list div.on,.ac-list div:hover{background:#e8f0fc}
+  .ac-list mark{background:#fff3b0;padding:0}
+  .ac-list .vacio{color:var(--gris);cursor:default}
+
+  /* Listas */
+  .item{border:1px solid var(--borde);border-radius:12px;padding:12px;margin-bottom:10px;background:#fff}
+  .item .top{display:flex;justify-content:space-between;gap:8px;align-items:flex-start}
+  .item .monto{font-weight:700;font-size:16px;white-space:nowrap}
+  .item .det{color:var(--gris);font-size:13px;margin-top:4px;line-height:1.45}
+  .badge{display:inline-block;font-size:11px;font-weight:700;padding:3px 8px;border-radius:20px;text-transform:uppercase;letter-spacing:.3px}
+  .b-Pendiente{background:#fff4d6;color:#8a5a00} .b-Aprobado{background:#dff3e2;color:#1d6b28}
+  .b-Observado{background:#ffe6cc;color:#a24d00} .b-Rechazado{background:#fde0e0;color:#a31515}
+  .b-rend{background:#e3ebf8;color:var(--azul2)} .b-asig{background:#dff3e2;color:#1d6b28}
+  .obs{background:#fff4e5;border-left:3px solid var(--naranja);padding:6px 8px;border-radius:6px;margin-top:8px;font-size:13px}
+
+  table{width:100%;border-collapse:collapse;font-size:14px}
+  th,td{padding:9px 8px;border-bottom:1px solid #edf0f4;text-align:left;vertical-align:middle}
+  th{font-size:12px;color:var(--gris);text-transform:uppercase;letter-spacing:.3px;background:#f7f9fb}
+  td.r,th.r{text-align:right}
+  .tabla-wrap{overflow-x:auto}
+  .pos{color:var(--verde);font-weight:700} .neg{color:var(--rojo);font-weight:700}
+
+  .filtros{display:grid;grid-template-columns:2fr 1fr 1fr;gap:0 10px;margin-bottom:6px}
+  .tot-bar{display:flex;justify-content:space-between;align-items:center;background:#f2f6fb;border-radius:10px;padding:12px 14px;margin:10px 0;font-weight:700}
+
+  /* Modal / toast / loader */
+  .modal{position:fixed;inset:0;background:rgba(15,23,42,.55);display:flex;align-items:center;justify-content:center;z-index:100;padding:16px}
+  .modal-box{background:#fff;border-radius:16px;max-width:520px;width:100%;max-height:92vh;overflow:auto;padding:20px;text-align:center}
+  .modal-box h3{margin:6px 0 8px;color:var(--azul2)}
+  .modal-box img{max-width:100%;border-radius:8px}
+  .modal-ico{width:56px;height:56px;border-radius:50%;margin:0 auto;display:flex;align-items:center;justify-content:center;font-size:30px;color:#fff}
+  #toast{position:fixed;left:50%;bottom:22px;transform:translateX(-50%);background:#263238;color:#fff;padding:11px 18px;border-radius:10px;z-index:200;max-width:92%;font-size:14px}
+  .spin{width:22px;height:22px;border:3px solid rgba(29,79,159,.2);border-top-color:var(--azul);border-radius:50%;animation:g 0.8s linear infinite}
+  #loader{position:fixed;inset:0;background:rgba(255,255,255,.6);display:flex;align-items:center;justify-content:center;z-index:150}
+  #loader .spin{width:44px;height:44px;border-width:4px}
+  @keyframes g{to{transform:rotate(360deg)}}
+
+  @media (max-width:640px){
+    .grid2,.grid3,.filtros{grid-template-columns:1fr}
+    .saldo .big{font-size:32px}
+    th.hm,td.hm{display:none}
+  }
+</style>
+</head>
+<body>
+
+<!-- LOGIN -->
+<section id="login">
+  <div class="login-card">
+    <img src="<?!= logoDelben ?>" alt="DELBEN">
+    <h1>Control de Combustible</h1>
+    <p>Ingresá con tu usuario de SGI</p>
+    <input id="lgUser" placeholder="Usuario" autocomplete="username" autocapitalize="off">
+    <div style="height:10px"></div>
+    <input id="lgPass" type="password" placeholder="Contraseña" autocomplete="current-password">
+    <button class="btn block" id="lgBtn" onclick="doLogin()">Ingresar</button>
+    <div id="lgErr" class="muted" style="color:var(--rojo);margin-top:10px"></div>
+  </div>
+</section>
+
+<!-- APP -->
+<section id="app" class="hidden">
+  <header>
+    <img src="<?!= logoDelben ?>" alt="DELBEN">
+    <div class="tit"><b>Control de Combustible</b><span id="hdrUser"></span></div>
+    <button onclick="doLogout()">Salir</button>
+  </header>
+  <nav id="nav"></nav>
+  <main>
+
+    <!-- SUPERVISOR: INICIO -->
+    <div id="v-inicio" class="vista hidden">
+      <div class="card saldo" id="saldoCard">
+        <div class="lbl" id="sdLbl">Disponible para gastar</div>
+        <div class="big" id="sdSaldo">$ 0,00</div>
+        <div class="sub" id="sdSub"></div>
+        <div class="kpis">
+          <div>Recibido<b id="sdAsig">$ 0</b></div>
+          <div>Gastado<b id="sdCons">$ 0</b></div>
+          <div>Sin rendir<b id="sdSin">$ 0</b></div>
+        </div>
+      </div>
+      <div class="fila-btn" style="margin-bottom:14px">
+        <button class="btn verde" style="flex:1" onclick="go('cargar')">+ Cargar ticket</button>
+        <button class="btn" style="flex:1" onclick="go('rendir')">Enviar rendición</button>
+      </div>
+      <div class="card">
+        <h2>Últimos movimientos</h2>
+        <div id="movs"></div>
+      </div>
+    </div>
+
+    <!-- SUPERVISOR: CARGAR -->
+    <div id="v-cargar" class="vista hidden">
+      <div class="card">
+        <h2>1. Foto del ticket</h2>
+        <div class="foto-btns">
+          <label>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+            Sacar foto
+            <input type="file" accept="image/*" capture="environment" class="hidden" onchange="onFoto(this)">
+          </label>
+          <label>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg>
+            Elegir de la galería
+            <input type="file" accept="image/*" class="hidden" onchange="onFoto(this)">
+          </label>
+        </div>
+        <div id="prev"></div>
+      </div>
+
+      <div class="card">
+        <h2>2. Datos del ticket</h2>
+        <p class="muted" style="margin:-6px 0 6px">Se completan solos al leer la foto. Revisalos antes de guardar.</p>
+        <label>¿A quién corresponde? *</label>
+        <div class="ac"><input id="tkCorr" placeholder="Escribí el servicio o SUPERVISOR"></div>
+        <div class="grid2">
+          <div><label>Fecha del ticket *</label><input id="tkFecha" type="date"></div>
+          <div><label>N° comprobante *</label><input id="tkNum" placeholder="00014-00021464"></div>
+        </div>
+        <div class="grid2">
+          <div><label>Proveedor</label><input id="tkProv"></div>
+          <div><label>CUIT proveedor</label><input id="tkCuit"></div>
+        </div>
+        <div class="grid3">
+          <div><label>Producto</label><input id="tkProd"></div>
+          <div><label>Litros</label><input id="tkLit" inputmode="decimal"></div>
+          <div><label>Precio x litro</label><input id="tkPre" inputmode="decimal"></div>
+        </div>
+        <label>Total con IVA *</label>
+        <input id="tkTot" inputmode="decimal" style="font-size:20px;font-weight:700">
+        <button class="btn verde block" id="tkGuardar" onclick="guardarTk()">Guardar ticket</button>
+      </div>
+    </div>
+
+    <!-- SUPERVISOR: MIS TICKETS -->
+    <div id="v-tickets" class="vista hidden">
+      <div class="card">
+        <h2>Mis tickets</h2>
+        <div id="misTks"></div>
+      </div>
+      <div class="card">
+        <h2>Fondos recibidos</h2>
+        <div id="misAsig"></div>
+      </div>
+    </div>
+
+    <!-- SUPERVISOR: RENDICIONES E INGRESOS -->
+    <div id="v-ingresos" class="vista hidden">
+      <div class="card">
+        <h2>Rendiciones e ingresos</h2>
+        <p class="muted" style="margin-top:-6px">Ingresos: la plata que te depositaron. Rendiciones: lo que rendiste. Saldo: cómo quedaste después de cada movimiento.</p>
+        <div class="tabla-wrap"><table>
+          <thead><tr><th>Fecha</th><th>Detalle</th><th class="r">Ingreso</th><th class="r">Rendido</th><th class="r">Saldo</th></tr></thead>
+          <tbody id="tbMov"></tbody>
+        </table></div>
+      </div>
+    </div>
+
+    <!-- SUPERVISOR: RENDIR -->
+    <div id="v-rendir" class="vista hidden">
+      <div class="card">
+        <h2>Enviar rendición</h2>
+        <p class="muted">Se arma la planilla con todos tus tickets sin rendir y te llega el PDF por mail (con copia a administración).</p>
+        <div id="rdLista"></div>
+        <div class="tot-bar"><span id="rdCant">0 tickets</span><span id="rdTot">$ 0,00</span></div>
+        <button class="btn block" id="rdBtn" onclick="enviarRend()">Enviar rendición</button>
+      </div>
+    </div>
+
+    <!-- ADMIN: SALDOS -->
+    <div id="v-saldos" class="vista hidden">
+      <div class="card">
+        <h2>Saldos por supervisor</h2>
+        <div class="tabla-wrap"><table>
+          <thead><tr><th>Supervisor</th><th class="r hm">Recibido</th><th class="r hm">Gastado</th><th class="r">Sin rendir</th><th class="r">Disponible</th></tr></thead>
+          <tbody id="tbSaldos"></tbody>
+        </table></div>
+      </div>
+    </div>
+
+    <!-- ADMIN: ASIGNAR -->
+    <div id="v-asignar" class="vista hidden">
+      <div class="card" id="asgForm">
+        <h2>Asignar fondos</h2>
+        <label>Supervisor *</label>
+        <div class="ac"><input id="asSup" placeholder="Escribí el nombre"></div>
+        <div id="asSaldoInfo" class="muted" style="margin-top:6px"></div>
+        <div class="grid2">
+          <div><label>Fecha *</label><input id="asFecha" type="date"></div>
+          <div><label>Monto *</label><input id="asMonto" inputmode="decimal" placeholder="300000"></div>
+        </div>
+        <label>Observación</label>
+        <input id="asObs" placeholder="Opcional">
+        <button class="btn verde block" onclick="guardarAsig()">Guardar asignación</button>
+      </div>
+      <div class="card">
+        <h2>Asignaciones cargadas</h2>
+        <div class="ac" style="margin-bottom:10px"><input id="asFil" placeholder="Filtrar por supervisor"></div>
+        <div class="tabla-wrap"><table>
+          <thead><tr><th>Fecha</th><th>Supervisor</th><th class="r">Monto</th><th class="hm">Observación</th><th></th></tr></thead>
+          <tbody id="tbAsig"></tbody>
+        </table></div>
+      </div>
+    </div>
+
+    <!-- ADMIN: REVISIÓN -->
+    <div id="v-revision" class="vista hidden">
+      <div class="card">
+        <h2>Revisión de tickets</h2>
+        <div class="filtros">
+          <div class="ac"><label>Supervisor</label><input id="rvSup" placeholder="Todos"></div>
+          <div><label>Estado</label>
+            <select id="rvEst" onchange="renderRevision()">
+              <option value="">Todos</option><option>Pendiente</option><option>Aprobado</option><option>Observado</option><option>Rechazado</option>
+            </select></div>
+          <div><label>N° Planilla</label><input id="rvPla" placeholder="Todas" oninput="renderRevision()"></div>
+        </div>
+        <div class="tot-bar"><span id="rvCant"></span><span id="rvTot"></span></div>
+        <div id="rvLista"></div>
+      </div>
+    </div>
+
+    <!-- ADMIN: RENDICIONES -->
+    <div id="v-rendiciones" class="vista hidden">
+      <div class="card">
+        <h2>Rendiciones</h2>
+        <div class="tabla-wrap"><table>
+          <thead><tr><th>N°</th><th>Fecha</th><th>Supervisor</th><th class="r hm">Tickets</th><th class="r">Total</th><th>Estado</th><th>Archivos</th></tr></thead>
+          <tbody id="tbRend"></tbody>
+        </table></div>
+      </div>
+    </div>
+
+  </main>
+</section>
+
+<div id="loader" class="hidden"><div class="spin"></div></div>
+<div id="toast" class="hidden"></div>
+<div id="modal" class="modal hidden" onclick="if(event.target===this)cerrarModal()"><div class="modal-box" id="modalBox"></div></div>
+
+<script>
+/* ================== ESTADO ================== */
+const SUP_LABEL = 'SUPERVISOR';
+let S = null;          // sesión
+let SD = null;         // datos supervisor
+let AD = null;         // datos admin
+let fotoData = '';     // foto comprimida (dataURL)
+let vistaActual = '';
+const AC = {};         // autocompletables
+
+/* ================== UTILES ================== */
+function run(fn, ...args){
+  return new Promise((ok, ko) => {
+    google.script.run.withSuccessHandler(ok).withFailureHandler(e => {
+      if (String(e && e.message || e).indexOf('SESION_VENCIDA') >= 0){ sesionVencida(); return; }
+      ko(e);
+    })[fn](...args);
+  });
+}
+function $(id){ return document.getElementById(id); }
+function esc(s){ return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function money(n){
+  const v = Math.round(Number(n || 0) * 100) / 100;
+  return (v < 0 ? '- ' : '') + '$ ' + Math.abs(v).toLocaleString('es-AR', {minimumFractionDigits:2, maximumFractionDigits:2});
+}
+function claseSaldo(n){ return Math.round(n * 100) < 0 ? 'egr' : 'ing'; }
+function num(v){
+  if (typeof v === 'number') return v;
+  let s = String(v || '').replace(/[^\d.,-]/g, '');
+  if (!s) return 0;
+  if (s.includes(',') && s.includes('.')) s = s.lastIndexOf(',') > s.lastIndexOf('.') ? s.replace(/\./g,'').replace(',','.') : s.replace(/,/g,'');
+  else if (s.includes(',')) s = s.replace(',', '.');
+  const n = parseFloat(s); return isNaN(n) ? 0 : n;
+}
+function fmtNumInput(n){ return (n === '' || n == null) ? '' : String(n).replace('.', ','); }
+function hoyIso(){ const d = new Date(); d.setMinutes(d.getMinutes() - d.getTimezoneOffset()); return d.toISOString().slice(0,10); }
+function norm(s){ return String(s || '').normalize('NFD').replace(/[̀-ͯ]/g,'').toLowerCase().replace(/\s+/g,' ').trim(); }
+function loader(on){ $('loader').classList.toggle('hidden', !on); }
+let toastT;
+function toast(msg){ const t = $('toast'); t.textContent = msg; t.classList.remove('hidden'); clearTimeout(toastT); toastT = setTimeout(() => t.classList.add('hidden'), 3500); }
+function errMsg(e){ return String(e && e.message || e).replace(/^Error:\s*/, ''); }
+
+function modal(tipo, titulo, html, botones){
+  const col = tipo === 'ok' ? 'var(--verde)' : tipo === 'err' ? 'var(--rojo)' : tipo === 'warn' ? 'var(--naranja)' : 'var(--azul)';
+  const ico = tipo === 'ok' ? '✓' : tipo === 'err' ? '!' : tipo === 'warn' ? '?' : 'i';
+  $('modalBox').innerHTML = (tipo ? `<div class="modal-ico" style="background:${col}">${ico}</div>` : '') +
+    `<h3>${esc(titulo)}</h3><div style="margin-bottom:16px">${html || ''}</div><div class="fila-btn" style="justify-content:center" id="modalBtns"></div>`;
+  (botones || [{txt:'Aceptar'}]).forEach(b => {
+    const el = document.createElement('button');
+    el.className = 'btn ' + (b.cls || '');
+    el.textContent = b.txt;
+    el.onclick = () => { cerrarModal(); if (b.fn) b.fn(); };
+    $('modalBtns').appendChild(el);
+  });
+  $('modal').classList.remove('hidden');
+}
+function cerrarModal(){ $('modal').classList.add('hidden'); }
+function confirmar(titulo, html, fn, txt, cls){ modal('warn', titulo, html, [{txt:'Cancelar', cls:'gris'}, {txt: txt || 'Confirmar', cls: cls || '', fn}]); }
+
+/* ================== AUTOCOMPLETABLE ==================
+   Busca por cada palabra escrita en cualquier parte del texto, sin importar acentos ni mayúsculas.
+   Ej: "san" o "franc" -> BARRIO SAN FRANCISCO */
+function makeAC(input, getItems, onPick, opts){
+  opts = opts || {};
+  const wrap = input.parentElement;
+  const list = document.createElement('div');
+  list.className = 'ac-list hidden';
+  wrap.appendChild(list);
+  let idx = -1, items = [];
+  function filtrar(){
+    const q = norm(input.value).split(' ').filter(Boolean);
+    const all = getItems();
+    items = q.length ? all.filter(it => { const n = norm(it); return q.every(w => n.includes(w)); }) : all.slice();
+    items = items.slice(0, 60);
+    idx = items.length ? 0 : -1;
+    pintar(q);
+  }
+  function marcar(txt, q){
+    let h = esc(txt);
+    q.forEach(w => {
+      const n = norm(txt), i = n.indexOf(w);
+      if (i >= 0){ const orig = txt.substr(i, w.length); h = h.replace(esc(orig), '<mark>' + esc(orig) + '</mark>'); }
+    });
+    return h;
+  }
+  function pintar(q){
+    list.innerHTML = items.length ? items.map((it, i) => `<div data-i="${i}" class="${i === idx ? 'on' : ''}">${marcar(it, q || [])}</div>`).join('') : '<div class="vacio">Sin resultados</div>';
+    list.classList.remove('hidden');
+  }
+  function elegir(i){
+    if (i < 0 || !items[i]) return;
+    input.value = items[i];
+    list.classList.add('hidden');
+    if (onPick) onPick(items[i]);
+  }
+  list.addEventListener('mousedown', e => { const d = e.target.closest('[data-i]'); if (d){ e.preventDefault(); elegir(+d.dataset.i); } });
+  input.addEventListener('focus', filtrar);
+  input.addEventListener('input', () => { filtrar(); if (opts.onType) opts.onType(input.value); });
+  input.addEventListener('keydown', e => {
+    if (list.classList.contains('hidden')) return;
+    if (e.key === 'ArrowDown'){ idx = Math.min(items.length - 1, idx + 1); pintar(norm(input.value).split(' ').filter(Boolean)); e.preventDefault(); }
+    else if (e.key === 'ArrowUp'){ idx = Math.max(0, idx - 1); pintar(norm(input.value).split(' ').filter(Boolean)); e.preventDefault(); }
+    else if (e.key === 'Enter'){ elegir(idx); e.preventDefault(); }
+    else if (e.key === 'Escape'){ list.classList.add('hidden'); }
+  });
+  input.addEventListener('blur', () => {
+    setTimeout(() => {
+      list.classList.add('hidden');
+      if (opts.estricto && input.value.trim()){
+        const ok = getItems().find(it => norm(it) === norm(input.value));
+        if (ok) input.value = ok;
+        else if (items.length === 1) { input.value = items[0]; if (onPick) onPick(items[0]); }
+        else { input.value = ''; if (onPick) onPick(''); }
+      }
+      if (opts.onBlur) opts.onBlur(input.value);
+    }, 150);
+  });
+  return { refresh: filtrar };
+}
+
+/* ================== LOGIN ================== */
+$('lgPass').addEventListener('keydown', e => { if (e.key === 'Enter') doLogin(); });
+$('lgUser').addEventListener('keydown', e => { if (e.key === 'Enter') $('lgPass').focus(); });
+
+function doLogin(){
+  const u = $('lgUser').value.trim(), p = $('lgPass').value;
+  $('lgErr').textContent = '';
+  $('lgBtn').disabled = true;
+  run('login', u, p).then(s => { guardarSesion(s); iniciar(); })
+    .catch(e => { $('lgErr').textContent = errMsg(e); })
+    .finally(() => { $('lgBtn').disabled = false; });
+}
+function guardarSesion(s){ S = s; try { localStorage.setItem('delben_comb', JSON.stringify(s)); } catch(e){} }
+function doLogout(){
+  if (S) run('logout', S.token).catch(()=>{});
+  try { localStorage.removeItem('delben_comb'); } catch(e){}
+  location.reload();
+}
+function sesionVencida(){
+  loader(false);
+  try { localStorage.removeItem('delben_comb'); } catch(e){}
+  modal('warn', 'Sesión vencida', 'Volvé a ingresar con tu usuario.', [{txt:'Ingresar', fn: () => location.reload()}]);
+}
+
+(function auto(){
+  let s = null;
+  try { s = JSON.parse(localStorage.getItem('delben_comb') || 'null'); } catch(e){}
+  if (!s || !s.token) return;
+  loader(true);
+  run('checkSession', s.token).then(x => { guardarSesion(x); iniciar(); }).catch(() => { try { localStorage.removeItem('delben_comb'); } catch(e){} }).finally(() => loader(false));
+})();
+
+/* ================== NAVEGACIÓN ================== */
+const RINDE = ['supervisor', 'visor'];
+function iniciar(){
+  $('login').classList.add('hidden');
+  $('app').classList.remove('hidden');
+  const rolTxt = S.rol === 'admin' ? 'Administrador' : S.rol === 'visor' ? 'Visor' : 'Supervisor';
+  $('hdrUser').textContent = S.nombre + ' · ' + rolTxt;
+  const tabs = [];
+  if (RINDE.includes(S.rol)) tabs.push(['inicio','Inicio'], ['cargar','Cargar ticket'], ['tickets','Mis tickets'], ['ingresos','Rendiciones e ingresos'], ['rendir','Rendir']);
+  if (S.rol === 'admin' || S.rol === 'visor'){
+    if (tabs.length) tabs.push(['|']);
+    tabs.push(['saldos','Saldos'], ['asignar','Asignaciones'], ['revision','Revisión'], ['rendiciones','Rendiciones']);
+  }
+  $('nav').innerHTML = tabs.map(t => t[0] === '|' ? '<span class="sep"></span>' : `<button data-v="${t[0]}" onclick="go('${t[0]}')">${t[1]}</button>`).join('');
+  $('tkFecha').value = hoyIso();
+  $('asFecha').value = hoyIso();
+  initAC();
+  go(tabs[0][0]);
+}
+
+function go(v){
+  vistaActual = v;
+  document.querySelectorAll('.vista').forEach(el => el.classList.add('hidden'));
+  $('v-' + v).classList.remove('hidden');
+  document.querySelectorAll('nav button').forEach(b => b.classList.toggle('on', b.dataset.v === v));
+  window.scrollTo(0, 0);
+  if (['inicio','cargar','tickets','ingresos','rendir'].includes(v)) cargarSup(v === 'cargar' && SD);
+  else cargarAdmin(!!AD);
+}
+
+function initAC(){
+  AC.corr = makeAC($('tkCorr'), () => [SUP_LABEL].concat((SD && SD.objetivos) || (AD && AD.objetivos) || []), null, {estricto:true});
+  AC.asSup = makeAC($('asSup'), () => AD ? AD.supervisores.map(s => s.nombre) : [], v => infoSaldo(v), {estricto:true});
+  AC.asFil = makeAC($('asFil'), () => AD ? AD.supervisores.map(s => s.nombre) : [], () => renderAsig(), {estricto:true, onType: () => renderAsig(), onBlur: () => renderAsig()});
+  AC.rvSup = makeAC($('rvSup'), () => AD ? AD.supervisores.map(s => s.nombre) : [], () => renderRevision(), {estricto:true, onType: v => { if (!v) renderRevision(); }, onBlur: () => renderRevision()});
+}
+
+/* ================== SUPERVISOR ================== */
+function cargarSup(silencioso){
+  if (!silencioso) loader(true);
+  return run('getSupervisorData', S.token).then(d => { SD = d; renderSup(); })
+    .catch(e => modal('err', 'Error', esc(errMsg(e))))
+    .finally(() => loader(false));
+}
+
+function renderSup(){
+  const s = SD.saldo;
+  const neg = Math.round(s.saldo * 100) < 0;
+  $('sdSaldo').textContent = money(s.saldo);
+  $('saldoCard').classList.toggle('neg', neg);
+  $('sdLbl').textContent = neg ? 'Saldo a tu favor' : 'Disponible para gastar';
+  $('sdSub').textContent = neg ? 'Gastaste más de lo que te depositaron: te deben ' + money(-s.saldo) : '';
+  $('sdAsig').textContent = money(s.asignado);
+  $('sdCons').textContent = money(s.consumido);
+  $('sdSin').textContent = money(s.sinRendir);
+
+  // movimientos (asignaciones + tickets)
+  const movs = SD.asignaciones.map(a => ({tipo:'a', fecha:a.fecha, o:a})).concat(SD.tickets.map(t => ({tipo:'t', fecha:t.fecha, o:t})));
+  movs.sort((x, y) => isoOf(y.fecha).localeCompare(isoOf(x.fecha)));
+  $('movs').innerHTML = movs.slice(0, 15).map(m => m.tipo === 'a'
+    ? `<div class="item"><div class="top"><div><span class="badge b-asig">Fondos recibidos</span><div class="det">${esc(m.o.fecha)}${m.o.observacion ? ' · ' + esc(m.o.observacion) : ''}</div></div><div class="monto pos">+ ${money(m.o.monto)}</div></div></div>`
+    : itemTicket(m.o, false)).join('') || '<p class="muted">Todavía no hay movimientos.</p>';
+
+  $('misTks').innerHTML = SD.tickets.map(t => itemTicket(t, true)).join('') || '<p class="muted">No cargaste tickets todavía.</p>';
+  $('misAsig').innerHTML = SD.asignaciones.map(a => `<div class="item"><div class="top"><div><b>${esc(a.fecha)}</b><div class="det">${esc(a.observacion || 'Asignación de fondos')}</div></div><div class="monto pos">${money(a.monto)}</div></div></div>`).join('') || '<p class="muted">Sin asignaciones.</p>';
+
+  renderIngresos();
+
+  const pend = SD.tickets.filter(t => !t.planilla && t.estado !== 'Rechazado');
+  $('rdLista').innerHTML = pend.map(t => itemTicket(t, false)).join('') || '<p class="muted">No tenés tickets pendientes de rendir.</p>';
+  $('rdCant').textContent = pend.length + (pend.length === 1 ? ' ticket' : ' tickets');
+  $('rdTot').textContent = money(pend.reduce((a, t) => a + t.total, 0));
+  $('rdBtn').disabled = !pend.length;
+}
+function isoOf(f){ const m = String(f).match(/(\d{2})\/(\d{2})\/(\d{4})/); return m ? m[3] + m[2] + m[1] : ''; }
+
+/* Rendiciones e ingresos: movimientos en orden de fecha con el saldo acumulado */
+function renderIngresos(){
+  const movs = SD.asignaciones.map(a => ({fecha:a.fecha, orden:0, det:'Ingreso de fondos' + (a.observacion ? ' · ' + a.observacion : ''), ing:a.monto, egr:0}))
+    .concat((SD.rendiciones || []).map(r => ({fecha:r.fecha, orden:1, det:`Rendición N° ${r.nro} · ${r.cant} ticket(s)` + (r.estado ? ' · ' + r.estado : ''), ing:0, egr:r.total})));
+  const pend = SD.tickets.filter(t => !t.planilla && t.estado !== 'Rechazado');
+  if (pend.length){
+    const ult = pend.map(t => t.fecha).sort((a, b) => isoOf(a).localeCompare(isoOf(b))).pop();
+    movs.push({fecha:ult, orden:2, det:`Tickets cargados sin rendir · ${pend.length}`, ing:0, egr:pend.reduce((a, t) => a + t.total, 0), pend:true});
+  }
+  movs.sort((x, y) => isoOf(x.fecha).localeCompare(isoOf(y.fecha)) || x.orden - y.orden);
+  let saldo = 0;
+  const filas = movs.map(m => {
+    saldo += m.ing - m.egr;
+    return `<tr><td>${esc(m.fecha)}</td><td>${esc(m.det)}${m.pend ? ' <span class="badge b-Pendiente">Sin rendir</span>' : ''}</td>
+      <td class="r ing">${m.ing ? money(m.ing) : ''}</td>
+      <td class="r egr">${m.egr ? '- ' + money(m.egr) : ''}</td>
+      <td class="r ${claseSaldo(saldo)}">${money(saldo)}</td></tr>`;
+  });
+  filas.reverse();
+  const s = SD.saldo.saldo;
+  $('tbMov').innerHTML = (movs.length ? `<tr class="fin"><td colspan="4">${Math.round(s * 100) < 0 ? 'SALDO A TU FAVOR' : 'DISPONIBLE PARA GASTAR'}</td><td class="r ${claseSaldo(s)}">${money(s)}</td></tr>` : '') +
+    (filas.join('') || '<tr><td colspan="5" class="muted">Todavía no hay movimientos.</td></tr>');
+}
+
+function itemTicket(t, acciones){
+  const rend = t.planilla ? `<span class="badge b-rend">Rendición N° ${esc(t.planilla)}</span>` : '<span class="badge b-Pendiente">Sin rendir</span>';
+  return `<div class="item"><div class="top"><div>
+      <b>${esc(t.correspondeA)}</b>
+      <div class="det">${esc(t.fecha)} · N° ${esc(t.numero)}<br>${esc(t.proveedor)}${t.litros ? ' · ' + String(t.litros).replace('.', ',') + ' L' : ''}</div>
+      <div style="margin-top:6px;display:flex;gap:6px;flex-wrap:wrap"><span class="badge b-${esc(t.estado)}">${esc(t.estado)}</span>${rend}</div>
+    </div><div class="monto ${t.estado === 'Rechazado' ? 'neg' : ''}">- ${money(t.total)}</div></div>
+    ${t.observacion ? `<div class="obs"><b>Observación:</b> ${esc(t.observacion)}</div>` : ''}
+    ${acciones ? `<div class="fila-btn" style="margin-top:10px"><button class="btn gris sm" onclick="verFoto(${t.id})">Ver foto</button>${!t.planilla ? `<button class="btn rojo sm" onclick="borrarTk(${t.id})">Borrar</button>` : ''}</div>` : ''}
+  </div>`;
+}
+
+/* ---- Foto ---- */
+function onFoto(inp){
+  const f = inp.files && inp.files[0];
+  inp.value = '';
+  if (!f) return;
+  comprimir(f).then(data => {
+    fotoData = data;
+    $('prev').innerHTML = `<img src="${data}"><div class="leyendo" id="leyendo"><div class="spin"></div>Leyendo el ticket...</div>`;
+    return run('leerTicket', S.token, data).then(d => {
+      if (d.fecha) $('tkFecha').value = d.fecha;
+      if (d.numero) $('tkNum').value = d.numero;
+      if (d.proveedor) $('tkProv').value = d.proveedor;
+      if (d.cuit) $('tkCuit').value = d.cuit;
+      if (d.producto) $('tkProd').value = d.producto;
+      if (d.litros !== '') $('tkLit').value = fmtNumInput(d.litros);
+      if (d.precio !== '') $('tkPre').value = fmtNumInput(d.precio);
+      if (d.total !== '') $('tkTot').value = fmtNumInput(d.total);
+      $('leyendo').innerHTML = '<span style="color:var(--verde)">✓ Datos leídos. Revisalos y elegí a quién corresponde.</span>';
+      if (!$('tkCorr').value) $('tkCorr').focus();
+    }).catch(e => { $('leyendo').innerHTML = `<span style="color:var(--naranja)">${esc(errMsg(e))}</span>`; });
+  }).catch(() => modal('err', 'Foto', 'No se pudo abrir la imagen.'));
+}
+
+function comprimir(file){
+  return new Promise((ok, ko) => {
+    const rd = new FileReader();
+    rd.onerror = ko;
+    rd.onload = () => {
+      const img = new Image();
+      img.onerror = ko;
+      img.onload = () => {
+        const w = img.naturalWidth, h = img.naturalHeight;
+        const k = Math.min(1, Math.sqrt(950000 / (w * h)), 2200 / Math.max(w, h));
+        const c = document.createElement('canvas');
+        c.width = Math.round(w * k); c.height = Math.round(h * k);
+        const ctx = c.getContext('2d');
+        ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, c.width, c.height);
+        ctx.drawImage(img, 0, 0, c.width, c.height);
+        ok(c.toDataURL('image/jpeg', 0.85));
+      };
+      img.src = rd.result;
+    };
+    rd.readAsDataURL(file);
+  });
+}
+
+function guardarTk(){
+  if (!fotoData) return modal('err', 'Falta la foto', 'Sacale una foto al ticket o elegila de la galería.');
+  const t = {
+    correspondeA: $('tkCorr').value.trim(), fecha: $('tkFecha').value, numero: $('tkNum').value.trim(),
+    proveedor: $('tkProv').value.trim(), cuit: $('tkCuit').value.trim(), producto: $('tkProd').value.trim(),
+    litros: $('tkLit').value.trim() === '' ? '' : num($('tkLit').value), precio: $('tkPre').value.trim() === '' ? '' : num($('tkPre').value),
+    total: num($('tkTot').value), foto: fotoData
+  };
+  if (!t.correspondeA) return modal('err', 'Falta un dato', 'Elegí a quién corresponde el gasto (servicio o SUPERVISOR).');
+  if (!t.fecha || !t.numero || !(t.total > 0)) return modal('err', 'Faltan datos', 'Completá fecha, N° de comprobante y total.');
+  if (SD && t.total > SD.saldo.saldo) {
+    return confirmar('Saldo insuficiente', `El ticket es de <b>${money(t.total)}</b> y tu disponible es <b>${money(SD.saldo.saldo)}</b>.<br>¿Lo guardás igual?`, () => guardarTkOk(t), 'Guardar igual');
+  }
+  guardarTkOk(t);
+}
+function guardarTkOk(t){
+  $('tkGuardar').disabled = true; loader(true);
+  run('guardarTicket', S.token, t).then(() => {
+    limpiarTk();
+    return cargarSup(true).then(() => modal('ok', 'Ticket guardado', `Total ${money(t.total)}<br>Disponible: <b>${money(SD.saldo.saldo)}</b>`,
+      [{txt:'Cargar otro', cls:'verde'}, {txt:'Ir al inicio', fn: () => go('inicio')}]));
+  }).catch(e => modal('err', 'No se guardó', esc(errMsg(e))))
+    .finally(() => { $('tkGuardar').disabled = false; loader(false); });
+}
+function limpiarTk(){
+  fotoData = '';
+  $('prev').innerHTML = '';
+  ['tkCorr','tkNum','tkProv','tkCuit','tkProd','tkLit','tkPre','tkTot'].forEach(id => $(id).value = '');
+  $('tkFecha').value = hoyIso();
+}
+
+function borrarTk(id){
+  confirmar('Borrar ticket', '¿Seguro que querés borrar este ticket?', () => {
+    loader(true);
+    run('eliminarTicket', S.token, id).then(() => { toast('Ticket borrado'); return vistaActual === 'revision' ? cargarAdmin(true) : cargarSup(true); })
+      .catch(e => modal('err', 'Error', esc(errMsg(e)))).finally(() => loader(false));
+  }, 'Borrar', 'rojo');
+}
+
+function verFoto(id){
+  loader(true);
+  run('getFoto', S.token, id).then(src => modal('', 'Foto del ticket', `<img src="${src}">`, [{txt:'Cerrar', cls:'gris'}]))
+    .catch(e => modal('err', 'Error', esc(errMsg(e)))).finally(() => loader(false));
+}
+
+function enviarRend(){
+  const pend = SD.tickets.filter(t => !t.planilla && t.estado !== 'Rechazado');
+  if (!pend.length) return;
+  const tot = pend.reduce((a, t) => a + t.total, 0);
+  confirmar('Enviar rendición', `Se va a enviar la rendición con <b>${pend.length}</b> ticket(s) por <b>${money(tot)}</b>.<br>Te llega el PDF por mail.`, () => {
+    $('rdBtn').disabled = true; loader(true);
+    run('enviarRendicion', S.token).then(r => {
+      return cargarSup(true).then(() => modal('ok', 'Rendición enviada', `Planilla N° <b>${r.nro}</b> · ${r.cant} ticket(s) · ${money(r.total)}<br>El PDF se envió por mail.`));
+    }).catch(e => modal('err', 'No se pudo enviar', esc(errMsg(e))))
+      .finally(() => { loader(false); });
+  }, 'Enviar');
+}
+
+/* ================== ADMINISTRADOR ================== */
+function cargarAdmin(silencioso){
+  if (!silencioso) loader(true);
+  return run('getAdminData', S.token).then(d => {
+    AD = d;
+    $('asgForm').classList.toggle('hidden', d.readOnly);
+    renderSaldos(); renderAsig(); renderRevision(); renderRend();
+  }).catch(e => modal('err', 'Error', esc(errMsg(e)))).finally(() => loader(false));
+}
+
+function renderSaldos(){
+  $('tbSaldos').innerHTML = AD.saldos.map(s => `<tr>
+    <td><b>${esc(s.nombre)}</b></td>
+    <td class="r hm">${money(s.asignado)}</td>
+    <td class="r hm">${money(s.consumido)}</td>
+    <td class="r">${money(s.sinRendir)}<div class="muted">${s.cantSinRendir} ticket(s)</div></td>
+    <td class="r ${s.saldo < 0 ? 'neg' : 'pos'}">${money(s.saldo)}</td></tr>`).join('') || '<tr><td colspan="5" class="muted">Sin datos</td></tr>';
+}
+
+function infoSaldo(nombre){
+  const s = AD && AD.saldos.find(x => norm(x.nombre) === norm(nombre));
+  $('asSaldoInfo').innerHTML = s ? `Disponible actual: <b class="${s.saldo < 0 ? 'neg' : 'pos'}">${money(s.saldo)}</b>` : '';
+}
+
+function guardarAsig(){
+  const a = { supervisor: $('asSup').value.trim(), fecha: $('asFecha').value, monto: num($('asMonto').value), observacion: $('asObs').value.trim() };
+  if (!a.supervisor) return modal('err', 'Falta el supervisor', 'Elegí un supervisor de la lista.');
+  if (!(a.monto > 0)) return modal('err', 'Falta el monto', 'Ingresá un monto mayor a cero.');
+  const s = AD.saldos.find(x => norm(x.nombre) === norm(a.supervisor));
+  const ant = s ? s.saldo : 0;
+  confirmar('Asignar fondos', `${esc(a.supervisor)}<br>Disponible actual: ${money(ant)}<br>+ Asignación: <b>${money(a.monto)}</b><br>= Nuevo disponible: <b>${money(ant + a.monto)}</b>`, () => {
+    loader(true);
+    run('guardarAsignacion', S.token, a).then(() => {
+      $('asMonto').value = ''; $('asObs').value = '';
+      return cargarAdmin(true).then(() => { infoSaldo(a.supervisor); toast('Asignación guardada'); });
+    }).catch(e => modal('err', 'Error', esc(errMsg(e)))).finally(() => loader(false));
+  }, 'Guardar', 'verde');
+}
+
+function renderAsig(){
+  if (!AD) return;
+  const f = norm($('asFil').value);
+  const rows = AD.asignaciones.filter(a => !f || norm(a.supervisor) === f || norm(a.supervisor).includes(f));
+  $('tbAsig').innerHTML = rows.map(a => `<tr>
+    <td>${esc(a.fecha)}</td><td>${esc(a.supervisor)}</td><td class="r"><b>${money(a.monto)}</b></td>
+    <td class="hm">${esc(a.observacion)}<div class="muted">${esc(a.cargadoPor)} · ${esc(a.fechaCarga)}</div></td>
+    <td>${AD.readOnly ? '' : `<button class="btn rojo sm" onclick="borrarAsig(${a.id})">Borrar</button>`}</td></tr>`).join('') || '<tr><td colspan="5" class="muted">Sin asignaciones</td></tr>';
+}
+
+function borrarAsig(id){
+  confirmar('Borrar asignación', '¿Seguro? El saldo del supervisor se va a recalcular.', () => {
+    loader(true);
+    run('eliminarAsignacion', S.token, id).then(() => cargarAdmin(true)).then(() => toast('Asignación borrada'))
+      .catch(e => modal('err', 'Error', esc(errMsg(e)))).finally(() => loader(false));
+  }, 'Borrar', 'rojo');
+}
+
+function renderRevision(){
+  if (!AD) return;
+  const fs = norm($('rvSup').value), fe = $('rvEst').value, fp = $('rvPla').value.trim();
+  const rows = AD.tickets.filter(t => (!fs || norm(t.supervisor) === fs) && (!fe || t.estado === fe) && (!fp || String(t.planilla) === fp));
+  $('rvCant').textContent = rows.length + ' ticket(s)';
+  $('rvTot').textContent = money(rows.filter(t => t.estado !== 'Rechazado').reduce((a, t) => a + t.total, 0));
+  const ro = AD.readOnly;
+  $('rvLista').innerHTML = rows.slice(0, 200).map(t => `<div class="item" id="rv-${t.id}">
+    <div class="top"><div><b>${esc(t.supervisor)}</b> <span class="badge b-${esc(t.estado)}">${esc(t.estado)}</span>
+      ${t.planilla ? `<span class="badge b-rend">Planilla N° ${esc(t.planilla)}</span>` : '<span class="badge b-Pendiente">Sin rendir</span>'}
+      <div class="det">Cargado ${esc(t.fechaCarga)} · ID ${t.id}</div></div>
+      <div class="monto">${money(t.total)}</div></div>
+    <div class="ac"><label>Corresponde a</label><input data-f="correspondeA" value="${esc(t.correspondeA)}" ${ro ? 'disabled' : ''}></div>
+    <div class="grid3">
+      <div><label>Fecha</label><input type="date" data-f="fecha" value="${esc(t.fechaIso)}" ${ro ? 'disabled' : ''}></div>
+      <div><label>N° comprobante</label><input data-f="numero" value="${esc(t.numero)}" ${ro ? 'disabled' : ''}></div>
+      <div><label>Total con IVA</label><input data-f="total" inputmode="decimal" value="${esc(fmtNumInput(t.total))}" ${ro ? 'disabled' : ''}></div>
+    </div>
+    <div class="grid3">
+      <div><label>Proveedor</label><input data-f="proveedor" value="${esc(t.proveedor)}" ${ro ? 'disabled' : ''}></div>
+      <div><label>CUIT</label><input data-f="cuit" value="${esc(t.cuit)}" ${ro ? 'disabled' : ''}></div>
+      <div><label>Producto</label><input data-f="producto" value="${esc(t.producto)}" ${ro ? 'disabled' : ''}></div>
+    </div>
+    <div class="grid3">
+      <div><label>Litros</label><input data-f="litros" inputmode="decimal" value="${esc(fmtNumInput(t.litros))}" ${ro ? 'disabled' : ''}></div>
+      <div><label>Precio x litro</label><input data-f="precio" inputmode="decimal" value="${esc(fmtNumInput(t.precio))}" ${ro ? 'disabled' : ''}></div>
+      <div><label>Control</label><div class="muted" style="padding-top:8px">${controlLitros(t)}</div></div>
+    </div>
+    <label>Observación</label><input data-f="observacion" value="${esc(t.observacion)}" placeholder="Motivo si se observa o rechaza" ${ro ? 'disabled' : ''}>
+    <div class="fila-btn" style="margin-top:12px">
+      <button class="btn gris sm" onclick="verFoto(${t.id})">Ver foto</button>
+      ${ro ? '' : `
+      <button class="btn verde sm" onclick="guardarRev(${t.id},'Aprobado')">Aprobar</button>
+      <button class="btn naranja sm" onclick="guardarRev(${t.id},'Observado')">Observar</button>
+      <button class="btn rojo sm" onclick="guardarRev(${t.id},'Rechazado')">Rechazar</button>
+      <button class="btn sm" onclick="guardarRev(${t.id},null)">Guardar cambios</button>
+      ${!t.planilla ? `<button class="btn gris sm" onclick="borrarTk(${t.id})">Borrar</button>` : ''}`}
+    </div></div>`).join('') || '<p class="muted">No hay tickets con esos filtros.</p>';
+  if (rows.length > 200) $('rvLista').insertAdjacentHTML('beforeend', '<p class="muted">Se muestran los primeros 200. Usá los filtros.</p>');
+  if (!ro) document.querySelectorAll('#rvLista input[data-f="correspondeA"]').forEach(inp =>
+    makeAC(inp, () => [SUP_LABEL].concat(AD.objetivos), null, {estricto:true}));
+}
+
+function controlLitros(t){
+  if (!t.litros || !t.precio) return '—';
+  const calc = t.litros * t.precio;
+  const dif = Math.abs(calc - t.total) / (t.total || 1);
+  return dif < 0.02 ? '<span class="pos">Litros x precio OK</span>' : `<span class="neg">L x precio = ${money(calc)}</span>`;
+}
+
+function guardarRev(id, estado){
+  const box = $('rv-' + id);
+  const t = AD.tickets.find(x => String(x.id) === String(id));
+  const v = {};
+  box.querySelectorAll('[data-f]').forEach(i => v[i.dataset.f] = i.value.trim());
+  const c = {
+    correspondeA: v.correspondeA, fecha: v.fecha, numero: v.numero, proveedor: v.proveedor, cuit: v.cuit, producto: v.producto,
+    litros: v.litros === '' ? '' : num(v.litros), precio: v.precio === '' ? '' : num(v.precio), total: num(v.total),
+    observacion: v.observacion, estado: estado || t.estado
+  };
+  if ((c.estado === 'Observado' || c.estado === 'Rechazado') && !c.observacion){
+    return modal('err', 'Falta el motivo', 'Escribí en Observación por qué se ' + (c.estado === 'Observado' ? 'observa' : 'rechaza') + ' el ticket.');
+  }
+  loader(true);
+  run('actualizarTicket', S.token, id, c).then(() => cargarAdmin(true)).then(() => {
+    toast('Ticket ' + (estado ? estado.toLowerCase() : 'actualizado'));
+    if (t.planilla) toast('Ticket actualizado. Si cambió algo de la planilla N° ' + t.planilla + ', regenerala en Rendiciones.');
+  }).catch(e => modal('err', 'Error', esc(errMsg(e)))).finally(() => loader(false));
+}
+
+function renderRend(){
+  const ro = AD.readOnly;
+  $('tbRend').innerHTML = AD.rendiciones.map(r => `<tr>
+    <td><b>${esc(r.nro)}</b></td><td>${esc(r.fecha)}</td><td>${esc(r.supervisor)}</td>
+    <td class="r hm">${r.cant}</td><td class="r"><b>${money(r.total)}</b></td>
+    <td>${ro ? esc(r.estado) : `<select onchange="estadoRend(${r.nro}, this.value)" style="min-width:150px">
+      ${['Enviada','Revisada','Enviada a Finanzas'].map(e => `<option ${e === r.estado ? 'selected' : ''}>${e}</option>`).join('')}</select>`}</td>
+    <td><div class="fila-btn">
+      ${r.pdf ? `<a class="btn sm" href="${esc(r.pdf)}" target="_blank">PDF</a>` : ''}
+      ${r.excel ? `<a class="btn verde sm" href="${esc(r.excel)}" target="_blank">Excel</a>` : ''}
+      <button class="btn gris sm" onclick="verTicketsRend(${r.nro})">Tickets</button>
+      ${ro ? '' : `<button class="btn naranja sm" onclick="regenerar(${r.nro})">Regenerar</button>`}
+    </div></td></tr>`).join('') || '<tr><td colspan="7" class="muted">Todavía no hay rendiciones.</td></tr>';
+}
+
+function verTicketsRend(nro){
+  $('rvSup').value = ''; $('rvEst').value = ''; $('rvPla').value = nro;
+  go('revision');
+}
+
+function estadoRend(nro, estado){
+  loader(true);
+  run('cambiarEstadoRendicion', S.token, nro, estado).then(() => cargarAdmin(true)).then(() => toast('Rendición N° ' + nro + ': ' + estado))
+    .catch(e => modal('err', 'Error', esc(errMsg(e)))).finally(() => loader(false));
+}
+
+function regenerar(nro){
+  modal('warn', 'Regenerar rendición N° ' + nro, 'Se vuelven a armar el Excel y el PDF con los datos corregidos (sin los tickets rechazados).<br>¿Querés reenviar el PDF por mail?', [
+    {txt:'Cancelar', cls:'gris'},
+    {txt:'Regenerar sin mail', fn: () => regenerarOk(nro, false)},
+    {txt:'Regenerar y enviar', cls:'verde', fn: () => regenerarOk(nro, true)}
+  ]);
+}
+function regenerarOk(nro, mail){
+  loader(true);
+  run('regenerarRendicion', S.token, nro, mail).then(r => cargarAdmin(true).then(() =>
+    modal('ok', 'Rendición regenerada', `Total: <b>${money(r.total)}</b><br><a href="${esc(r.pdfUrl)}" target="_blank">Abrir PDF</a> · <a href="${esc(r.excelUrl)}" target="_blank">Abrir Excel</a>`)))
+    .catch(e => modal('err', 'Error', esc(errMsg(e)))).finally(() => loader(false));
+}
+</script>
+</body>
+</html>
