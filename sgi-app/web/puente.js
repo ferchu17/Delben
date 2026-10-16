@@ -10,19 +10,42 @@
     try { u = localStorage.getItem(CLAVE) || ''; } catch (e) { }
     return String(window.NOVEDADES_BACKEND || u || '').trim();
   }
+  // v2: el SGI pide muchas hojas a la vez al abrir. Apps Script corta si llegan demasiadas juntas
+  // ("too many simultaneous invocations") y esa hoja quedaba vacía. Ahora se mandan de a pocas (en cola)
+  // y, si el servidor rechaza por exceso o falla la red, se reintenta solo.
+  var MAX_JUNTAS = 6, enCurso = 0, cola = [];
+  function siguiente() {
+    while (enCurso < MAX_JUNTAS && cola.length) { var t = cola.shift(); enCurso++; t(); }
+  }
+  function reintentable(msg) {
+    return /too many|simult|demasiad|invoked|l[ií]mite|quota|cuota|timed? ?out|tiempo|429|50[0-9]|HTTP 0|Failed to fetch|NetworkError|Load failed|no v[aá]lida|temporar|unavailable|Service/i.test(String(msg || ''));
+  }
   function llamar(fn, args, ok, mal, obj) {
     var url = backend();
     if (!url) { var e0 = new Error('Falta configurar la dirección del servidor (Apps Script).'); if (mal) mal(e0, obj); pedirServidor(); return; }
-    fetch(url, { method: 'POST', redirect: 'follow', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify({ fn: fn, args: args || [] }) })
-      .then(function (r) {
-        return r.text().then(function (t) {
-          var p; try { p = JSON.parse(t); } catch (e) { throw new Error(/<html/i.test(t) ? 'El servidor pidió iniciar sesión en Google: la implementación de Apps Script tiene que estar con acceso "Cualquier persona".' : 'Respuesta no válida del servidor.'); }
-          if (!p || p.ok !== true) throw new Error((p && p.error) || ('HTTP ' + r.status));
-          return p.result;
+    var intento = 0;
+    function uno() {
+      fetch(url, { method: 'POST', redirect: 'follow', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify({ fn: fn, args: args || [] }) })
+        .then(function (r) {
+          return r.text().then(function (t) {
+            var p; try { p = JSON.parse(t); } catch (e) { throw new Error(/<html/i.test(t) && /accounts\.google|ServiceLogin|signin/i.test(t) ? 'El servidor pidió iniciar sesión en Google: la implementación de Apps Script tiene que estar con acceso "Cualquier persona".' : 'Respuesta no válida del servidor (HTTP ' + r.status + ').'); }
+            if (!p || p.ok !== true) throw new Error((p && p.error) || ('HTTP ' + r.status));
+            return p.result;
+          });
+        })
+        .then(function (res) { enCurso--; siguiente(); if (ok) ok(res, obj); })
+        .catch(function (err) {
+          var msg = (err && err.message) || err;
+          if (intento < 4 && reintentable(msg) && !/iniciar sesión/.test(msg)) {
+            intento++;
+            setTimeout(uno, 700 * intento + Math.random() * 500); // sigue ocupando su lugar en la cola
+            return;
+          }
+          enCurso--; siguiente();
+          if (mal) mal(err, obj); else console.error('Servidor ' + fn, err);
         });
-      })
-      .then(function (res) { if (ok) ok(res, obj); })
-      .catch(function (err) { if (mal) mal(err, obj); else console.error('Novedades ' + fn, err); });
+    }
+    cola.push(uno); siguiente();
   }
   function runner(ok, mal, obj) {
     var base = {
