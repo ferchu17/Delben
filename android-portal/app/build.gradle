@@ -9,11 +9,7 @@ android {
         targetSdk 34
         versionCode Integer.parseInt(System.getenv('VERSION_CODE') ?: '1')
         versionName '1.0.' + (System.getenv('VERSION_CODE') ?: '1')
-        // Dirección de la app (GitHub Pages)
-        manifestPlaceholders = [
-            hostName: 'ferchu17.github.io',
-            defaultUrl: 'https://ferchu17.github.io/Delben/portal/'
-        ]
+        // La dirección del portal está en MainActivity.java (INICIO)
     }
     signingConfigs {
         release {
@@ -29,6 +25,3 @@ android {
     compileOptions { sourceCompatibility JavaVersion.VERSION_17; targetCompatibility JavaVersion.VERSION_17 }
 }
 
-dependencies {
-    implementation 'com.google.androidbrowserhelper:androidbrowserhelper:2.5.0'
-}
