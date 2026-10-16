@@ -835,7 +835,6 @@ var _PMAP = {
   "Solicitud de Indumentaria::Saltan Leer":        {tab:"tab-ind-saltan",      screen:"screen-indum",      group:"tabs-indum"},
   "Solicitud de Indumentaria::Próxima Entrega":    {tab:"tab-ind-proxima",     screen:"screen-indum",      group:"tabs-indum"},
   "Solicitud de Indumentaria::Curvas":             {tab:"tab-ind-curvas",      screen:"screen-indum",      group:"tabs-indum"},
-  "Control de Móviles::Nuevo Control":             {tab:"tab-mov-nuevo",       screen:"screen-moviles",    group:"tabs-moviles"},
   "Control de Móviles::Combustible":               {tab:"tab-combustible",     screen:"screen-moviles",    group:"tabs-moviles"},
   "Control de Móviles::Carro Eléctrico":           {tab:"tab-carroelectrico",  screen:"screen-moviles",    group:"tabs-moviles"},
   "Control de Móviles::Bicicletas":                {tab:"tab-bicicleta",       screen:"screen-moviles",    group:"tabs-moviles"}
@@ -1224,6 +1223,7 @@ el.classList.add('active');
 setTimeout(function(){
 try{refreshScreen(screen,true);}catch(e){if(typeof _showErr==='function')_showErr(screen,e);}
 try{applyReadonly(screen);}catch(e){}
+if(screen==='moviles'){try{var gm=document.getElementById('tabs-moviles'),am=gm&&gm.querySelector('.tab.active');if(gm&&(!am||!am.offsetParent)){var fm=[].filter.call(gm.querySelectorAll('.tab'),function(t){return t.offsetParent;})[0];if(fm)fm.click();}}catch(e){}}
 var _elapsed=Date.now()-_goStart;
 setTimeout(hideLoading,Math.max(0,300-_elapsed));
 },0);
