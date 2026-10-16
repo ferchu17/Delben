@@ -126,6 +126,7 @@
     rec = null; recBtn = null; recInput = null;
   }
   function stopRec() {
+    $$(".mic.rec").forEach((b) => { b.classList.remove("rec"); const sp = $("span", b); if (sp) sp.textContent = "Hablar"; });
     if (rec) { const r = rec; rec = null; try { r.onend = null; r.stop(); } catch (e) {} }
     micApagar(); $$(".mic-state").forEach((s) => (s.textContent = ""));
   }
@@ -155,7 +156,14 @@
     // 1) Pedir permiso de micrófono de forma explícita (en apps instaladas es lo que dispara el permiso de Android).
     btn.classList.add("rec"); nota("Pidiendo acceso al micrófono…");
     if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
-      try { const st = await navigator.mediaDevices.getUserMedia({ audio: true }); st.getTracks().forEach((t) => t.stop()); await new Promise((r) => setTimeout(r, 250)); }
+      try {
+        // En apps instaladas el pedido de permiso puede quedar colgado: se espera 3 s y se sigue igual.
+        const pedido = navigator.mediaDevices.getUserMedia({ audio: true });
+        const colgado = Symbol("colgado");
+        const st = await Promise.race([pedido, new Promise((r) => setTimeout(() => r(colgado), 3000))]);
+        if (st === colgado) { pedido.then((x) => x.getTracks().forEach((t) => t.stop())).catch(() => {}); nota("El permiso no responde en esta app; probando el dictado igual…"); }
+        else { st.getTracks().forEach((t) => t.stop()); await new Promise((r) => setTimeout(r, 250)); }
+      }
       catch (e) {
         btn.classList.remove("rec");
         const m = (e && e.name === "NotFoundError") ? "No se encontró un micrófono." : "Esta pantalla no tiene permiso para usar el micrófono. Habilitalo en Ajustes › Aplicaciones › (esta app o Chrome) › Permisos › Micrófono. Mientras tanto usá el 🎤 del teclado.";
@@ -167,11 +175,15 @@
     const idiomas = ["es-AR", "es-419", "es-ES"]; let li = 0, vacios = 0, frases = 0, ultimo = "iniciando", fatal = false;
     let base = target.value;
     const r = new SR(); r.lang = idiomas[li]; r.continuous = false; r.interimResults = true; r.maxAlternatives = 1;
-    const diag = () => nota("🔴 Escuchando (" + r.lang + ")… frases: " + frases + " · " + ultimo);
-    r.onaudiostart = () => { ultimo = "micrófono activo"; diag(); };
-    r.onspeechstart = () => { vacios = 0; ultimo = "te oigo"; diag(); };
-    r.onnomatch = () => { ultimo = "no entendí, repetí"; diag(); };
+    let eventos = 0;
+    const perro = setTimeout(() => { if (rec === r && eventos === 0) { fatal = true; try { r.abort(); } catch (e) {} micApagar(); nota("El dictado integrado no responde en esta app (no llegó ningún evento). Tocá el campo y usá el 🎤 del teclado del celular."); toast("El dictado integrado no responde en esta app. Usá el 🎤 del teclado.", true); } }, 8000);
+    const diag = () => { nota("🔴 Escuchando (" + r.lang + ")… frases: " + frases + " · " + ultimo); };
+    r.onaudiostart = () => { eventos++; ultimo = "micrófono activo"; diag(); };
+    r.onspeechstart = () => { eventos++; vacios = 0; ultimo = "te oigo"; diag(); };
+    r.onstart = () => { eventos++; };
+    r.onnomatch = () => { eventos++; ultimo = "no entendí, repetí"; diag(); };
     r.onresult = (ev) => {
+      eventos++;
       let fin = "", parcial = "";
       for (let i = ev.resultIndex; i < ev.results.length; i++) { const t = ev.results[i][0].transcript; if (ev.results[i].isFinal) fin += t; else parcial += t; }
       vacios = 0;
@@ -183,6 +195,7 @@
       diag();
     };
     r.onerror = (e) => {
+      eventos++;
       const messages = {
         "not-allowed": "Permiso de micrófono denegado. Habilitalo en Ajustes › Aplicaciones › Permisos › Micrófono.",
         "service-not-allowed": "El servicio de reconocimiento de voz está bloqueado o desactivado en este celular (revisá Ajustes › Aplicaciones › Google › Permisos). Usá el 🎤 del teclado.",
@@ -195,6 +208,7 @@
       fatal = true; nota(messages[e.error] || ("Error de micrófono: " + e.error)); toast(messages[e.error] || ("Error de micrófono: " + e.error), true);
     };
     r.onend = () => {
+      eventos++; clearTimeout(perro);
       if (rec !== r) return;
       if (!fatal) {
         if (vacios >= 3 && li < idiomas.length - 1 && frases === 0) { li++; r.lang = idiomas[li]; vacios = 0; }       // otra variante de español
