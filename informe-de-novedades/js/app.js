@@ -7,7 +7,7 @@
   const $$ = (s, r) => Array.from((r || document).querySelectorAll(s));
   const DEMO = !CFG.API_URL;
 
-  const S = { usuarios: [], quienesRetiran: [], objetivos: [], para: [], cc: [], fotos: [null, null, null, null], pdfCache: {} };
+  const S = { usuarios: [], quienesRetiran: [], personal: [], objetivos: [], para: [], cc: [], fotos: [null, null, null, null], pdfCache: {} };
 
   /* ---------------- utilidades ---------------- */
   const norm = (s) => String(s || "").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").trim();
@@ -91,7 +91,7 @@
   async function demo(action, p) {
     await new Promise((r) => setTimeout(r, 350));
     const pad = (n) => String(n).padStart(4, "0");
-    if (action === "listas") return { ok: true, usuarios: DEMO_DB.users, quienRetira: DEMO_DB.personal, objetivos: DEMO_DB.objetivos, siguiente: pad(DEMO_DB.next), errores: [] };
+    if (action === "listas") return { ok: true, usuarios: DEMO_DB.users, quienRetira: DEMO_DB.personal, personal: DEMO_DB.personal, objetivos: DEMO_DB.objetivos, siguiente: pad(DEMO_DB.next), errores: [] };
     if (action === "reservar") {
       const d = p.data, it = { id: DEMO_DB.next, numero: pad(DEMO_DB.next), fecha: d.fecha, de: d.de, para: d.para.join("; "), asunto: d.asunto, objetivo: d.objetivo, informe: d.informe, medidas: d.medidas, link: "" };
       DEMO_DB.items.push(it); DEMO_DB.next++; return { ok: true, id: it.id, numero: it.numero };
@@ -266,7 +266,19 @@
   /* ---------- personal mencionado en el texto ---------- */
   const tokensNombre = (p) => norm(p.nombre).split(/[^a-zñ]+/).filter(Boolean);
   const detallePersonal = (p) => [p.empresa ? "Empresa: " + p.empresa : "", p.legajo ? "Legajo: " + p.legajo : ""].filter(Boolean).join(" – ");
-  const textoPersonal = (p) => p.nombre + (detallePersonal(p) ? " (" + detallePersonal(p) + ")" : "");
+  // Así queda en el informe: "PEREZ DANIEL, legajo 20, empresa PPQ".
+  const textoPersonal = (p) => p.nombre + (p.legajo ? ", legajo " + p.legajo : "") + (p.empresa ? ", empresa " + p.empresa : "");
+  // Apellido = primera palabra del nombre (SGI guarda "APELLIDO NOMBRE"); "SAN MARTIN", "DEL VALLE", etc. también por la segunda.
+  const PARTICULAS = new Set(["de", "del", "la", "las", "los", "san", "santa", "da", "di", "van", "von", "mc"]);
+  function apellidos(p) {
+    const t = tokensNombre(p); if (!t.length) return [];
+    return PARTICULAS.has(t[0]) && t[1] ? [t[0] + " " + t[1], t[1]] : [t[0]];
+  }
+  const personalPorApellido = (q) => S.personal.filter((p) => apellidos(p).includes(q));
+  // Para no confundir palabras comunes ("puerta", "campo") con apellidos: se pregunta solo si la palabra
+  // empieza con mayúscula o viene después de "vigilador", "personal", "señor", "agente", etc.
+  const ANTES_DE_NOMBRE = /(vigilador|vigiladora|vigiladores|personal|señor|señora|sr|sra|agente|guardia|compañero|compañera|empleado|empleada|supervisor|supervisora|encargado|encargada|operador|operadora)\.?\s+$/i;
+  const pareceNombre = (texto, ini) => /^\p{Lu}/u.test(texto.slice(ini)) || ANTES_DE_NOMBRE.test(texto.slice(Math.max(0, ini - 25), ini));
 
   function cajaPersonal(campo) {
     let box = document.getElementById("sug-" + campo.id);
@@ -280,14 +292,15 @@
 
   // Muestra al personal que coincide con la palabra [ini, fin) del campo.
   function ofrecerPersonal(campo, ini, fin) {
-    const box = cajaPersonal(campo), pers = S.quienesRetiran;
+    const box = cajaPersonal(campo), pers = S.personal;
     const palabra = campo.value.slice(ini, fin), q = norm(palabra);
     if (!pers.length || q.length < 3) return ocultarPersonal(campo);
     const cap = /^\p{Lu}/u.test(palabra);
+    if (!pareceNombre(campo.value, ini)) return ocultarPersonal(campo);
     // Palabra completa igual a un apellido/nombre (4+ letras) o, si empieza con mayúscula, prefijo.
-    const coinc = pers.filter((p) => tokensNombre(p).some((t) => (q.length >= 4 && t === q) || (cap && t.startsWith(q)))).slice(0, 8);
+    const coinc = pers.filter((p) => apellidos(p).some((t) => (t === q) || (cap && q.length >= 4 && t.startsWith(q)))).slice(0, 30);
     if (!coinc.length) return ocultarPersonal(campo);
-    box.innerHTML = '<div class="sug-head"><span>👤 ¿De quién hablás? Tocá a la persona</span><button type="button" data-no="1">Ninguno</button></div>' +
+    box.innerHTML = '<div class="sug-head"><span>👤 ¿Qué ' + esc(palabra.toUpperCase()) + ' es? Tocá a la persona</span><button type="button" data-no="1">Ninguno</button></div>' +
       coinc.map((p, i) => '<button type="button" role="option" class="suggestion" data-i="' + i + '"><strong>' + esc(p.nombre) + '</strong>' + (detallePersonal(p) ? "<small>" + esc(detallePersonal(p)) + "</small>" : "") + "</button>").join("");
     box.hidden = false;
     const elegir = (e) => {
@@ -310,8 +323,8 @@
   }
   // Al dictar: busca en la frase recién dicha un apellido del personal.
   function personalEnDictado(campo, frase) {
-    const pals = String(frase).match(/[\p{L}'’-]{4,}/gu) || [];
-    const set = new Set(); S.quienesRetiran.forEach((p) => tokensNombre(p).forEach((t) => { if (t.length >= 4) set.add(t); }));
+    const pals = String(frase).match(/[\p{L}'’-]{3,}/gu) || [];
+    const set = new Set(); S.personal.forEach((p) => apellidos(p).forEach((t) => { if (t.length >= 3) set.add(t); }));
     const hallada = pals.find((w) => set.has(norm(w)));
     if (!hallada) return;
     const v = campo.value, i = v.toLowerCase().lastIndexOf(hallada.toLowerCase());
@@ -324,7 +337,7 @@
     const inp = $("#bpIn"), list = $("#bpList");
     const pintar = () => {
       const tk = norm(inp.value).split(/\s+/).filter(Boolean);
-      const r = tk.length ? S.quienesRetiran.filter((p) => tk.every((t) => norm(p.nombre).includes(t))).slice(0, 12) : [];
+      const r = tk.length ? S.personal.filter((p) => tk.every((t) => norm(p.nombre).includes(t))).slice(0, 30) : [];
       list.innerHTML = r.length ? r.map((p, i) => '<button type="button" class="suggestion" data-i="' + i + '"><strong>' + esc(p.nombre) + "</strong>" + (detallePersonal(p) ? "<small>" + esc(detallePersonal(p)) + "</small>" : "") + "</button>").join("") : (tk.length ? '<div class="suggestion-empty">No hay coincidencias.</div>' : "");
       list.onclick = (e) => {
         const b = e.target.closest(".suggestion[data-i]"); if (!b) return; const p = r[+b.dataset.i]; if (!p) return;
@@ -334,6 +347,43 @@
       };
     };
     inp.addEventListener("input", pintar); inp.focus();
+  }
+
+  // Corrector: antes de revisar la ortografía, por cada apellido del personal que aparece en el texto
+  // (y que todavía no tiene legajo) pregunta qué persona es y lo reemplaza por "APELLIDO NOMBRE, legajo N, empresa X".
+  function elegirPersonalDelTexto(id, despues) {
+    const campo = $("#" + id); if (!campo || !S.personal.length) return despues();
+    const ignorados = new Set();
+    const siguiente = () => {
+      const v = campo.value, re = /[\p{L}'’]{3,}/gu; let m, hallado = null;
+      while ((m = re.exec(v))) {
+        const w = m[0], q = norm(w), ini = m.index, fin = ini + w.length;
+        if (ignorados.has(ini + "|" + q)) continue;
+        if (!pareceNombre(v, ini)) continue;
+        // ya completado: el nombre en mayúsculas va seguido de ", legajo"
+        if (/^[\p{Lu}'’.\s-]{0,60},\s*legajo\s/u.test(v.slice(ini))) continue;
+        let cand = personalPorApellido(q), ini2 = ini;
+        const prev = v.slice(0, ini).match(/([\p{L}]+)\s+$/u);          // "San Martin", "Del Valle"
+        if (prev && PARTICULAS.has(norm(prev[1]))) { const c2 = personalPorApellido(norm(prev[1]) + " " + q); if (c2.length) { cand = c2; ini2 = ini - prev[0].length; } }
+        if (cand.length) { hallado = { ini: ini2, fin, palabra: v.slice(ini2, fin), cand, clave: ini + "|" + q }; break; }
+      }
+      if (!hallado) { closeModal(); return despues(); }
+      const h = hallado;
+      openModal('<h2 style="margin:0 0 4px;color:var(--green-d)">👤 ¿Qué ' + esc(h.palabra.toUpperCase()) + ' es?</h2>' +
+        '<p class="hint">Tocá a la persona. En el informe queda con legajo y empresa.</p>' +
+        '<div class="suggestions" style="position:static;border:0;box-shadow:none;max-height:55vh">' +
+        h.cand.slice(0, 40).map((p, i) => '<button type="button" class="suggestion" data-i="' + i + '"><strong>' + esc(p.nombre) + '</strong><small>' + esc(detallePersonal(p)) + '</small></button>').join("") +
+        '</div><div style="display:flex;gap:8px;margin-top:10px"><button type="button" class="btn ghost" id="epNo">No es del personal</button><button type="button" class="btn ghost" id="epFin">Seguir con la ortografía</button></div>');
+      $$("#modalBody .suggestion[data-i]").forEach((b) => (b.onclick = () => {
+        const p = h.cand[+b.dataset.i], t = textoPersonal(p), val = campo.value;
+        campo.value = val.slice(0, h.ini) + t + val.slice(h.fin);
+        campo.dispatchEvent(new Event("input", { bubbles: true }));
+        siguiente();
+      }));
+      $("#epNo").onclick = () => { ignorados.add(h.clave); siguiente(); };
+      $("#epFin").onclick = () => { closeModal(); despues(); };
+    };
+    siguiente();
   }
 
   /* ---------------- destinatarios (chips) ---------------- */
@@ -537,8 +587,9 @@
     S.usuarios = Array.isArray(r.usuarios) ? r.usuarios : [];
     S.quienesRetiran = Array.isArray(r.quienesRetiran || r.quienRetira) ? (r.quienesRetiran || r.quienRetira) : [];
     S.objetivos = Array.isArray(r.objetivos) ? r.objetivos : [];
+    S.personal = Array.isArray(r.personal) ? r.personal : [];
     $("#numInforme").textContent = r.siguiente || "—";
-    Corrector.setConocidos(S.quienesRetiran.map((p) => p.nombre).concat(S.objetivos.map((o) => o.nombre)));
+    Corrector.setConocidos(S.quienesRetiran.map((p) => p.nombre).concat(S.personal.map((p) => p.nombre), S.objetivos.map((o) => o.nombre)));
     if (Array.isArray(r.errores) && r.errores.length) toast("Aviso del servidor: " + r.errores.join(" | "), true);
     const listaObjetivos = $("#dl-objetivos");
     if (listaObjetivos) listaObjetivos.innerHTML = S.objetivos.map((o) => `<option value="${esc(o.nombre)}">`).join("");
@@ -677,7 +728,7 @@
     $("#de").addEventListener("focus", mostrarSugerenciasDe);
     $("#de").addEventListener("change", () => { mostrarSugerenciasDe(); renderChips("cc"); });
     Corrector.init({ toast });
-    $$(".spell-btn").forEach((b) => b.addEventListener("click", () => Corrector.abrir(b.dataset.target)));
+    $$(".spell-btn").forEach((b) => b.addEventListener("click", () => elegirPersonalDelTexto(b.dataset.target, () => Corrector.abrir(b.dataset.target))));
     $("#fileInput").onchange = (e) => { onFiles(e.target.files); e.target.value = ""; };
     $("#cameraInput").onchange = (e) => { onFiles(e.target.files); e.target.value = ""; };
     $("#masFotos").onclick = () => { S.fotos.push(null, null, null, null); renderFotos(); toast("Se agregaron 4 recuadros más"); };

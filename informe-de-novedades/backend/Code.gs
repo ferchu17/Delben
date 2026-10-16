@@ -10,6 +10,7 @@ const CONFIG = {
   HOJA_USUARIOS:  'Usuarios y contraseñas',
   HOJA_quienRetira: 'quienRetira',
   HOJA_OBJETIVOS: 'objetivos',
+  HOJA_PERSONAL:  'personal',      // listado de personal de Stock Manager (legajo | nombre | empresa | estado)
 
   // Se identifican por el gid de la URL (…/edit?gid=XXXX), así no importa cómo se llame la pestaña.
   USUARIOS_GID:  310678371,    // encabezados: id | nombre | usuario | password | rol | correo
@@ -102,6 +103,7 @@ function listas_() {
   intentar('usuarios',    leerUsuarios_,    []);
   intentar('quienRetira', leerquienRetir_,  []);
   intentar('objetivos',   leerObjetivos_,   []);
+  intentar('personal',    leerPersonal_,    []);
   intentar('siguiente',   siguienteNumero_, '0001');
   return out;
 }
@@ -164,6 +166,34 @@ function leerUsuarios_() {
     if (!nombre || seen[norm_(nombre)]) return;
     seen[norm_(nombre)] = 1;
     out.push({ nombre: nombre, email: iMail >= 0 ? String(r[iMail] || '').trim() : '' });
+  });
+  return out.sort((a, b) => a.nombre.localeCompare(b.nombre, 'es'));
+}
+
+// Personal (vigiladores) para mencionar en el texto: pestaña "personal" de Stock Manager.
+// Devuelve { nombre, legajo, empresa } solo del personal activo (sin bajas).
+const EMPRESAS_SIGLA_ = {
+  'P.P.Q. SA': 'PPQ',
+  'KONTROL DEFENSA ELECTRONICA S.A.': 'KDE',
+  'L E GUYET SERVICIOS DE SEGURIDAD S.R.L.': 'LE GUYET',
+  'LEG': 'LEG'
+};
+function leerPersonal_() {
+  const sh = ss_().getSheets().find(h => norm_(h.getName()) === norm_(CONFIG.HOJA_PERSONAL));
+  if (!sh) throw new Error('No se encontró la pestaña "' + CONFIG.HOJA_PERSONAL + '" en la planilla.');
+  const vals = sh.getDataRange().getDisplayValues();
+  if (vals.length < 2) return [];
+  const enc = vals[0].map(norm_);
+  const cL = enc.indexOf('legajo'), cN = enc.indexOf('nombre'), cE = enc.indexOf('empresa'), cS = enc.indexOf('estado');
+  if (cL < 0 || cN < 0) throw new Error('La pestaña personal no tiene las columnas "legajo" y "nombre".');
+  const out = [];
+  vals.slice(1).forEach(f => {
+    const nombre = String(f[cN] || '').replace(/\s+/g, ' ').trim().toUpperCase();
+    const legajo = String(f[cL] || '').trim();
+    if (!nombre || !legajo) return;
+    if (cS >= 0 && norm_(f[cS]) === 'baja') return;
+    const emp = cE >= 0 ? String(f[cE] || '').trim() : '';
+    out.push({ nombre: nombre, legajo: legajo, empresa: EMPRESAS_SIGLA_[emp] || emp });
   });
   return out.sort((a, b) => a.nombre.localeCompare(b.nombre, 'es'));
 }
@@ -447,6 +477,7 @@ function probarListas() {
     usuarios: leerUsuarios_().slice(0, 5),
     quienRetira: leerquienRetir_().slice(0, 5),
     objetivos: leerObjetivos_().slice(0, 5),
+    personal: leerPersonal_().slice(0, 5),
     siguiente: siguienteNumero_()
   }, null, 2));
 }
@@ -454,7 +485,7 @@ function probarListas() {
 // Ejecutala una vez desde el editor: pide el permiso de "Enviar correo" y te manda un mail de prueba a vos.
 // Después hay que publicar una VERSIÓN NUEVA de la implementación para que la app tome el permiso.
 function probarCorreo() {
-  const yo = Session.getEffectiveUser().getEmail();
-  MailApp.sendEmail({ to: yo, name: CONFIG.REMITENTE, subject: 'Prueba Informe de Novedades', htmlBody: 'Si te llegó este correo, el envío funciona.' });
-  Logger.log('Correo de prueba enviado a ' + yo + ' · cupo restante hoy: ' + MailApp.getRemainingDailyQuota());
+  const para = 'fjacyno@ktl-seguridad.com';   // a quién llega la prueba
+  MailApp.sendEmail({ to: para, name: CONFIG.REMITENTE, subject: 'Prueba Informe de Novedades', htmlBody: 'Si te llegó este correo, el envío funciona.' });
+  Logger.log('Correo de prueba enviado a ' + para + ' · cupo restante hoy: ' + MailApp.getRemainingDailyQuota());
 }
