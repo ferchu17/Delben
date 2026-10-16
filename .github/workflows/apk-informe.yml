@@ -1,0 +1,38 @@
+name: APK Informe de Novedades
+
+# Arma la APK de Informe de Novedades (abre la página con el motor de Chrome, así anda el micrófono)
+# y la publica siempre en el mismo link:
+# https://github.com/ferchu17/Delben/releases/download/informe-novedades-apk/InformeNovedades.apk
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths: ["android-informe/**", ".github/workflows/apk-informe.yml"]
+
+permissions:
+  contents: write
+
+jobs:
+  apk:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with: { distribution: temurin, java-version: "17" }
+      - uses: android-actions/setup-android@v3
+      - uses: gradle/actions/setup-gradle@v4
+        with: { gradle-version: "8.7" }
+      - name: Compilar APK
+        env: { VERSION_CODE: "${{ github.run_number }}" }
+        run: gradle -p android-informe :app:assembleRelease --no-daemon --stacktrace
+      - name: Renombrar
+        run: cp android-informe/app/build/outputs/apk/release/app-release.apk InformeNovedades.apk
+      - uses: actions/upload-artifact@v4
+        with: { name: InformeNovedades-apk, path: InformeNovedades.apk }
+      - name: Publicar en el link fijo
+        env: { GH_TOKEN: "${{ github.token }}" }
+        run: |
+          gh release view informe-novedades-apk >/dev/null 2>&1 || \
+            gh release create informe-novedades-apk --title "Informe de Novedades (APK)" \
+              --notes "App de Android de Informe de Novedades. Descargar InformeNovedades.apk e instalar."
+          gh release upload informe-novedades-apk InformeNovedades.apk --clobber
