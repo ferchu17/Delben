@@ -188,9 +188,11 @@
       : "Este navegador no tiene dictado de voz. Usá Google Chrome actualizado. " + ABRIR_EN_CHROME, true);
 
     const r = new SR(); r.lang = "es-AR"; r.continuous = true; r.interimResults = true; r.maxAlternatives = 1;
-    const base = target.value ? target.value.replace(/\s+$/, "") + " " : "";
-    // El navegador vuelve a entregar resultados anteriores en cada evento: se guardan por índice.
-    const segmentos = [];
+    // Android corta el reconocimiento después de cada frase: la app lo vuelve a arrancar sola
+    // y sigue escuchando hasta que se toca otra vez el botón.
+    let base = "", segmentos = [];
+    const nuevaTanda = () => { base = target.value ? target.value.replace(/\s+$/, "") + " " : ""; segmentos = []; };
+    nuevaTanda();
     let eventos = 0, huboTexto = false, fallo = false;
     const vivo = () => { eventos++; };
     r.onstart = () => { vivo(); delete btn.dataset.reintento; nota("🔴 Escuchando… hablá ahora (tocá el botón para terminar)"); };
@@ -205,7 +207,10 @@
       nota("🔴 Escuchando… texto recibido");
     };
     r.onerror = (e) => {
-      vivo(); fallo = true;
+      vivo();
+      if (e.error === "no-speech" || e.error === "aborted") return;           // silencio: sigue escuchando
+      if (e.error === "network" && eventos > 3) return;                       // corte momentáneo: reintenta solo
+      fallo = true;
       const messages = {
         "not-allowed": "El micrófono está bloqueado para esta página. En Chrome: tocá el candado 🔒 al lado de la dirección › Permisos › Micrófono › Permitir. Si usás el ícono instalado: Ajustes del celular › Aplicaciones › Chrome › Permisos › Micrófono › Permitir.",
         "service-not-allowed": ES_WEBVIEW ? "Esta app instalada no permite el dictado de voz. " + ABRIR_EN_CHROME : "El servicio de voz de Google está desactivado. Ajustes › Aplicaciones › Google › Permisos › Micrófono › Permitir, y que la app Google esté actualizada.",
@@ -220,6 +225,11 @@
     r.onend = () => {
       vivo(); clearTimeout(perro);
       if (rec !== r) return;
+      if (!fallo) {                                                         // terminó una frase: seguir escuchando
+        nota("🔴 Escuchando… (tocá el botón para terminar)");
+        setTimeout(() => { if (rec !== r) return; nuevaTanda(); try { r.start(); } catch (e) { setTimeout(() => { if (rec === r) { try { r.start(); } catch (e2) {} } }, 400); } }, 150);
+        return;
+      }
       rec = null;
       if (recBtn) { recBtn.classList.remove("rec"); const sp = $("span", recBtn); if (sp) sp.textContent = "Hablar"; }
       recBtn = null;
