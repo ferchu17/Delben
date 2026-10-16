@@ -14,7 +14,16 @@
   const SALTAR = /^(STYLE|REDUNDANCY|TYPOGRAPHY|PLAIN_ENGLISH|WIKIPEDIA|COLLOQUIALISMS|PUNCTUATION_PARAGRAPH_END)$/;
 
   let toast = (m) => console.log(m);
-  let propio = new Set();
+  let alAgregar = null;                // avisa al servidor: la palabra queda para todos los supervisores
+  // Palabras del trabajo de seguridad y del habla argentina que el corrector no tiene que marcar.
+  const BASE = ("vigilador vigiladora vigiladores vigiladoras legajo legajos garita garitas rondin rondín rondines " +
+    "relevo relevos relevar relevó franco francos franquero franqueros presentismo cobertura coberturas refuerzo refuerzos " +
+    "reten retén retenes encargado encargada supervisor supervisora monitoreo monitorista handy handys borrador " +
+    "novedad novedades objetivo objetivos puesto puestos portería porteria recorrida recorridas ronda rondas " +
+    "celular whatsapp mail mails email patrullero patrulla comisaría comisaria denuncia " +
+    "ingresó egresó ingresante egresante acta actas libro libros minuta minutas planilla planillas " +
+    "laburo laburar remis remís colectivo boliche quilombo pibe pibes changarín bondi").split(/\s+/);
+  let propio = new Set(BASE.map((w) => String(w).toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "")));
   try { JSON.parse(localStorage.getItem(KEY) || "[]").forEach((w) => propio.add(w)); } catch (e) {}
   let conocidos = new Set();          // apellidos y nombres de las listas: no se marcan
   let idioma = "es-AR";
@@ -165,7 +174,7 @@
       '<div class="cs-msg">' + esc(e.msg || (e.typo ? "Palabra mal escrita" : "Revisá esta parte")) + "</div>" +
       '<div class="cs-sug">' + (e.sug.length ? e.sug.map((s, k) => '<button type="button" data-k="' + k + '">' + esc(s) + "</button>").join("") : '<div class="cs-nosug">Sin sugerencias. Escribila vos abajo.</div>') + "</div>" +
       '<div class="cs-manual"><input id="csIn" value="' + esc(e.word) + '" autocomplete="off" autocapitalize="off" spellcheck="false"><button type="button" class="btn small" id="csCambiar">Cambiar</button></div>' +
-      '<div class="cs-act"><button type="button" id="csPrev">◀ Anterior</button><button type="button" id="csIgn">Ignorar</button><button type="button" id="csSig">Ignorar siempre</button><button type="button" id="csNext">Siguiente ▶</button></div>';
+      '<div class="cs-act"><button type="button" id="csPrev">◀ Anterior</button><button type="button" id="csIgn">Ignorar</button><button type="button" id="csSig">➕ Agregar al diccionario</button><button type="button" id="csNext">Siguiente ▶</button></div>';
 
     const aplicar = (txt) => {
       const nv = v.slice(0, e.start) + txt + v.slice(e.start + e.len), d = txt.length - e.len;
@@ -179,6 +188,8 @@
     box.querySelector("#csIgn").onclick = () => { f.errs.splice(i, 1); marcar(f); paso(f, i); };
     box.querySelector("#csSig").onclick = () => {
       const k = norm(e.word); propio.add(k); try { localStorage.setItem(KEY, JSON.stringify(Array.from(propio))); } catch (x) {}
+      if (alAgregar) { try { alAgregar(e.word); } catch (x) {} }
+      toast("“" + e.word + "” se agregó al diccionario de todos los supervisores");
       Object.values(campos).forEach((c) => { c.errs = c.errs.filter((x) => norm(x.word) !== k); marcar(c); });
       paso(f, i);
     };
@@ -188,7 +199,12 @@
   }
 
   window.Corrector = {
-    init(opts) { if (opts && opts.toast) toast = opts.toast; },
+    init(opts) { if (opts && opts.toast) toast = opts.toast; if (opts && opts.agregar) alAgregar = opts.agregar; },
+    // Palabras que agregaron los supervisores (vienen del servidor): no se marcan más.
+    setDiccionario(lista) {
+      (lista || []).forEach((w) => { const k = norm(w); if (k) propio.add(k); });
+      Object.values(campos).forEach((c) => { c.errs = c.errs.filter((x) => !(x.typo && propio.has(norm(x.word)))); marcar(c); });
+    },
     attach, setConocidos, abrir,
     pendientes() { return Object.values(campos).reduce((s, f) => s + (f.el.value === f.snap ? f.errs.length : 0), 0); },
     refrescar(id) { const f = campos[id]; if (f) { f.crecer(); marcar(f); programar(f); } },

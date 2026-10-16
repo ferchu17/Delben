@@ -73,6 +73,53 @@
       return out;
     }
 
+    // ---- Texto con negrita: personas "APELLIDO NOMBRE, legajo N, empresa X" ----
+    const PERSONA = /(?<![\p{L}\d])\p{Lu}[\p{Lu}'’.-]*(?: \p{Lu}[\p{Lu}'’.-]*)*, legajo [^\s,;]+(?:, empresa \p{Lu}[\p{Lu}\d&-]*(?: \p{Lu}[\p{Lu}\d&-]*)*)?/gu;
+    const wRun = (r, size) => width(r.t, size, r.b ? bold : font);
+    const wWord = (w, size) => w.reduce((a, r) => a + wRun(r, size), 0);
+    // Devuelve renglones; cada renglón es una lista de palabras y cada palabra una lista de tramos {t, b}.
+    function wrapRich(txt, maxMm, size) {
+      const out = [];
+      clean(txt).split("\n").forEach((par) => {
+        if (!par.trim()) { out.push([]); return; }
+        const neg = new Array(par.length).fill(false); let m;
+        PERSONA.lastIndex = 0;
+        while ((m = PERSONA.exec(par))) for (let k = m.index; k < m.index + m[0].length; k++) neg[k] = true;
+        const words = []; const re = /\S+/g; let w;
+        while ((w = re.exec(par))) {
+          const runs = []; let i = w.index;
+          for (const ch of w[0]) { const b = neg[i]; const last = runs[runs.length - 1]; if (last && last.b === b) last.t += ch; else runs.push({ t: ch, b }); i += ch.length; }
+          words.push(runs);
+        }
+        let cur = [], curW = 0; const sp = width(" ", size);
+        words.forEach((wd) => {
+          let ww = wWord(wd, size);
+          if (ww > maxMm) {                                   // palabra más larga que el renglón: se corta por letras
+            if (cur.length) { out.push(cur); cur = []; curW = 0; }
+            let piece = [], pw = 0;
+            wd.forEach((r) => Array.from(r.t).forEach((ch) => {
+              const cw = width(ch, size, r.b ? bold : font);
+              if (pw + cw > maxMm && piece.length) { out.push([piece]); piece = []; pw = 0; }
+              const l = piece[piece.length - 1]; if (l && l.b === r.b) l.t += ch; else piece.push({ t: ch, b: r.b }); pw += cw;
+            }));
+            wd = piece; ww = pw;
+          }
+          if (!cur.length) { cur = [wd]; curW = ww; }
+          else if (curW + sp + ww <= maxMm) { cur.push(wd); curW += sp + ww; }
+          else { out.push(cur); cur = [wd]; curW = ww; }
+        });
+        out.push(cur);
+      });
+      return out;
+    }
+    function textRich(pg, words, x, yy, size) {
+      let xx = x; const sp = width(" ", size);
+      words.forEach((wd, i) => {
+        if (i) xx += sp;
+        wd.forEach((r) => { pg.drawText(r.t, { x: xx * K, y: PH - yy * K, size, font: r.b ? bold : font, color: black }); xx += wRun(r, size); });
+      });
+    }
+
     const newPage = () => { page = pdf.addPage([PW, PH]); pages.push(page); y = TOP; };
     newPage();
 
@@ -109,12 +156,13 @@
       o = o || {};
       if (y + ROW > BOT) newPage();
       rect(page, ML, y, CW, ROW);
-      if (txt) text(page, txt, ML + 1.5, y + ROW - 1.9, o.size || 10);
+      if (Array.isArray(txt)) { if (txt.length) textRich(page, txt, ML + 1.5, y + ROW - 1.9, o.size || 10); }
+      else if (txt) text(page, txt, ML + 1.5, y + ROW - 1.9, o.size || 10);
       y += ROW;
     }
     function lineas(texto) {
-      const out = wrap(texto, CW - 3.5, 10);
-      while (out.length && out[out.length - 1].trim() === "") out.pop();
+      const out = wrapRich(texto, CW - 3.5, 10);
+      while (out.length && !out[out.length - 1].length) out.pop();
       return out;
     }
 

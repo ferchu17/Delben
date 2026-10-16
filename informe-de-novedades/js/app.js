@@ -549,11 +549,52 @@
   }
 
   /* ---------------- formulario ---------------- */
+  /* ---------- formato automático del texto ----------
+     - Mayúscula al empezar el texto y después de punto, signo de pregunta o exclamación, o renglón nuevo.
+     - Nombres de servicios / clientes (lista de objetivos) siempre en MAYÚSCULAS.
+     - "puesto 3", "puesto n° 2" → "PUESTO 3", "PUESTO N° 2".
+     Solo cambia mayúsculas, así el cursor queda donde estaba. */
+  const plegar = (t) => Array.from(t, (c) => c.normalize("NFD")[0].toLowerCase()).join("");   // mismo largo, sin tildes
+  const esLetra = (c) => !!c && /[\p{L}\d]/u.test(c);
+  function formatoTexto(v) {
+    if (!v) return v;
+    const a = Array.from(v); if (a.length !== v.length) return v;     // emojis u otros caracteres raros: no tocar
+    const sube = (i, j) => { for (let k = i; k < j; k++) a[k] = a[k].toUpperCase(); };
+    // servicios / clientes
+    const pl = plegar(v);
+    (S.objetivos || []).map((o) => String(typeof o === "string" ? o : (o && o.nombre) || "").trim()).filter((n) => n.length >= 4)
+      .sort((x, y) => y.length - x.length).forEach((n) => {
+        const q = plegar(n); let i = pl.indexOf(q);
+        while (i >= 0) { if (!esLetra(v[i - 1]) && !esLetra(v[i + q.length])) sube(i, i + q.length); i = pl.indexOf(q, i + q.length); }
+      });
+    // PUESTO N
+    const re = /\bpuesto(\s+(n[°º.]?|nro\.?|numero|número)?\s*\d+[a-z]?\b)?/giu; let m;
+    while ((m = re.exec(v))) sube(m.index, m.index + m[0].length);
+    // mayúscula al empezar cada oración (un punto cuenta solo si después viene un espacio: no toca mails ni números)
+    let inicio = true, punto = false;
+    for (let k = 0; k < a.length; k++) {
+      const c = a[k];
+      if (punto) { punto = false; if (/\s/.test(c)) { inicio = true; continue; } }
+      if (c === "\n" || c === "¡" || c === "¿") { inicio = true; continue; }
+      if (c === "." || c === "!" || c === "?") { punto = true; continue; }
+      if (/\p{L}/u.test(c)) { if (inicio) a[k] = c.toUpperCase(); inicio = false; continue; }
+      if (/\d/.test(c)) inicio = false;
+    }
+    return a.join("");
+  }
+  function aplicarFormato(el) {
+    const v = el.value, nv = formatoTexto(v);
+    if (nv === v) return;
+    const a = el.selectionStart, b = el.selectionEnd;
+    el.value = nv;
+    try { if (document.activeElement === el) el.setSelectionRange(a, b); } catch (e) {}
+  }
+
   function leerForm() {
     const a = autor();
     return {
-      fecha: isoToAr($("#fecha").value), de: a ? a.nombre : "", asunto: $("#asunto").value.trim(), objetivo: $("#objetivo").value.trim(),
-      informe: $("#informe").value.trim(), medidas: $("#medidas").value.trim()
+      fecha: isoToAr($("#fecha").value), de: a ? a.nombre : "", asunto: $("#asunto").value.trim(), objetivo: $("#objetivo").value.trim().toUpperCase(),
+      informe: formatoTexto($("#informe").value.trim()), medidas: formatoTexto($("#medidas").value.trim())
     };
   }
   function validar(d) {
@@ -723,6 +764,7 @@
     S.objetivos = Array.isArray(r.objetivos) ? r.objetivos : [];
     S.personal = Array.isArray(r.personal) ? r.personal : [];
     if (r.siguiente && /^[·—-]*$/.test($("#numInforme").textContent.trim())) { $("#numInforme").textContent = r.siguiente; avisoCarga("numero"); }
+    try { Corrector.setDiccionario(Array.isArray(r.diccionario) ? r.diccionario : []); } catch (e) { console.error(e); }
     try { Corrector.setConocidos(S.quienesRetiran.map((p) => p.nombre).concat(S.personal.map((p) => p.nombre), S.objetivos.map((o) => o.nombre))); } catch (e) { console.error(e); }
     const errs = Array.isArray(r.errores) ? r.errores : [];
     if (errs.length) avisoCarga("listas", "error", "Algunos listados no se pudieron leer: " + errs.join(" | "));
@@ -771,6 +813,8 @@
     S.pdfCache[it.id] = o; return o;
   }
 
+  // Personas "APELLIDO NOMBRE, legajo N, empresa X" en negrita (igual que en el PDF).
+  const negritaPersonas = (t) => esc(t).replace(/(?<![\p{L}\d])\p{Lu}[\p{Lu}'’.-]*(?: \p{Lu}[\p{Lu}'’.-]*)*, legajo [^\s,;]+(?:, empresa \p{Lu}[\p{Lu}\d&-]*(?: \p{Lu}[\p{Lu}\d&-]*)*)?/gu, (m) => "<b>" + m + "</b>");
   function verInforme(it) {
     const logo = CFG.LOGO_PDF;
     openModal(`<h2 style="margin:0;color:var(--green-d)">Informe N° ${esc(it.numero)}</h2>
@@ -779,8 +823,8 @@
         <div class="sheet-b">
           <p><b>Fecha:</b> ${esc(it.fecha)}</p><p><b>De:</b> ${esc(it.de)}</p><p><b>Para:</b> ${esc(it.para)}</p>
           <p><b>Asunto:</b> ${esc(it.asunto)}</p><p><b>Objetivo:</b> ${esc(it.objetivo)}</p>
-          <div class="sheet-t"><h4>Día, Hora, Lugar del hecho, quien, qué, cómo y por qué:</h4><div>${esc(it.informe)}</div></div>
-          <div class="sheet-t"><h4>Medidas Tomadas:</h4><div>${esc(it.medidas)}</div></div>
+          <div class="sheet-t"><h4>Día, Hora, Lugar del hecho, quien, qué, cómo y por qué:</h4><div>${negritaPersonas(it.informe)}</div></div>
+          <div class="sheet-t"><h4>Medidas Tomadas:</h4><div>${negritaPersonas(it.medidas)}</div></div>
         </div></div>
       <div class="modal-actions">
         <button class="btn" id="vVer">📄 Ver PDF</button>
@@ -853,19 +897,26 @@
     $("#inPara").addEventListener("change", (e) => { if (buscarPersona(e.target.value) || okMail(e.target.value)) addChip("para", e.target); });
     $("#inCc").addEventListener("change", (e) => { if (buscarPersona(e.target.value) || okMail(e.target.value)) addChip("cc", e.target); });
     $("#de").addEventListener("input", mostrarSugerenciasDe);
-    $("#objetivo").addEventListener("input", mostrarSugerenciasObjetivo);
+    $("#objetivo").addEventListener("input", (e) => { const el = e.target, p = el.selectionStart, up = el.value.toUpperCase(); if (up !== el.value) { el.value = up; try { el.setSelectionRange(p, p); } catch (x) {} } mostrarSugerenciasObjetivo(); });
     $("#objetivo").addEventListener("focus", mostrarSugerenciasObjetivo);
     $("#inPara").addEventListener("input", () => mostrarSugerenciasDestinatario("para"));
     $("#inCc").addEventListener("input", () => mostrarSugerenciasDestinatario("cc"));
     ["informe", "medidas"].forEach((id) => {
       const el = $("#" + id);
+      // se aplica al terminar cada palabra (o cuando escribe el dictado), nunca mientras el teclado está componiendo
+      el.addEventListener("input", (ev) => {
+        if (ev.isComposing) return;
+        const c = el.value[(el.selectionStart || 0) - 1];
+        if (!ev.isTrusted || !c || /[\s.,;:!?)]/.test(c)) aplicarFormato(el);
+      });
+      el.addEventListener("blur", () => aplicarFormato(el));
       el.addEventListener("input", () => { clearTimeout(el._tPers); el._tPers = setTimeout(() => sugerirPersonal(el), 350); });
       Corrector.attach(el, $('.spell-btn[data-target="' + id + '"]'));
     });
     $$(".pers-btn").forEach((b) => b.addEventListener("click", () => buscarPersonal(b.dataset.target)));
     $("#de").addEventListener("focus", mostrarSugerenciasDe);
     $("#de").addEventListener("change", () => { mostrarSugerenciasDe(); renderChips("cc"); });
-    Corrector.init({ toast });
+    Corrector.init({ toast, agregar: (palabra) => { if (!DEMO) api("agregarPalabra", { palabra, de: (autor() || {}).nombre || "" }).then(() => { listasPromise = null; }).catch(() => {}); } });
     $$(".spell-btn").forEach((b) => b.addEventListener("click", () => elegirPersonalDelTexto(b.dataset.target, () => Corrector.abrir(b.dataset.target))));
     $("#fileInput").onchange = (e) => { onFiles(e.target.files); e.target.value = ""; };
     $("#cameraInput").onchange = (e) => { onFiles(e.target.files); e.target.value = ""; };

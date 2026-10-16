@@ -7,6 +7,7 @@
 const CONFIG = {
   SPREADSHEET_ID: '1Z06eLpbng51tYcycQlr0fLNI1OYmOpnmQp94YHY_coY',
   HOJA_INFORMES:  'informes_novedades',
+  HOJA_DICCIONARIO: 'diccionario',   // palabras que los supervisores agregan al corrector (para todos)
   HOJA_USUARIOS:  'Usuarios y contraseñas',
   HOJA_quienRetira: 'quienRetira',
   HOJA_OBJETIVOS: 'objetivos',
@@ -75,6 +76,7 @@ function doPost(e) {
       case 'logo':       return json_(logo_());
       case 'listas':     return json_(listas_());
       case 'numero':     return json_({ ok: true, siguiente: siguienteNumero_() });
+      case 'agregarPalabra': return json_(agregarPalabra_(req));
       case 'reservar':   return json_(reservar_(req));
       case 'finalizar':  return json_(finalizar_(req));
       case 'buscar':     return json_(buscar_(req));
@@ -107,6 +109,7 @@ function listas_() {
   intentar('quienRetira', leerquienRetir_,  []);
   intentar('objetivos',   leerObjetivos_,   []);
   intentar('personal',    personalCache_,   []);
+  intentar('diccionario', leerDiccionario_, []);
   intentar('siguiente',   siguienteNumero_, '0001');
   return out;
 }
@@ -205,6 +208,29 @@ function leerPersonal_() {
     out.push({ nombre: nombre, legajo: legajo, empresa: EMPRESAS_SIGLA_[emp] || emp });
   });
   return out.sort((a, b) => a.nombre.localeCompare(b.nombre, 'es'));
+}
+
+// Diccionario compartido del corrector: pestaña "diccionario" (palabra | agregada_por | fecha).
+function hojaDiccionario_() {
+  const ss = ss_();
+  let sh = ss.getSheetByName(CONFIG.HOJA_DICCIONARIO);
+  if (!sh) { sh = ss.insertSheet(CONFIG.HOJA_DICCIONARIO); sh.getRange(1, 1, 1, 3).setValues([['palabra', 'agregada_por', 'fecha']]).setFontWeight('bold'); }
+  return sh;
+}
+function leerDiccionario_() {
+  const sh = hojaDiccionario_(), last = sh.getLastRow();
+  if (last < 2) return [];
+  return sh.getRange(2, 1, last - 1, 1).getDisplayValues().map(r => String(r[0] || '').trim()).filter(Boolean);
+}
+function agregarPalabra_(req) {
+  const palabra = String(req.palabra || '').trim().slice(0, 60);
+  if (!palabra || /\s{2,}/.test(palabra)) return { ok: false, error: 'Palabra vacía' };
+  const lock = LockService.getScriptLock(); lock.waitLock(20000);
+  try {
+    const ya = leerDiccionario_().some(w => norm_(w) === norm_(palabra));
+    if (!ya) hojaDiccionario_().appendRow([palabra, String(req.de || ''), Utilities.formatDate(new Date(), 'America/Argentina/Buenos_Aires', 'dd/MM/yyyy HH:mm')]);
+    return { ok: true, palabra: palabra, nueva: !ya };
+  } finally { lock.releaseLock(); }
 }
 
 // El listado de personal es grande: se guarda 10 minutos en caché (en partes) para que la app cargue rápido.
