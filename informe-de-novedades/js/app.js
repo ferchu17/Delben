@@ -176,7 +176,7 @@
     let base = target.value;
     const r = new SR(); r.lang = idiomas[li]; r.continuous = false; r.interimResults = true; r.maxAlternatives = 1;
     let eventos = 0;
-    const perro = setTimeout(() => { if (rec === r && eventos === 0) { fatal = true; try { r.abort(); } catch (e) {} micApagar(); nota("El dictado integrado no responde en esta app (no llegó ningún evento). Tocá el campo y usá el 🎤 del teclado del celular."); toast("El dictado integrado no responde en esta app. Usá el 🎤 del teclado.", true); } }, 8000);
+    const perro = setTimeout(() => { if (rec === r && eventos === 0) { fatal = true; try { r.abort(); } catch (e) {} micApagar(); try { target.focus(); } catch (e) {} nota("El dictado integrado no responde en esta app (no llegó ningún evento). Ya te dejé el cursor en el campo: tocá el 🎤 del teclado del celular."); toast("El dictado integrado no responde en esta app. Usá el 🎤 del teclado.", true); } }, 8000);
     const diag = () => { nota("🔴 Escuchando (" + r.lang + ")… frases: " + frases + " · " + ultimo); };
     r.onaudiostart = () => { eventos++; ultimo = "micrófono activo"; diag(); };
     r.onspeechstart = () => { eventos++; vacios = 0; ultimo = "te oigo"; diag(); };
