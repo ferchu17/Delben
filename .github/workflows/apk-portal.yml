@@ -1,0 +1,39 @@
+name: APK Portal DELBEN
+
+# Arma la APK del Portal DELBEN (abre la página del portal con el motor de Chrome)
+# y la publica siempre en el mismo link:
+# https://github.com/ferchu17/Delben/releases/download/portal-apk/PortalDelben.apk
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths: ["android-portal/**", ".github/workflows/apk-portal.yml"]
+
+permissions:
+  contents: write
+
+jobs:
+  apk:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-java@v5
+        with: { distribution: temurin, java-version: "17" }
+      - name: SDK de Android (ya viene en el servidor de GitHub)
+        run: echo "sdk.dir=$ANDROID_HOME" > android-portal/local.properties && (yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses >/dev/null || true)
+      - uses: gradle/actions/setup-gradle@v4
+        with: { gradle-version: "8.7" }
+      - name: Compilar APK
+        env: { VERSION_CODE: "${{ github.run_number }}" }
+        run: gradle -p android-portal :app:assembleRelease --no-daemon --stacktrace
+      - name: Renombrar
+        run: cp android-portal/app/build/outputs/apk/release/app-release.apk PortalDelben.apk
+      - uses: actions/upload-artifact@v4
+        with: { name: PortalDelben-apk, path: PortalDelben.apk }
+      - name: Publicar en el link fijo
+        env: { GH_TOKEN: "${{ github.token }}" }
+        run: |
+          gh release view portal-apk >/dev/null 2>&1 || \
+            gh release create portal-apk --title "Portal DELBEN (APK)" \
+              --notes "App de Android del Portal DELBEN. Descargar PortalDelben.apk e instalar."
+          gh release upload portal-apk PortalDelben.apk --clobber
