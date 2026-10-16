@@ -4,6 +4,9 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#0b6e4f">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="assets/icono-192.png">
+<link rel="apple-touch-icon" href="assets/icono-192.png">
 <title>Informes de Novedades · DelBen</title>
 <link rel="stylesheet" href="css/app.css?v=20261016h">
 </head>
@@ -145,12 +148,13 @@
 </div>
 
 <div id="toast" class="toast" hidden></div>
-<p style="text-align:center;font-size:12px;color:#888;margin:8px 0 24px">Versión 16/10 · 11:15 (micrófono con prueba y reintento)</p>
+<p style="text-align:center;font-size:12px;color:#888;margin:8px 0 24px">Versión 16/10 · 11:30 (lista para PWABuilder)</p>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js"></script>
 <script src="js/config.js"></script>
 <script src="js/pdf.js"></script>
 <script src="js/corrector.js?v=20261016d"></script>
+<script>if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js").catch(() => {});</script>
 <script src="js/app.js?v=20261016i"></script>
 </body>
 </html>
