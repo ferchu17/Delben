@@ -450,3 +450,11 @@ function probarListas() {
     siguiente: siguienteNumero_()
   }, null, 2));
 }
+
+// Ejecutala una vez desde el editor: pide el permiso de "Enviar correo" y te manda un mail de prueba a vos.
+// Después hay que publicar una VERSIÓN NUEVA de la implementación para que la app tome el permiso.
+function probarCorreo() {
+  const yo = Session.getEffectiveUser().getEmail();
+  MailApp.sendEmail({ to: yo, name: CONFIG.REMITENTE, subject: 'Prueba Informe de Novedades', htmlBody: 'Si te llegó este correo, el envío funciona.' });
+  Logger.log('Correo de prueba enviado a ' + yo + ' · cupo restante hoy: ' + MailApp.getRemainingDailyQuota());
+}

@@ -144,70 +144,51 @@
     return t.replace(/\s*\b(punto y aparte|punto aparte)\s*$/i, ".\n").replace(/\s*\b(nueva línea|nuevo renglón|nueva linea)\s*$/i, "\n")
       .replace(/\s+punto y coma\s*$/i, ";").replace(/\s+dos puntos\s*$/i, ":").replace(/\s+coma\s*$/i, ",").replace(/\s+punto\s*$/i, ".");
   }
+  // Dictado: mismo funcionamiento que la versión del 15/10 (la que andaba en el celular).
   function toggleMic(btn) {
     if (recBtn === btn) return stopRec();
     stopRec();
     const target = document.getElementById(btn.dataset.target), state = $(`.mic-state[data-for="${btn.dataset.target}"]`);
-    const nota = (m) => { if (state) state.textContent = m; };
     const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-    if (!window.isSecureContext) { toast("El dictado requiere una conexión segura HTTPS.", true); nota("Abrí la aplicación desde su dirección HTTPS."); return; }
-    if (!SR) { toast("Este navegador o la app no admite dictado integrado. Usá el micrófono 🎤 del teclado para dictar en el campo.", true); nota("Sin dictado integrado: tocá el campo y usá el 🎤 del teclado del celular."); return; }
-
-    // El reconocimiento arranca directo desde el toque (sin esperas previas), como exigen Android y las apps instaladas.
-    btn.classList.add("rec");
-    // 2) Reconocimiento por frases; se reinicia solo hasta que toques de nuevo.
-    const idiomas = ["es-AR", "es-419", "es-ES"]; let li = 0, vacios = 0, frases = 0, ultimo = "iniciando", fatal = false;
-    let base = target.value;
-    const r = new SR(); r.lang = idiomas[li]; r.continuous = true; r.interimResults = true; r.maxAlternatives = 1;
-    let eventos = 0;
-    const perro = setTimeout(() => { if (rec === r && eventos === 0) { fatal = true; try { r.abort(); } catch (e) {} micApagar(); try { target.focus(); } catch (e) {} nota("El dictado integrado no responde en esta app (no llegó ningún evento). Ya te dejé el cursor en el campo: tocá el 🎤 del teclado del celular."); toast("El dictado integrado no responde en esta app. Usá el 🎤 del teclado.", true); } }, 8000);
-    const diag = () => { nota("🔴 Escuchando (" + r.lang + ")… frases: " + frases + " · " + ultimo); };
-    r.onaudiostart = () => { eventos++; ultimo = "micrófono activo"; diag(); };
-    r.onspeechstart = () => { eventos++; vacios = 0; ultimo = "te oigo"; diag(); };
-    r.onstart = () => { eventos++; };
-    r.onnomatch = () => { eventos++; ultimo = "no entendí, repetí"; diag(); };
+    if (!window.isSecureContext) { toast("El dictado requiere una conexión segura HTTPS.", true); if (state) state.textContent = "Abrí la aplicación desde su dirección HTTPS."; return; }
+    if (!SR) { toast("Este navegador o la APK no admite dictado integrado. Usá el micrófono 🎤 del teclado para dictar en el campo.", true); if (state) state.textContent = "El reconocimiento de voz no está disponible en este entorno."; return; }
+    const r = new SR(); r.lang = "es-AR"; r.continuous = true; r.interimResults = true; r.maxAlternatives = 1;
+    const base = target.value ? target.value.replace(/\s+$/, "") + " " : "";
+    // El navegador vuelve a entregar resultados anteriores en cada evento.
+    // Guardarlos por índice evita concatenar dos veces el mismo fragmento.
+    const segmentos = [];
     r.onresult = (ev) => {
-      eventos++;
-      let fin = "", parcial = "";
-      for (let i = ev.resultIndex; i < ev.results.length; i++) { const t = ev.results[i][0].transcript; if (ev.results[i].isFinal) fin += t; else parcial += t; }
-      vacios = 0;
-      if (fin.trim()) { base = unirTexto(base, comandosVoz(fin.trim())); target.value = base; frases++; ultimo = "texto recibido"; }
-      else { target.value = unirTexto(base, parcial); ultimo = "escribiendo…"; }
-      try { target.dispatchEvent(new Event("input", { bubbles: true })); } catch (e) { console.error(e); }
+      for (let i = 0; i < ev.results.length; i++) {
+        segmentos[i] = ev.results[i][0].transcript;
+      }
+      target.value = (base + segmentos.filter(Boolean).join(" ")).replace(/\s+/g, " ").trimStart();
+      target.dispatchEvent(new Event("input", { bubbles: true }));
       if (target.tagName === "TEXTAREA") target.scrollTop = target.scrollHeight;
-      if (fin.trim() && (target.id === "informe" || target.id === "medidas")) { try { personalEnDictado(target, fin); } catch (e) { console.error(e); } }
-      diag();
     };
     r.onerror = (e) => {
-      eventos++;
       const messages = {
-        "not-allowed": "Permiso de micrófono denegado. Habilitalo en Ajustes › Aplicaciones › Permisos › Micrófono.",
-        "service-not-allowed": "El servicio de reconocimiento de voz está bloqueado o desactivado en este celular (revisá Ajustes › Aplicaciones › Google › Permisos). Usá el 🎤 del teclado.",
+        "not-allowed": "Permiso de micrófono denegado. Revisá los permisos del sitio o de la APK.",
+        "service-not-allowed": "El servicio de reconocimiento de voz está bloqueado en este dispositivo.",
         "audio-capture": "No se encontró un micrófono disponible.",
-        "network": "El dictado no pudo conectar con el servicio de voz. Revisá la conexión o usá el 🎤 del teclado.",
-        "language-not-supported": "Este celular no admite dictado en ese idioma."
+        "network": "El reconocimiento de voz necesita conexión a Internet.",
+        "no-speech": "No se detectó voz. Tocá Hablar e intentá nuevamente.",
+        "language-not-supported": "Este dispositivo no admite dictado en español.",
+        "aborted": "Dictado cancelado."
       };
-      if (e.error === "no-speech" || e.error === "aborted") { ultimo = e.error === "no-speech" ? "no se oyó voz" : "reiniciando"; vacios++; return; }
-      if (e.error === "language-not-supported" && li < idiomas.length - 1) { li++; r.lang = idiomas[li]; return; }
-      fatal = true; nota(messages[e.error] || ("Error de micrófono: " + e.error)); toast(messages[e.error] || ("Error de micrófono: " + e.error), true);
+      if (state) state.textContent = messages[e.error] || ("Error de micrófono: " + e.error);
+      if (e.error !== "aborted") toast(messages[e.error] || ("Error de micrófono: " + e.error), true);
     };
     r.onend = () => {
-      eventos++; clearTimeout(perro);
-      if (rec !== r) return;
-      if (!fatal) {
-        if (vacios >= 3 && li < idiomas.length - 1 && frases === 0) { li++; r.lang = idiomas[li]; vacios = 0; }       // otra variante de español
-        if (vacios >= 6 && frases === 0) { fatal = true; nota("No llegó ningún texto. El dictado integrado no responde en este celular o app: tocá el campo y usá el 🎤 del teclado."); }
-        else { diag(); setTimeout(() => { if (rec !== r) return; try { r.start(); } catch (e) { micApagar(); } }, 250); return; }
+      if (rec === r) {
+        rec = null;
+        if (recBtn) { recBtn.classList.remove("rec"); const sp = $("span", recBtn); if (sp) sp.textContent = "Hablar"; }
+        recBtn = null;
+        if (state && !state.textContent.startsWith("Error") && !state.textContent.includes("denegado")) state.textContent = "Dictado finalizado.";
       }
-      const msg = state ? state.textContent : "";
-      micApagar(); nota(fatal ? msg : "Dictado finalizado.");
     };
-    // si escribís con el teclado mientras dictás, se conserva lo escrito
-    const fn = (ev) => { if (ev.isTrusted) base = target.value; };
-    target.addEventListener("input", fn); recInput = { el: target, fn };
-    try { r.start(); } catch (e) { toast("No se pudo iniciar el dictado. Volvé a tocar el micrófono.", true); recInput = null; target.removeEventListener("input", fn); btn.classList.remove("rec"); return; }
+    try { r.start(); } catch (e) { toast("No se pudo iniciar el dictado. Volvé a tocar el micrófono.", true); return; }
     rec = r; recBtn = btn; btn.classList.add("rec"); const sp = $("span", btn); if (sp) sp.textContent = "Escuchando… tocá para parar";
-    diag();
+    if (state) state.textContent = "🔴 Escuchando…";
   }
 
   /* ---------------- selector de personal y corrector móvil ---------------- */
