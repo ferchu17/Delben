@@ -365,6 +365,9 @@ function compactarEncabezado_(sh) {
     if (!nav.length) return;
     var c0 = nav.reduce(function (m, x) { return Math.min(m, x[1]); }, 99);
     nav.forEach(function (x) { var rg = sh.getRange(x[0] + 1, x[1] + 1); try { rg.breakApart(); } catch (e) { } rg.clear(); });
+    // v1.24.2: el bloque de empresa / período / supervisor queda en su lugar, igual de ancho que en el Excel
+    // (solo se sacan las celdas grises). Lo de abajo (correrlo a la izquierda) ya no se usa.
+    return;
     if (info < 0 || info <= c0) return;
     var ancho = 4, mover = sh.getRange(1, info + 1, 4, ancho);
     // Lo que se mueve pasa a valores (si tuviera fórmulas, al correrlas de lugar quedarían apuntando mal)

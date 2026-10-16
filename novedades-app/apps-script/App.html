@@ -6369,14 +6369,12 @@ function htmlPlanServicio(serv, filas, periodo, opts) {
   // Encabezado: se sacan las celdas grises (Retiro, Flota, Personal, Facturación, Consolidado, Licencias...)
   // y el bloque de empresa / período / supervisor pasa a ese lugar (igual que el Excel que se descarga).
   const neutro = Math.max(0, F.styles.findIndex(x => Object.keys(x).every(k => k === 'fn' || k === 'fs') && x.fs === 11));
-  for (let r = 0; r < 4; r++) {
-    for (let c = 1; c <= 12; c++) { S0[r][c - 1] = S0[r][c + 3]; if (V[r][c + 4] !== undefined) V[r][c] = V[r][c + 4]; else delete V[r][c]; }
-    for (let c = 13; c <= 16; c++) { S0[r][c - 1] = neutro; delete V[r][c]; }
-  }
+  // v1.24.2: el bloque de empresa / supervisor queda en su lugar, igual de ancho que en el Excel (solo se sacan las celdas grises de A a D)
+  for (let r = 0; r < 4; r++) for (let c = 1; c <= 4; c++) { S0[r][c - 1] = neutro; delete V[r][c]; }
   const supNom = ((S.base.supervisores || []).find(x => x.usuario === serv.Supervisor) || {}).nombre || serv.Supervisor || '';
   const emp = serv.Empresa || '';
   const empCf = /LEGUYET/i.test(emp) ? { bg: '#1f4e79', fc: '#fff' } : /LEG/i.test(emp) ? { bg: '#2e75b6', fc: '#fff', b: 1 } : /PPQ|KDE|KTL/i.test(emp) ? { bg: '#ff0000', fc: '#fff', b: 1 } : null;
-  pone(0, 1, emp, empCf); pone(1, 1, '', empCf); pone(1, 4, nombrePeriodo(periodo)); pone(3, 1, supNom);
+  pone(0, 5, emp, empCf); pone(1, 5, '', empCf); pone(1, 8, nombrePeriodo(periodo)); pone(3, 5, supNom);
   pone(4, 2, String(nombreListado(serv.Id) || serv.Cliente || serv.Servicio || '').toUpperCase());
   const obj = (S.base.objetivos || []).find(o => String(o.Id) === String(serv.ObjetivoId)) || {};
   pone(7, 2, serv.Direccion || obj.Direccion || '');
@@ -6526,7 +6524,6 @@ function htmlPlanServicio(serv, filas, periodo, opts) {
   F.merges.forEach(([r1, c1, r2, c2]) => {
     if (r1 <= 4 && c1 <= 4) return;
     let a = r1, b = c1, cc2 = c2;
-    if (r1 <= 4 && c1 >= 5 && c2 <= 16) { b = c1 - 4; cc2 = c2 - 4; }
     if ((r1 >= 11 && r1 <= 20) || (r1 >= 38 && r1 <= 47)) return;
     if (c1 >= COL('CV')) return;
     const i1 = outDe(a), i2 = outDe(r2);
@@ -6547,7 +6544,7 @@ function htmlPlanServicio(serv, filas, periodo, opts) {
       let colspan = sp ? sp[1] : 1;
       if (sp) for (let cc = c; cc < c + sp[1]; cc++) if (!visible(cc)) colspan--;
       const v = V[i][c];
-      const tf = c >= COL('CV') && i >= iCob0 && i <= iCob0 + 31 ? 11 + (i - iCob0) : o.t, tc = o.t <= 4 && c <= 12 ? c + 4 : c;
+      const tf = c >= COL('CV') && i >= iCob0 && i <= iCob0 + 31 ? 11 + (i - iCob0) : o.t, tc = c;
       const x = X[i][c] || cfXL(F.cf, tf, tc, v);
       const fm = typeof v === 'number' && Math.abs(v) < 0.0001 ? { t: '' } : fmtXL(v, (F.styles[S0[i][c - 1]] || {}).nf);   // los ceros no se muestran
       const est = x ? (x.bg ? 'background:' + x.bg + ';' : '') + (x.fc ? 'color:' + x.fc + ';' : '') + (x.b ? 'font-weight:700;' : '') + (x.i ? 'font-style:italic;' : '') : '';
@@ -6618,6 +6615,8 @@ function planAplicarValor(pe, v, sinDeshacer) {
   if (parte && /^D\d\d$/.test(b)) {
     const f0 = planFila(ed, tipo === 'R' ? 'RETEN' : 'COBERTURA', +a, true), v0 = f0[b] || '', p0 = parseCelda(v0, f0.Turno);
     const num0 = v.replace(',', '.');
+    // v1.24.2: al pegar desde Excel, el código va en la columna D y la N viene vacía: esa N vacía no borra el código
+    if (v === '' && parte === 'N' && p0.t !== 'horas') return '';
     if (v === '' || /^\d+(\.\d+)?$/.test(num0)) {
       // un número en la columna D o N: se arma la celda con las dos partes (ej.: 3 diurnas y 9 nocturnas = 12N)
       const dd = parte === 'D' ? (v === '' ? 0 : Number(num0)) : (p0.t === 'horas' ? p0.d : 0);
@@ -6650,37 +6649,64 @@ function planAplicarValor(pe, v, sinDeshacer) {
   } else f[b] = b === 'Puesto' ? v : v.toUpperCase();
   return '';
 }
-function planEditarCelda(td, repintar) {
+// v1.24.2: como en Excel: el cuadro de edición es del tamaño de la celda; Enter confirma y baja, Tab confirma y va a la derecha
+// (Mayús+Enter sube, Mayús+Tab a la izquierda); si se empezó escribiendo, las flechas también confirman y mueven. Esc cancela.
+function planEditarCelda(td, repintar, inicial) {
   const ed = PLANS.ed; if (!ed) return;
-  if (td.dataset.pe.indexOf('T|') === 0) { editarLineas(ed.id); return; }   // líneas de teléfono: su propia ventana
+  if (td.dataset.pe.indexOf('T|') === 0) { if (ed.id !== 'SIM') editarLineas(ed.id); return; }   // líneas de teléfono: su propia ventana
   const pe = td.dataset.pe, b = pe.split('|')[2];
   const actual = planValorActual(pe);
   $$('.pe-input').forEach(x => x.remove());
-  const r = td.getBoundingClientRect();
+  const r = td.getBoundingClientRect(), cs = getComputedStyle(td);
   const inp = document.createElement('input');
-  inp.className = 'pe-input'; inp.value = actual;
+  inp.className = 'pe-input'; inp.value = inicial != null ? inicial : actual;
   if (b === 'Nombre') inp.setAttribute('list', 'peNombres');
-  inp.style.cssText = 'position:fixed;z-index:90;left:' + r.left + 'px;top:' + r.top + 'px;min-width:' + Math.max(r.width, b === 'Nombre' ? 260 : 70) + 'px;height:' + Math.max(r.height, 24) + 'px';
+  const ancho = b === 'Nombre' ? Math.max(r.width, 240) : Math.max(r.width, 30);
+  inp.style.cssText = 'position:fixed;z-index:90;left:' + r.left + 'px;top:' + r.top + 'px;width:' + ancho + 'px;height:' + Math.max(r.height, 20) + 'px;' +
+    'font-size:' + cs.fontSize + ';text-align:' + (cs.textAlign || 'left') + ';box-sizing:border-box';
   if (b === 'Nombre' && !$('#peNombres')) {
     const dl = document.createElement('datalist'); dl.id = 'peNombres';
     dl.innerHTML = (S.base.personal || []).filter(p => !/BAJA/i.test(p.Categoria || '')).map(p => '<option value="' + esc(p.Nombre) + '">' + esc(p.Legajo) + '</option>').join('');
     document.body.appendChild(dl);
   }
-  document.body.appendChild(inp); inp.focus(); inp.select();
+  document.body.appendChild(inp); inp.focus();
+  if (inicial != null) { const L = inp.value.length; inp.setSelectionRange(L, L); } else inp.select();
   let hecho = false;
-  const aplicar = () => {
+  const aplicar = (dr, dc) => {
     if (hecho) return; hecho = true;
     const v = inp.value.trim(); inp.remove();
-    if (v === String(actual)) return;
+    const mover = () => { if (dr || dc) pselMover(dr || 0, dc || 0); };
+    if (v === String(actual)) { mover(); return; }
     const err = planAplicarValor(pe, v);
     if (err) { toast(err, true); return; }
-    repintar();
+    Promise.resolve(repintar()).then(mover);
   };
   inp.onkeydown = e => {
-    if (e.key === 'Enter' || e.key === 'Tab') { e.preventDefault(); e.stopPropagation(); aplicar(); }
-    if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); hecho = true; inp.remove(); }
+    const k = e.key;
+    if (k === 'Enter') { e.preventDefault(); e.stopPropagation(); aplicar(e.shiftKey ? -1 : 1, 0); return; }
+    if (k === 'Tab') { e.preventDefault(); e.stopPropagation(); aplicar(0, e.shiftKey ? -1 : 1); return; }
+    if (inicial != null && (k === 'ArrowDown' || k === 'ArrowUp')) { e.preventDefault(); e.stopPropagation(); aplicar(k === 'ArrowDown' ? 1 : -1, 0); return; }
+    if (k === 'Escape') { e.preventDefault(); e.stopPropagation(); hecho = true; inp.remove(); }
   };
-  inp.onblur = aplicar;
+  inp.onblur = () => aplicar(0, 0);
+}
+// Mueve la celda elegida (como las flechas de Excel), saltando las que no se pueden modificar
+function pselMover(dr, dc) {
+  const t = PSEL.t; if (!t || !t.isConnected || !PSEL.a) return;
+  const g = gridTabla(t), a = PSEL.a, edit = !!t.querySelector('td[data-pe]');
+  let r = dr > 0 ? a.r2 + 1 : dr < 0 ? a.r - 1 : a.r, c = dc > 0 ? a.c2 + 1 : dc < 0 ? a.c - 1 : a.c;
+  for (let k = 0; k < 80; k++) {
+    if (r < 0 || c < 0 || r > g.maxR || c > g.maxC) return;
+    let td = g.at[r + '|' + c];
+    if (!td) for (const [x, p] of g.pos) if (r >= p.r && r <= p.r2 && c >= p.c && c <= p.c2) { td = x; break; }
+    if (td && (!edit || td.dataset.pe)) {
+      PSEL.extras = []; PSEL.a = PSEL.b = g.pos.get(td); pselPintar();
+      try { td.scrollIntoView({ block: 'nearest', inline: 'nearest' }); } catch (e) { }
+      return;
+    }
+    r += dr; c += dc;
+    if (!dr && !dc) return;
+  }
 }
 // v1.22.8: lista de lo que se cambió en la Planificación (para el aviso al salir)
 function planCambios() {
@@ -6835,10 +6861,14 @@ document.addEventListener('keydown', e => {
     tds.forEach(td => planAplicarValor(td.dataset.pe, '', true));
     PLANS.repintar && PLANS.repintar(); return;
   }
-  if ((e.key === 'Enter' || e.key === 'F2') && ancla && ancla.dataset.pe) { e.preventDefault(); planEditarCelda(ancla, PLANS.repintar); return; }
+  // v1.24.2: como en Excel: Enter baja, Tab va a la derecha (con Mayús al revés), flechas mueven, F2 edita, escribir reemplaza
+  const mov = { ArrowDown: [1, 0], ArrowUp: [-1, 0], ArrowRight: [0, 1], ArrowLeft: [0, -1] }[e.key];
+  if (mov && !e.shiftKey) { e.preventDefault(); pselMover(mov[0], mov[1]); return; }
+  if (e.key === 'Enter') { e.preventDefault(); pselMover(e.shiftKey ? -1 : 1, 0); return; }
+  if (e.key === 'Tab') { e.preventDefault(); pselMover(0, e.shiftKey ? -1 : 1); return; }
+  if (e.key === 'F2' && ancla && ancla.dataset.pe) { e.preventDefault(); planEditarCelda(ancla, PLANS.repintar); return; }
   if (e.key.length === 1 && ancla && ancla.dataset.pe) {
-    e.preventDefault(); planEditarCelda(ancla, PLANS.repintar);
-    const inp = $('.pe-input'); if (inp) { inp.value = e.key; }
+    e.preventDefault(); planEditarCelda(ancla, PLANS.repintar, e.key);
   }
 });
 document.addEventListener('copy', e => {

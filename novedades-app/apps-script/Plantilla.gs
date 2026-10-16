@@ -1363,9 +1363,8 @@ function accionSimExcel_(u, d) {
   var rg = sh.getDataRange(); rg.copyTo(rg, { contentsOnly: true });
   try {
     sh.getRange('B5').setValue(nomServ.toUpperCase());
-    sh.getRange('A1').setValue(serv.Empresa || '');
-    sh.getRange('D2').setValue(nombrePeriodo_(periodo));
-    sh.getRange('A4').setValue('');
+    sh.getRange('E1').setValue(serv.Empresa || '');
+    sh.getRange('E4').setValue('');
   } catch (e) { }
   try { sh.setName(nomServ.replace(/[\[\]\*\?\/\\:]/g, ' ').slice(0, 90) || 'Proyección'); } catch (e) { }
   soloPestanas_(ss, [sh.getName()]);
