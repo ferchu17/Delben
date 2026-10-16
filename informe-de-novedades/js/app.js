@@ -144,7 +144,7 @@
     return t.replace(/\s*\b(punto y aparte|punto aparte)\s*$/i, ".\n").replace(/\s*\b(nueva línea|nuevo renglón|nueva linea)\s*$/i, "\n")
       .replace(/\s+punto y coma\s*$/i, ";").replace(/\s+dos puntos\s*$/i, ":").replace(/\s+coma\s*$/i, ",").replace(/\s+punto\s*$/i, ".");
   }
-  async function toggleMic(btn) {
+  function toggleMic(btn) {
     if (recBtn === btn) return stopRec();
     stopRec();
     const target = document.getElementById(btn.dataset.target), state = $(`.mic-state[data-for="${btn.dataset.target}"]`);
@@ -153,28 +153,12 @@
     if (!window.isSecureContext) { toast("El dictado requiere una conexión segura HTTPS.", true); nota("Abrí la aplicación desde su dirección HTTPS."); return; }
     if (!SR) { toast("Este navegador o la app no admite dictado integrado. Usá el micrófono 🎤 del teclado para dictar en el campo.", true); nota("Sin dictado integrado: tocá el campo y usá el 🎤 del teclado del celular."); return; }
 
-    // 1) Pedir permiso de micrófono de forma explícita (en apps instaladas es lo que dispara el permiso de Android).
-    btn.classList.add("rec"); nota("Pidiendo acceso al micrófono…");
-    if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
-      try {
-        // En apps instaladas el pedido de permiso puede quedar colgado: se espera 3 s y se sigue igual.
-        const pedido = navigator.mediaDevices.getUserMedia({ audio: true });
-        const colgado = Symbol("colgado");
-        const st = await Promise.race([pedido, new Promise((r) => setTimeout(() => r(colgado), 3000))]);
-        if (st === colgado) { pedido.then((x) => x.getTracks().forEach((t) => t.stop())).catch(() => {}); nota("El permiso no responde en esta app; probando el dictado igual…"); }
-        else { st.getTracks().forEach((t) => t.stop()); await new Promise((r) => setTimeout(r, 250)); }
-      }
-      catch (e) {
-        btn.classList.remove("rec");
-        const m = (e && e.name === "NotFoundError") ? "No se encontró un micrófono." : "Esta pantalla no tiene permiso para usar el micrófono. Habilitalo en Ajustes › Aplicaciones › (esta app o Chrome) › Permisos › Micrófono. Mientras tanto usá el 🎤 del teclado.";
-        nota(m); toast(m, true); return;
-      }
-    }
-
+    // El reconocimiento arranca directo desde el toque (sin esperas previas), como exigen Android y las apps instaladas.
+    btn.classList.add("rec");
     // 2) Reconocimiento por frases; se reinicia solo hasta que toques de nuevo.
     const idiomas = ["es-AR", "es-419", "es-ES"]; let li = 0, vacios = 0, frases = 0, ultimo = "iniciando", fatal = false;
     let base = target.value;
-    const r = new SR(); r.lang = idiomas[li]; r.continuous = false; r.interimResults = true; r.maxAlternatives = 1;
+    const r = new SR(); r.lang = idiomas[li]; r.continuous = true; r.interimResults = true; r.maxAlternatives = 1;
     let eventos = 0;
     const perro = setTimeout(() => { if (rec === r && eventos === 0) { fatal = true; try { r.abort(); } catch (e) {} micApagar(); try { target.focus(); } catch (e) {} nota("El dictado integrado no responde en esta app (no llegó ningún evento). Ya te dejé el cursor en el campo: tocá el 🎤 del teclado del celular."); toast("El dictado integrado no responde en esta app. Usá el 🎤 del teclado.", true); } }, 8000);
     const diag = () => { nota("🔴 Escuchando (" + r.lang + ")… frases: " + frases + " · " + ultimo); };
