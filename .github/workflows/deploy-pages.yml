@@ -44,6 +44,9 @@ jobs:
           cp -R combustible _site/combustible
           # Iconos de cada app (se ven en la pestaña del navegador)
           cp -R iconos _site/iconos
+          # Juego Mansión Sombranegra (https://ferchu17.github.io/Delben/mansion/). Se arma con: python3 juego-mansion/build.py
+          mkdir -p _site/mansion
+          cp juego-mansion/index.html _site/mansion/index.html
           # Portal DELBEN: página con todas las apps (https://ferchu17.github.io/Delben/portal/)
           cp -R portal _site/portal
           sed -i '0,/<head[^>]*>/s##&\n<link rel="icon" type="image/png" sizes="64x64" href="/Delben/iconos/sgi-64.png">\n<link rel="apple-touch-icon" href="/Delben/iconos/sgi-192.png">#' _site/sgi/index.html

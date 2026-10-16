@@ -1,0 +1,26 @@
+plugins { id 'com.android.application' }
+
+android {
+    namespace 'ar.com.delben.mansion'
+    compileSdk 34
+    defaultConfig {
+        applicationId 'ar.com.delben.mansion'
+        minSdk 21
+        targetSdk 34
+        versionCode Integer.parseInt(System.getenv('VERSION_CODE') ?: '1')
+        versionName '1.0.' + (System.getenv('VERSION_CODE') ?: '1')
+        // La dirección del juego está en MainActivity.java (INICIO)
+    }
+    signingConfigs {
+        release {
+            storeFile file('../../android-informe/firma/informe-novedades.keystore')
+            storePassword 'gMzA_RnzTlJ1dBoMQgtnvfml'
+            keyAlias 'informe'
+            keyPassword 'gMzA_RnzTlJ1dBoMQgtnvfml'
+        }
+    }
+    buildTypes {
+        release { minifyEnabled false; signingConfig signingConfigs.release }
+    }
+    compileOptions { sourceCompatibility JavaVersion.VERSION_17; targetCompatibility JavaVersion.VERSION_17 }
+}

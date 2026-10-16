@@ -1,0 +1,395 @@
+<title>Mansión Sombranegra</title>
+<meta name="theme-color" content="#050407">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IM+Fell+English+SC&family=IM+Fell+English:ital@0;1&family=Special+Elite&family=Nothing+You+Could+Do&display=swap" rel="stylesheet">
+<style>
+/* Layout: juego a pantalla completa sobre lienzo; HUD mínimo en las esquinas; documentos como papel viejo; todo oscuro a propósito (un solo tema) */
+:root{
+  --negro:#050407;
+  --noche:#0d0b10;
+  --piedra:#1a1620;
+  --hueso:#e6dcc6;
+  --tinta:#2a2019;
+  --tinta-suave:#6e5d4b;
+  --sangre:#8e1b1b;
+  --sangre-viva:#c22a22;
+  --vela:#d9a84a;
+  --niebla:#b7b0c2;
+  --moho:#7f9a78;
+  --f-titulo:'IM Fell English SC','Times New Roman',serif;
+  --f-cuerpo:'IM Fell English',Georgia,serif;
+  --f-doc:'Special Elite','Courier New',monospace;
+  --f-mano:'Nothing You Could Do','Segoe Script',cursive;
+  color-scheme:dark;
+}
+[hidden]{display:none!important}
+*{box-sizing:border-box}
+html,body{height:100%}
+body{margin:0;background:var(--negro);color:var(--niebla);font-family:var(--f-cuerpo);overflow:hidden;touch-action:none;user-select:none;-webkit-user-select:none;-webkit-tap-highlight-color:transparent}
+#c{position:fixed;inset:0;width:100%;height:100%;display:block;background:var(--negro)}
+button{font-family:inherit;cursor:pointer}
+button:focus-visible,input:focus-visible,textarea:focus-visible{outline:2px solid var(--vela);outline-offset:2px}
+
+/* ---------- HUD ---------- */
+#hud{position:fixed;inset:0;pointer-events:none;z-index:5}
+.hud-izq{position:absolute;left:max(14px,env(safe-area-inset-left,0px));top:calc(10px + env(safe-area-inset-top,0px));display:flex;flex-direction:column;gap:3px;max-width:min(60vw,520px)}
+.hud-area{font-family:var(--f-titulo);font-size:18px;color:var(--vela);letter-spacing:.06em;text-shadow:0 1px 8px #000}
+.hud-obj{font-size:15px;color:var(--niebla);text-shadow:0 1px 6px #000;line-height:1.3}
+.hud-obj b{color:var(--hueso);font-weight:400}
+.hud-online{font-size:13px;color:var(--moho);text-shadow:0 1px 4px #000}
+.hud-guard{font-size:12px;color:var(--niebla);opacity:0;transition:opacity .6s}
+.hud-guard.ver{opacity:.8}
+.hud-der{position:absolute;right:max(12px,env(safe-area-inset-right,0px));top:calc(10px + env(safe-area-inset-top,0px));display:flex;gap:6px;pointer-events:auto}
+.hbtn{background:rgba(13,11,16,.82);color:var(--niebla);border:1px solid #3a3242;border-radius:4px;padding:7px 11px;font-size:14px;font-family:var(--f-titulo);letter-spacing:.04em}
+.hbtn:hover{border-color:var(--vela);color:var(--vela)}
+.barras{position:absolute;left:max(14px,env(safe-area-inset-left,0px));bottom:calc(14px + env(safe-area-inset-bottom,0px));display:flex;flex-direction:column;gap:6px;width:170px}
+body.tactil .barras{left:50%;transform:translateX(-50%);bottom:calc(10px + env(safe-area-inset-bottom,0px));width:150px}
+.barra{display:grid;grid-template-columns:62px 1fr;align-items:center;gap:8px;font-size:12px;color:var(--niebla);text-shadow:0 1px 4px #000;font-family:var(--f-titulo);letter-spacing:.05em}
+.barra .tubo{height:6px;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.15);border-radius:3px;overflow:hidden}
+.barra .lleno{height:100%;width:100%;background:var(--vela);transition:width .3s}
+.barra.cordura .lleno{background:#8a6aa8}
+.barra.aliento .lleno{background:var(--moho)}
+.barra.baja .lleno{background:var(--sangre-viva)}
+.inv-mini{font-size:12px;color:var(--niebla);text-shadow:0 1px 4px #000}
+
+#cartel{position:fixed;left:50%;top:30%;transform:translateX(-50%);text-align:center;pointer-events:none;z-index:6;opacity:0;transition:opacity 1.2s;width:min(92vw,700px)}
+#cartel.ver{opacity:1}
+#cartel .c1{font-family:var(--f-titulo);font-size:15px;letter-spacing:.35em;color:var(--sangre-viva);text-transform:uppercase}
+#cartel .c2{font-family:var(--f-titulo);font-size:clamp(30px,6.5vw,58px);color:var(--hueso);text-shadow:0 0 30px rgba(142,27,27,.7),0 3px 0 #000;line-height:1.05;text-wrap:balance}
+#susurro{position:fixed;left:50%;top:58%;transform:translateX(-50%);font-family:var(--f-mano);font-size:clamp(22px,4.5vw,36px);color:var(--sangre-viva);text-shadow:0 0 14px #000;pointer-events:none;z-index:6;opacity:0;transition:opacity .8s;text-align:center;width:min(92vw,700px)}
+#susurro.ver{opacity:.95}
+#toast{position:fixed;left:50%;bottom:calc(120px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);max-width:calc(100% - 32px);background:rgba(8,6,10,.92);border:1px solid #4a2020;color:var(--hueso);padding:9px 14px;border-radius:4px;font-size:15px;text-align:center;z-index:7;opacity:0;transition:opacity .4s;pointer-events:none}
+#toast.ver{opacity:1}
+
+/* ---------- Diálogo ---------- */
+#dialogo{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(14px + env(safe-area-inset-bottom,0px));width:min(720px,calc(100% - 28px));z-index:8;
+  background:rgba(10,8,12,.95);border:1px solid #3a2a2a;border-top:2px solid var(--sangre);color:var(--hueso);border-radius:3px;padding:12px 18px 10px;box-shadow:0 10px 40px rgba(0,0,0,.8);cursor:pointer}
+#dialogo .quien{font-family:var(--f-titulo);font-size:19px;color:var(--vela);letter-spacing:.04em}
+#dialogo .texto{font-size:18px;line-height:1.45;min-height:2.9em;margin-top:4px}
+#dialogo .seguir{font-size:12px;color:#8a8090;text-align:right;margin-top:2px;font-family:var(--f-titulo)}
+#opciones{display:flex;flex-direction:column;gap:6px;margin-top:8px}
+#opciones button{text-align:left;background:rgba(255,255,255,.04);border:1px solid #4a3a3a;color:var(--hueso);padding:8px 12px;border-radius:3px;font-size:16px;font-family:var(--f-cuerpo)}
+#opciones button:hover,#opciones button:focus-visible{border-color:var(--vela);color:var(--vela)}
+
+/* ---------- Paneles ---------- */
+.velo{position:fixed;inset:0;background:rgba(3,2,5,.82);z-index:9;display:flex;align-items:center;justify-content:center;
+  padding:calc(14px + env(safe-area-inset-top,0px)) max(14px,env(safe-area-inset-right,0px)) calc(14px + env(safe-area-inset-bottom,0px)) max(14px,env(safe-area-inset-left,0px))}
+.hoja{background:var(--hueso);color:var(--tinta);width:min(660px,100%);max-height:100%;overflow:auto;border-radius:2px;padding:20px 22px;
+  box-shadow:0 20px 60px rgba(0,0,0,.9),inset 0 0 70px rgba(110,80,40,.35);position:relative;-webkit-overflow-scrolling:touch;touch-action:pan-y}
+.hoja.oscura{background:#15111a;color:var(--niebla);box-shadow:0 20px 60px rgba(0,0,0,.9);border:1px solid #2e2636}
+.hoja h2{font-family:var(--f-titulo);font-weight:400;color:var(--sangre);font-size:30px;margin:0 0 6px;line-height:1.05;text-wrap:balance}
+.hoja.oscura h2{color:var(--vela)}
+.hoja h3{font-family:var(--f-titulo);font-size:14px;text-transform:uppercase;letter-spacing:.14em;color:var(--tinta-suave);margin:18px 0 8px;font-weight:400}
+.hoja.oscura h3{color:#8a8090}
+.hoja p{margin:6px 0;line-height:1.5;font-size:16px}
+.hoja ul{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:6px}
+.hoja li{font-size:15px;line-height:1.45;padding:6px 9px;border-left:3px solid var(--tinta-suave);background:rgba(110,93,75,.08)}
+.hoja.oscura li{border-left-color:#4a4052;background:rgba(255,255,255,.03)}
+.hoja li.falta{opacity:.55;font-style:italic}
+.hoja li.rojo{border-left-color:var(--sangre)}
+.doc{font-family:var(--f-doc);font-size:16px;line-height:1.6;white-space:pre-wrap}
+.doc.mano{font-family:var(--f-mano);font-size:20px;line-height:1.5}
+.fila-btn{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end;margin-top:16px}
+.btn{background:var(--tinta);color:var(--hueso);border:none;border-radius:3px;padding:10px 16px;font-size:16px;font-family:var(--f-titulo);letter-spacing:.04em}
+.btn:hover{background:var(--sangre)}
+.btn.sec{background:transparent;color:inherit;border:1px solid currentColor}
+.btn:disabled{opacity:.4;cursor:not-allowed}
+.hoja.oscura .btn{background:#2a2230;color:var(--hueso)}
+.hoja.oscura .btn:hover{background:var(--sangre)}
+.tabs{display:flex;gap:4px;flex-wrap:wrap;margin:6px 0 4px;border-bottom:1px solid rgba(110,93,75,.4)}
+.tabs button{background:transparent;border:none;border-bottom:3px solid transparent;color:var(--tinta-suave);padding:6px 10px;font-family:var(--f-titulo);font-size:15px}
+.tabs button[aria-selected="true"]{color:var(--sangre);border-bottom-color:var(--sangre)}
+.pista-box{background:rgba(142,27,27,.08);border:1px dashed var(--sangre);padding:8px 10px;font-size:15px;margin-top:8px}
+.msj{text-align:center;min-height:1.4em;color:var(--sangre);font-size:15px}
+.hoja.oscura .msj{color:var(--sangre-viva)}
+.grupo{margin-top:6px}
+.grupo .tit{font-family:var(--f-titulo);font-size:16px;color:var(--tinta);margin-bottom:4px}
+
+/* candado / teclados */
+.visor{font-family:var(--f-doc);font-size:38px;letter-spacing:.32em;text-align:center;background:#0e0b09;color:var(--vela);border-radius:3px;padding:10px 0 6px .32em;margin:12px auto;width:240px;max-width:100%;font-variant-numeric:tabular-nums}
+.teclado{display:grid;grid-template-columns:repeat(3,64px);gap:8px;justify-content:center}
+.teclado button{height:52px;font-size:22px;background:#2e251d;color:var(--hueso);border:none;border-radius:4px;box-shadow:0 3px 0 #120e0b;font-family:var(--f-doc)}
+.teclado button:active{transform:translateY(2px);box-shadow:0 1px 0 #120e0b}
+.temblor{animation:temblor .4s}
+@keyframes temblor{20%{transform:translateX(-8px)}40%{transform:translateX(8px)}60%{transform:translateX(-5px)}80%{transform:translateX(5px)}}
+.piano{display:flex;justify-content:center;gap:3px;margin:14px 0}
+.piano button{width:44px;height:130px;background:linear-gradient(#f6f1e6,#d8d0c0);border:1px solid #333;border-radius:0 0 5px 5px;color:#333;font-family:var(--f-doc);font-size:13px;display:flex;align-items:flex-end;justify-content:center;padding-bottom:8px}
+.piano button:active,.piano button.on{background:linear-gradient(#d8c8a8,#b8a888)}
+.diales{display:flex;justify-content:center;gap:12px;flex-wrap:wrap;margin:14px 0}
+.dial{display:flex;flex-direction:column;align-items:center;gap:6px;font-family:var(--f-titulo);font-size:14px}
+.dial button{width:70px;height:70px;border-radius:50%;background:radial-gradient(circle at 40% 35%,#7a5a3a,#3a2412);border:3px solid #1a1008;color:var(--hueso);font-family:var(--f-doc);font-size:26px}
+.opc{display:flex;flex-wrap:wrap;gap:6px}
+.opc button{background:transparent;border:1px solid var(--tinta-suave);color:var(--tinta);border-radius:20px;padding:7px 12px;font-size:15px;font-family:var(--f-cuerpo)}
+.opc button[aria-pressed="true"]{background:var(--sangre);border-color:var(--sangre);color:var(--hueso)}
+.hoja.oscura .opc button{color:var(--niebla);border-color:#5a5062}
+.orden{display:flex;flex-direction:column;gap:6px;margin-top:8px}
+.orden .slot{display:flex;align-items:center;gap:10px;padding:8px 10px;border:1px solid #4a4052;border-radius:3px}
+.orden .slot b{font-family:var(--f-titulo);color:var(--vela);width:24px}
+canvas.mapa{width:100%;max-width:560px;display:block;margin:8px auto;background:#0a080c;border:1px solid #3a3242;image-rendering:pixelated}
+textarea.codigo{width:100%;min-height:90px;font-family:var(--f-doc);font-size:13px;background:#f6efdf;color:var(--tinta);border:1px solid var(--tinta-suave);border-radius:3px;padding:8px;resize:vertical;user-select:text;-webkit-user-select:text}
+.hoja input[type=text]{font-family:var(--f-doc);font-size:17px;padding:9px 10px;border:1px solid var(--tinta-suave);border-radius:3px;background:#f6efdf;color:var(--tinta);width:100%;min-width:0;user-select:text;-webkit-user-select:text}
+.hoja label{display:block;font-family:var(--f-titulo);font-size:14px;letter-spacing:.1em;color:var(--tinta-suave);margin:14px 0 6px;text-transform:uppercase}
+.fila-in{display:flex;gap:8px}
+
+/* ---------- Portada ---------- */
+#portada{position:fixed;inset:0;z-index:20;overflow:auto;display:flex;align-items:center;justify-content:center;touch-action:pan-y;
+  background:radial-gradient(ellipse at 50% 20%,#24121a 0%,#0b080e 55%,#030204 100%);
+  padding:calc(24px + env(safe-area-inset-top,0px)) max(16px,env(safe-area-inset-right,0px)) calc(24px + env(safe-area-inset-bottom,0px)) max(16px,env(safe-area-inset-left,0px))}
+.portada-in{max-width:600px;width:100%;display:flex;flex-direction:column;gap:14px;text-align:center}
+.portada-in h1{font-family:var(--f-titulo);font-weight:400;font-size:clamp(44px,11vw,88px);line-height:.95;margin:0;color:var(--hueso);
+  text-shadow:0 0 30px rgba(142,27,27,.85),0 4px 0 #000;text-wrap:balance;letter-spacing:.02em}
+.portada-in .sub{font-family:var(--f-titulo);font-size:15px;letter-spacing:.3em;text-transform:uppercase;color:var(--sangre-viva)}
+.portada-in .aviso{font-size:14px;color:#8a8090;font-style:italic}
+.portada-in .historia{font-size:17px;line-height:1.55;color:var(--niebla);text-align:left;background:rgba(0,0,0,.4);border-left:3px solid var(--sangre);padding:12px 14px}
+.menu{display:flex;flex-direction:column;gap:10px;align-items:center}
+.menu-fila{display:flex;gap:8px;flex-wrap:wrap;justify-content:center}
+.btn-grande{font-family:var(--f-titulo);font-size:26px;letter-spacing:.05em;background:var(--sangre);color:var(--hueso);border:none;border-radius:3px;padding:12px 30px;box-shadow:0 0 30px rgba(142,27,27,.45)}
+.btn-grande:hover{background:#a82424}
+.btn-menu{background:rgba(13,11,16,.9);color:var(--hueso);border:1px solid #4a3a4a;border-radius:3px;padding:11px 16px;font-size:16px;font-family:var(--f-titulo);letter-spacing:.04em}
+.btn-menu:hover{border-color:var(--vela);color:var(--vela)}
+.credito{font-family:var(--f-titulo);font-size:14px;letter-spacing:.12em;color:#6e6478;margin-top:10px}
+.nota{font-size:14px;color:#8a8090;max-width:480px;margin:0 auto;line-height:1.45}
+.stats{display:grid;grid-template-columns:1fr auto;gap:4px 18px;font-size:16px;margin-top:8px}
+.stats span:nth-child(even){text-align:right;font-family:var(--f-doc);font-variant-numeric:tabular-nums}
+
+/* ---------- Muerte ---------- */
+#muerte{position:fixed;inset:0;z-index:15;background:radial-gradient(ellipse at center,rgba(60,0,0,.85),rgba(0,0,0,.97));display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;text-align:center;padding:24px}
+#muerte h2{font-family:var(--f-titulo);font-weight:400;font-size:clamp(40px,9vw,80px);color:var(--sangre-viva);margin:0;text-shadow:0 0 30px #000}
+#muerte p{font-size:18px;color:var(--niebla);max-width:520px;margin:0}
+
+/* ---------- Táctil ---------- */
+#tactil{position:fixed;inset:auto 0 0 0;height:0;z-index:7}
+#joy{position:fixed;left:max(18px,calc(env(safe-area-inset-left,0px) + 10px));bottom:calc(22px + env(safe-area-inset-bottom,0px));width:130px;height:130px;border-radius:50%;
+  background:rgba(183,176,194,.06);border:2px solid rgba(183,176,194,.22);touch-action:none}
+#knob{position:absolute;left:50%;top:50%;width:54px;height:54px;margin:-27px 0 0 -27px;border-radius:50%;background:rgba(217,168,74,.28);border:2px solid rgba(217,168,74,.6)}
+.tbtns{position:fixed;right:max(16px,calc(env(safe-area-inset-right,0px) + 10px));bottom:calc(18px + env(safe-area-inset-bottom,0px));display:grid;grid-template-columns:repeat(2,auto);gap:10px;align-items:end;justify-items:center}
+.tb{width:66px;height:66px;border-radius:50%;background:rgba(20,16,24,.6);border:2px solid rgba(230,220,198,.35);color:var(--hueso);font-size:12px;line-height:1.1;font-family:var(--f-titulo);touch-action:none;padding:0}
+.tb.grande{width:84px;height:84px;font-size:14px;background:rgba(142,27,27,.5)}
+.tb.activo{background:rgba(142,27,27,.92);box-shadow:0 0 20px rgba(194,42,34,.7)}
+.tb.on{border-color:var(--vela);color:var(--vela)}
+body.susto #hud,body.susto #dialogo,body.susto #cartel,body.susto #susurro,body.susto #toast,body.susto #tactil{visibility:hidden}
+@media (max-width:520px){.hbtn{padding:6px 8px;font-size:13px}.hud-obj{font-size:13px}.hud-area{font-size:16px}}
+@media (prefers-reduced-motion:reduce){#cartel,#susurro,#toast{transition:none}.temblor{animation:none}}
+</style>
+
+<canvas id="c" aria-label="Mansión Sombranegra"></canvas>
+
+<div id="hud" hidden>
+  <div class="hud-izq">
+    <div class="hud-area" id="hArea"></div>
+    <div class="hud-obj" id="hObj"></div>
+    <div class="hud-online" id="hOnline" hidden></div>
+    <div class="hud-guard" id="hGuard">Partida guardada</div>
+  </div>
+  <div class="hud-der">
+    <button class="hbtn" id="bDiario">Diario</button>
+    <button class="hbtn" id="bMenu">Menú</button>
+  </div>
+  <div class="barras">
+    <div class="barra" id="brLuz"><span>Linterna</span><div class="tubo"><div class="lleno"></div></div></div>
+    <div class="barra cordura" id="brCor"><span>Cordura</span><div class="tubo"><div class="lleno"></div></div></div>
+    <div class="barra aliento" id="brAli"><span>Aliento</span><div class="tubo"><div class="lleno"></div></div></div>
+    <div class="inv-mini" id="hInv"></div>
+  </div>
+</div>
+<div id="cartel"><div class="c1" id="cartel1"></div><div class="c2" id="cartel2"></div></div>
+<div id="susurro"></div>
+<div id="toast"></div>
+
+<div id="dialogo" hidden>
+  <div class="quien" id="dQuien"></div>
+  <div class="texto" id="dTexto"></div>
+  <div id="opciones"></div>
+  <div class="seguir" id="dSeguir">E · espacio · tocá para seguir</div>
+</div>
+
+<div class="velo" id="pDoc" hidden><div class="hoja" role="dialog" aria-label="Documento">
+  <h2 id="docTit"></h2><div class="doc" id="docTxt"></div>
+  <div class="fila-btn"><button class="btn" data-cerrar>Cerrar</button></div>
+</div></div>
+
+<div class="velo" id="pDiario" hidden><div class="hoja" role="dialog" aria-label="Diario">
+  <h2>Diario del detective</h2>
+  <div class="tabs" role="tablist" id="dTabs">
+    <button role="tab" data-tab="obj">Objetivo</button>
+    <button role="tab" data-tab="caso">Caso</button>
+    <button role="tab" data-tab="docs">Documentos</button>
+    <button role="tab" data-tab="inv">Objetos</button>
+    <button role="tab" data-tab="mapa">Mapa</button>
+  </div>
+  <div id="dCont"></div>
+  <div class="fila-btn"><button class="btn" data-cerrar>Cerrar</button></div>
+</div></div>
+
+<div class="velo" id="pTeclado" hidden><div class="hoja oscura" role="dialog" aria-label="Candado">
+  <h2 id="kTit">Candado</h2><p id="kSub"></p>
+  <div class="visor" id="kVisor"></div>
+  <div class="msj" id="kMsj"></div>
+  <div class="teclado" id="kTec"></div>
+  <div class="fila-btn"><button class="btn sec" data-cerrar>Salir</button><button class="btn" id="kOk">Probar</button></div>
+</div></div>
+
+<div class="velo" id="pPiano" hidden><div class="hoja oscura" role="dialog" aria-label="Piano">
+  <h2>El piano del salón</h2><p>Las teclas están amarillas y algunas no suenan bien. Tocá la melodía correcta.</p>
+  <div class="visor" id="pVisor" style="font-size:20px;letter-spacing:.1em;padding-left:0"></div>
+  <div class="piano" id="pTeclas"></div>
+  <div class="msj" id="pMsj"></div>
+  <div class="fila-btn"><button class="btn sec" id="pBorrar">Empezar de nuevo</button><button class="btn sec" data-cerrar>Salir</button></div>
+</div></div>
+
+<div class="velo" id="pValv" hidden><div class="hoja oscura" role="dialog" aria-label="Válvulas">
+  <h2>Válvulas de presión</h2><p>Cuatro válvulas oxidadas. Cada una marca de 1 a 5. Si la presión queda mal, la caldera va a golpear fuerte.</p>
+  <div class="diales" id="vDiales"></div>
+  <div class="msj" id="vMsj"></div>
+  <div class="fila-btn"><button class="btn sec" data-cerrar>Salir</button><button class="btn" id="vOk">Abrir la compuerta</button></div>
+</div></div>
+
+<div class="velo" id="pElegir" hidden><div class="hoja oscura" role="dialog" aria-label="Elegir">
+  <h2 id="eTit"></h2><p id="eSub"></p>
+  <div id="eCont"></div>
+  <div class="msj" id="eMsj"></div>
+  <div class="fila-btn"><button class="btn sec" data-cerrar>Salir</button><button class="btn" id="eOk">Confirmar</button></div>
+</div></div>
+
+<div class="velo" id="pAcusar" hidden><div class="hoja" role="dialog" aria-label="Acusación">
+  <h2>Llamar al Inspector</h2>
+  <p>"Detective. Dígame quién fue, con qué y por qué. Si se equivoca, el culpable va a tener tiempo de borrar sus huellas."</p>
+  <h3>¿Quién fue?</h3><div class="opc" id="aQuien"></div>
+  <h3>¿Con qué?</h3><div class="opc" id="aArma"></div>
+  <h3>¿Por qué?</h3><div class="opc" id="aMot"></div>
+  <p class="msj" id="aMsj"></p>
+  <div class="fila-btn"><button class="btn sec" data-cerrar>Todavía no</button><button class="btn" id="aOk" disabled>Acusar</button></div>
+</div></div>
+
+<div class="velo" id="pMenu" hidden><div class="hoja oscura" role="dialog" aria-label="Menú">
+  <h2>Pausa</h2>
+  <div class="stats" id="mStats"></div>
+  <div class="menu" style="margin-top:16px;align-items:stretch">
+    <button class="btn-menu" data-cerrar>Seguir jugando</button>
+    <button class="btn-menu" id="mSonido">Sonido: sí</button>
+    <button class="btn-menu" id="mCodigo">Pasar la partida a otro aparato</button>
+    <button class="btn-menu" id="mAyuda">Cómo se juega</button>
+    <button class="btn-menu" id="mSalir">Guardar y volver al menú</button>
+  </div>
+</div></div>
+
+<div class="velo" id="pCodigo" hidden><div class="hoja" role="dialog" aria-label="Código de partida">
+  <h2>Pasar la partida</h2>
+  <p id="cExpl"></p>
+  <textarea class="codigo" id="cTxt" readonly></textarea>
+  <p class="msj" id="cMsj"></p>
+  <div class="fila-btn"><button class="btn sec" data-cerrar>Cerrar</button><button class="btn" id="cCopiar">Copiar código</button></div>
+</div></div>
+
+<div class="velo" id="pCargar" hidden><div class="hoja" role="dialog" aria-label="Cargar código">
+  <h2>Cargar una partida</h2>
+  <p>Pegá acá el código que copiaste en el otro aparato (por ejemplo, el que te mandaste por WhatsApp).</p>
+  <textarea class="codigo" id="lTxt" placeholder="SN2:..."></textarea>
+  <p class="msj" id="lMsj"></p>
+  <div class="fila-btn"><button class="btn sec" data-cerrar>Cancelar</button><button class="btn" id="lOk">Cargar partida</button></div>
+</div></div>
+
+<div class="velo" id="pOnline" hidden><div class="hoja" role="dialog" aria-label="Jugar en línea">
+  <h2>Jugar en línea</h2>
+  <p>Exploren la mansión juntos. Las pistas, llaves y puertas abiertas se comparten; cada uno tiene su propia linterna... y su propio monstruo.</p>
+  <label for="oApodo">Tu apodo</label>
+  <input type="text" id="oApodo" maxlength="14" placeholder="Ej: Delfi" autocomplete="off">
+  <h3>Crear una sala</h3>
+  <p>Creá una sala y pasales el código a tus amigos.</p>
+  <div class="fila-btn" style="justify-content:flex-start"><button class="btn" id="oCrear">Crear sala nueva</button></div>
+  <h3>Unirse a una sala</h3>
+  <div class="fila-in"><input type="text" id="oCodigo" maxlength="6" placeholder="Código, ej: k7m2" autocomplete="off" autocapitalize="off"><button class="btn" id="oUnir">Unirse</button></div>
+  <p class="msj" id="oMsj"></p>
+  <div class="fila-btn"><button class="btn sec" data-cerrar>Volver</button></div>
+</div></div>
+
+<div class="velo" id="pAyuda" hidden><div class="hoja" role="dialog" aria-label="Cómo se juega">
+  <h2>Cómo se juega</h2>
+  <p>Una noche de tormenta llegás a la Mansión Sombranegra para investigar la muerte del Conde Ulrico. Lo que encontrás ahí es mucho peor que un asesinato. El juego tiene <b>tres capítulos</b> y es largo: no se termina en una sentada. Se guarda solo.</p>
+  <h3>Controles en la compu</h3>
+  <ul>
+    <li><b>W A S D</b> o flechas: caminar. <b>Shift</b> (mantener): correr.</li>
+    <li><b>Mouse</b>: apuntar la linterna. <b>F</b>: prender o apagar la linterna.</li>
+    <li><b>E</b> o espacio: examinar, hablar, abrir, esconderte y salir del escondite.</li>
+    <li><b>G</b>: tirar una botella (para distraer). <b>Q</b> o <b>Tab</b>: diario. <b>Esc</b>: pausa.</li>
+  </ul>
+  <h3>Controles en el celular</h3>
+  <ul>
+    <li>La rueda de la izquierda mueve. Los botones de la derecha: <b>Acción</b>, <b>Correr</b> (mantener), <b>Linterna</b> y <b>Botella</b>.</li>
+    <li>La linterna apunta hacia donde caminás. Se juega mejor con el teléfono acostado y con auriculares.</li>
+  </ul>
+  <h3>Sobrevivir</h3>
+  <ul>
+    <li><b>Linterna</b>: se gasta. Juntá pilas; se cambian solas cuando se agota. Con la linterna prendida ves más, pero también te ven desde más lejos.</li>
+    <li><b>Cordura</b>: baja en la oscuridad y cuando ves cosas que no deberías ver. Con poca cordura vas a escuchar y ver cosas que no están. Si llega a cero, te desmayás. Cerca de una vela se recupera.</li>
+    <li><b>Aliento</b>: correr lo gasta, y correr hace ruido.</li>
+    <li><b>Escondites</b>: en los roperos y debajo de las camas podés esconderte (acción al lado). Si algo te vio entrar, no sirve.</li>
+    <li>Si algo te atrapa, volvés al último punto seguro. No perdés lo que encontraste.</li>
+  </ul>
+  <h3>Cada criatura es distinta</h3>
+  <ul>
+    <li>Prestá atención a lo que dicen los documentos: explican cómo funciona cada cosa que te persigue. Lo que sirve con una, con otra te mata.</li>
+  </ul>
+  <h3>Resolver</h3>
+  <ul>
+    <li>El <b>Diario</b> guarda tu objetivo, las pistas del caso, los documentos y los objetos. Hay un <b>mapa</b> de lo que ya recorriste.</li>
+    <li>Las cosas para examinar brillan apenas cuando las alumbrás. Leé todo: las claves de los candados están escondidas en los textos.</li>
+    <li>El caso cambia en cada partida nueva: el culpable, el arma, la hora y las claves se sortean.</li>
+    <li>Si te trabás, en el Diario hay un botón "Necesito una pista" (no en Modo Pesadilla).</li>
+  </ul>
+  <h3>Guardar y otro aparato</h3>
+  <ul>
+    <li>Se guarda solo al encontrar cosas, al cambiar de lugar y al salir.</li>
+    <li>Para seguir en otro aparato: Menú → "Pasar la partida a otro aparato". Copiá el código, mandátelo (por ejemplo por WhatsApp) y en el otro aparato tocá "Cargar código" en la pantalla de inicio. Si jugás desde Claude con tu cuenta, además se guarda en la nube solo.</li>
+  </ul>
+  <h3>En línea</h3>
+  <ul>
+    <li>Uno crea la sala y pasa el código; los demás se unen con ese código. Las pistas, llaves y puertas se comparten. Si estás en el mismo lugar que otro jugador, lo ves.</li>
+  </ul>
+  <div class="fila-btn"><button class="btn" data-cerrar>Entendido</button></div>
+</div></div>
+
+<div class="velo" id="pFinal" hidden><div class="hoja oscura" role="dialog" aria-label="Final">
+  <h2 id="fTit"></h2>
+  <div id="fTxt"></div>
+  <div class="stats" id="fStats"></div>
+  <div class="fila-btn" id="fBtns"></div>
+</div></div>
+
+<div id="muerte" hidden>
+  <h2 id="mTit">Te atrapó</h2>
+  <p id="mTxt"></p>
+  <button class="btn-grande" id="mSeguir">Despertar</button>
+</div>
+
+<div id="portada">
+  <div class="portada-in">
+    <div class="sub">Tres capítulos de terror</div>
+    <h1>Mansión Sombranegra</h1>
+    <div class="aviso">Contiene sustos fuertes, sangre y escenas perturbadoras. Se recomienda jugar de noche, con auriculares.</div>
+    <div class="historia" id="portHist">Tormenta. Medianoche. El Conde Ulrico Sombranegra apareció muerto en su biblioteca y cinco personas quedaron encerradas con el cuerpo. Te llamaron para encontrar al asesino. Nadie te dijo qué más vive en esa casa.</div>
+    <div class="menu">
+      <button class="btn-grande" id="bContinuar" hidden>Continuar</button>
+      <button class="btn-grande" id="bNueva">Nueva partida</button>
+      <button class="btn-menu" id="bPesadilla" hidden>Modo Pesadilla</button>
+      <div class="menu-fila">
+        <button class="btn-menu" id="bOnline">Jugar en línea</button>
+        <button class="btn-menu" id="bCargar">Cargar código</button>
+        <button class="btn-menu" id="bAyuda">Cómo se juega</button>
+      </div>
+      <div class="nota" id="notaNube"></div>
+    </div>
+    <div class="credito">Creado por Fernando Jacyno · 10/2026</div>
+  </div>
+</div>
+
+<div id="tactil" hidden>
+  <div id="joy"><div id="knob"></div></div>
+  <div class="tbtns">
+    <button class="tb" id="tLuz">Linterna</button>
+    <button class="tb" id="tBot" hidden>Botella</button>
+    <button class="tb" id="tCorrer">Correr</button>
+    <button class="tb grande" id="tAcc">Acción</button>
+  </div>
+</div>
