@@ -10,7 +10,8 @@ const CONFIG = {
   HOJA_USUARIOS:  'Usuarios y contraseñas',
   HOJA_quienRetira: 'quienRetira',
   HOJA_OBJETIVOS: 'objetivos',
-  HOJA_PERSONAL:  'personal',      // listado de personal de Stock Manager (legajo | nombre | empresa | estado)
+  HOJA_PERSONAL:  'personal',      // listado de personal / vigiladores (legajo | nombre | empresa | estado)
+  PERSONAL_GID:   1959223792,      // pestaña del personal (gid de la URL)
 
   // Se identifican por el gid de la URL (…/edit?gid=XXXX), así no importa cómo se llame la pestaña.
   USUARIOS_GID:  310678371,    // encabezados: id | nombre | usuario | password | rol | correo
@@ -179,19 +180,25 @@ const EMPRESAS_SIGLA_ = {
   'LEG': 'LEG'
 };
 function leerPersonal_() {
-  const sh = ss_().getSheets().find(h => norm_(h.getName()) === norm_(CONFIG.HOJA_PERSONAL));
-  if (!sh) throw new Error('No se encontró la pestaña "' + CONFIG.HOJA_PERSONAL + '" en la planilla.');
-  const vals = sh.getDataRange().getDisplayValues();
+  const vals = hojaPor_(CONFIG.HOJA_PERSONAL, CONFIG.PERSONAL_GID).getDataRange().getDisplayValues();
   if (vals.length < 2) return [];
-  const enc = vals[0].map(norm_);
-  const cL = enc.indexOf('legajo'), cN = enc.indexOf('nombre'), cE = enc.indexOf('empresa'), cS = enc.indexOf('estado');
-  if (cL < 0 || cN < 0) throw new Error('La pestaña personal no tiene las columnas "legajo" y "nombre".');
+  // Fila de encabezados: la primera (de las 5 primeras) que tenga "legajo" o "nombre".
+  let h = 0;
+  for (let i = 0; i < Math.min(5, vals.length); i++) if (vals[i].some(c => /legajo|nombre|apellido/.test(norm_(c)))) { h = i; break; }
+  const enc = vals[h].map(norm_);
+  const busca = re => enc.findIndex(x => re.test(x));
+  const cL = busca(/legajo|^leg\.?$/);
+  const cFull = busca(/apellido\s*y\s*nombre|nombre\s*y\s*apellido|nombre completo|^nombre$|^nombres$/);
+  const cApe = busca(/^apellidos?$/), cNom = busca(/^nombres?$/);
+  const cE = busca(/empresa|razon social/), cS = busca(/^estado$|situacion/);
+  if (cL < 0 || (cFull < 0 && cApe < 0)) throw new Error('La pestaña del personal no tiene columnas de legajo y nombre. Encabezados: ' + vals[h].join(' | '));
   const out = [];
-  vals.slice(1).forEach(f => {
-    const nombre = String(f[cN] || '').replace(/\s+/g, ' ').trim().toUpperCase();
+  vals.slice(h + 1).forEach(f => {
+    let nombre = cApe >= 0 && cNom >= 0 && cFull === cNom ? (f[cApe] + ' ' + f[cNom]) : (cFull >= 0 ? f[cFull] : f[cApe]);
+    nombre = String(nombre || '').replace(/\s+/g, ' ').trim().toUpperCase();
     const legajo = String(f[cL] || '').trim();
     if (!nombre || !legajo) return;
-    if (cS >= 0 && norm_(f[cS]) === 'baja') return;
+    if (cS >= 0 && /^baja/.test(norm_(f[cS]))) return;
     const emp = cE >= 0 ? String(f[cE] || '').trim() : '';
     out.push({ nombre: nombre, legajo: legajo, empresa: EMPRESAS_SIGLA_[emp] || emp });
   });
@@ -472,6 +479,7 @@ function reenviar_(req) {
    Ejecutala una vez desde el editor para aceptar los permisos y ver las listas. */
 function probarListas() {
   Logger.log('Encabezados usuarios: ' + JSON.stringify(tabla_(CONFIG.HOJA_USUARIOS, CONFIG.USUARIOS_GID).headRaw.filter(h => !/contrase|clave|pass/i.test(h))));
+  Logger.log('Encabezados personal: ' + JSON.stringify(hojaPor_(CONFIG.HOJA_PERSONAL, CONFIG.PERSONAL_GID).getRange(1, 1, 1, 30).getDisplayValues()[0].filter(String)));
   Logger.log('Encabezados objetivos: ' + JSON.stringify(tabla_(CONFIG.HOJA_OBJETIVOS, CONFIG.OBJETIVOS_GID).headRaw));
   Logger.log(JSON.stringify({
     usuarios: leerUsuarios_().slice(0, 5),
