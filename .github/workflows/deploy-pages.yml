@@ -40,6 +40,9 @@ jobs:
           python3 tools/armar_pagina.py sgi-app _site/sgi Admin
           # Informe de Novedades: app estática (HTML + JS), se copia tal cual
           cp -R informe-de-novedades _site/informe-de-novedades
+          # Iconos de cada app (se ven en la pestaña del navegador)
+          cp -R iconos _site/iconos
+          sed -i '0,/<head[^>]*>/s##&\n<link rel="icon" type="image/png" sizes="64x64" href="/Delben/iconos/sgi-64.png">\n<link rel="apple-touch-icon" href="/Delben/iconos/sgi-192.png">#' _site/sgi/index.html
             
 
       - name: Configure Pages
