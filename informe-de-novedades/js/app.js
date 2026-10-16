@@ -288,48 +288,59 @@
     }
     return box;
   }
-  function ocultarPersonal(campo) { const b = cajaPersonal(campo); b.hidden = true; b.innerHTML = ""; }
+  function ocultarPersonal(campo) { const b = cajaPersonal(campo); b.hidden = true; b.innerHTML = ""; b.dataset.clave = ""; }
 
-  // Muestra al personal que coincide con la palabra [ini, fin) del campo.
-  function ofrecerPersonal(campo, ini, fin) {
-    const box = cajaPersonal(campo), pers = S.personal;
-    const palabra = campo.value.slice(ini, fin), q = norm(palabra);
-    if (!pers.length || q.length < 3) return ocultarPersonal(campo);
-    const cap = /^\p{Lu}/u.test(palabra);
-    if (!pareceNombre(campo.value, ini)) return ocultarPersonal(campo);
-    // Palabra completa igual a un apellido/nombre (4+ letras) o, si empieza con mayúscula, prefijo.
-    const coinc = pers.filter((p) => apellidos(p).some((t) => (t === q) || (cap && q.length >= 4 && t.startsWith(q)))).slice(0, 30);
-    if (!coinc.length) return ocultarPersonal(campo);
-    box.innerHTML = '<div class="sug-head"><span>👤 ¿Qué ' + esc(palabra.toUpperCase()) + ' es? Tocá a la persona</span><button type="button" data-no="1">Ninguno</button></div>' +
-      coinc.map((p, i) => '<button type="button" role="option" class="suggestion" data-i="' + i + '"><strong>' + esc(p.nombre) + '</strong>' + (detallePersonal(p) ? "<small>" + esc(detallePersonal(p)) + "</small>" : "") + "</button>").join("");
+  // Busca en todo el texto el primer apellido del personal que todavía no tiene legajo
+  // (lo ya elegido queda "APELLIDO NOMBRE, legajo N, ..." en mayúsculas y no se vuelve a preguntar).
+  const ignoradosPorCampo = {};
+  function mencionPendiente(v, ignorados) {
+    const re = /[\p{L}'’]{3,}/gu; let m;
+    while ((m = re.exec(v))) {
+      const w = m[0], q = norm(w), ini = m.index, fin = ini + w.length;
+      if (ignorados && ignorados.has(ini + "|" + q)) continue;
+      if (!pareceNombre(v, ini)) continue;
+      if (/^[\p{Lu}'’.\s-]{0,60},\s*legajo\s/u.test(v.slice(ini))) continue;
+      let cand = personalPorApellido(q), ini2 = ini;
+      const prev = v.slice(0, ini).match(/([\p{L}]+)\s+$/u);          // "San Martin", "Del Valle"
+      if (prev && PARTICULAS.has(norm(prev[1]))) { const c2 = personalPorApellido(norm(prev[1]) + " " + q); if (c2.length) { cand = c2; ini2 = ini - prev[0].length; } }
+      if (cand.length) return { ini: ini2, fin, palabra: v.slice(ini2, fin), cand, clave: ini + "|" + q };
+    }
+    return null;
+  }
+  // Muestra debajo del campo la lista de personas para la mención encontrada.
+  function ofrecerPersonal(campo, h) {
+    const box = cajaPersonal(campo);
+    box.innerHTML = '<div class="sug-head"><span>👤 ¿Qué ' + esc(h.palabra.toUpperCase()) + ' es? Tocá a la persona</span><button type="button" data-no="1">Ninguno</button></div>' +
+      h.cand.slice(0, 40).map((p, i) => '<button type="button" role="option" class="suggestion" data-i="' + i + '"><strong>' + esc(p.nombre) + '</strong>' + (detallePersonal(p) ? "<small>" + esc(detallePersonal(p)) + "</small>" : "") + "</button>").join("");
     box.hidden = false;
+    try { box.scrollIntoView({ block: "nearest", behavior: "smooth" }); } catch (e) {}
     const elegir = (e) => {
       const b = e.target.closest("button"); if (!b || !box.contains(b)) return;
       e.preventDefault(); e.stopPropagation();
-      if (b.dataset.no) return ocultarPersonal(campo);
-      const p = coinc[+b.dataset.i]; if (!p) return;
-      const t = textoPersonal(p), v = campo.value;
-      campo.value = v.slice(0, ini) + t + v.slice(fin);
-      const pos = ini + t.length; campo.focus(); campo.setSelectionRange(pos, pos);
+      if (b.dataset.no) { (ignoradosPorCampo[campo.id] = ignoradosPorCampo[campo.id] || new Set()).add(h.clave); ocultarPersonal(campo); return sugerirPersonal(campo); }
+      const p = h.cand[+b.dataset.i]; if (!p) return;
+      const t = textoPersonal(p), v = campo.value, cur = campo.selectionStart == null ? v.length : campo.selectionStart;
+      campo.value = v.slice(0, h.ini) + t + v.slice(h.fin);
+      const pos = cur >= h.fin ? cur + (t.length - (h.fin - h.ini)) : h.ini + t.length;
       ocultarPersonal(campo); campo.dispatchEvent(new Event("input", { bubbles: true }));
+      try { campo.setSelectionRange(pos, pos); } catch (e2) {}
+      sugerirPersonal(campo);                                   // si hay otro apellido pendiente, lo ofrece
     };
-    box.onclick = elegir;
+    // pointerdown: elige antes de que el teclado se cierre y mueva la pantalla
+    box.onpointerdown = elegir; box.onclick = (e) => e.preventDefault();
   }
-  // Mientras se escribe: mira la palabra que está justo antes del cursor.
+  // Mientras se escribe o se dicta (con el 🎤 del teclado o el de la app): revisa todo el texto,
+  // así la lista aparece aunque después de "Pérez" se siga escribiendo.
   function sugerirPersonal(campo) {
-    const cur = campo.selectionStart, m = campo.value.slice(0, cur).match(/([\p{L}'’-]{3,})$/u);
-    if (!m) return ocultarPersonal(campo);
-    ofrecerPersonal(campo, cur - m[1].length, cur);
+    if (!S.personal.length) return ocultarPersonal(campo);
+    const h = mencionPendiente(campo.value, ignoradosPorCampo[campo.id]);
+    if (!h) return ocultarPersonal(campo);
+    const box = cajaPersonal(campo);
+    if (!box.hidden && box.dataset.clave === h.clave) return;   // ya está mostrada
+    box.dataset.clave = h.clave;
+    ofrecerPersonal(campo, h);
   }
-  // Al dictar: busca en la frase recién dicha un apellido del personal.
-  function personalEnDictado(campo, frase) {
-    const pals = String(frase).match(/[\p{L}'’-]{3,}/gu) || [];
-    const set = new Set(); S.personal.forEach((p) => apellidos(p).forEach((t) => { if (t.length >= 3) set.add(t); }));
-    const hallada = pals.find((w) => set.has(norm(w)));
-    if (!hallada) return;
-    const v = campo.value, i = v.toLowerCase().lastIndexOf(hallada.toLowerCase());
-    if (i >= 0) ofrecerPersonal(campo, i, i + hallada.length);
-  }
+  function personalEnDictado(campo) { sugerirPersonal(campo); }
   // Botón "Personal": búsqueda manual con lista (sin teclado complicado).
   function buscarPersonal(id) {
     const campo = $("#" + id); if (!campo) return;
@@ -353,20 +364,10 @@
   // (y que todavía no tiene legajo) pregunta qué persona es y lo reemplaza por "APELLIDO NOMBRE, legajo N, empresa X".
   function elegirPersonalDelTexto(id, despues) {
     const campo = $("#" + id); if (!campo || !S.personal.length) return despues();
-    const ignorados = new Set();
+    ocultarPersonal(campo);
+    const ignorados = new Set(ignoradosPorCampo[id] || []);
     const siguiente = () => {
-      const v = campo.value, re = /[\p{L}'’]{3,}/gu; let m, hallado = null;
-      while ((m = re.exec(v))) {
-        const w = m[0], q = norm(w), ini = m.index, fin = ini + w.length;
-        if (ignorados.has(ini + "|" + q)) continue;
-        if (!pareceNombre(v, ini)) continue;
-        // ya completado: el nombre en mayúsculas va seguido de ", legajo"
-        if (/^[\p{Lu}'’.\s-]{0,60},\s*legajo\s/u.test(v.slice(ini))) continue;
-        let cand = personalPorApellido(q), ini2 = ini;
-        const prev = v.slice(0, ini).match(/([\p{L}]+)\s+$/u);          // "San Martin", "Del Valle"
-        if (prev && PARTICULAS.has(norm(prev[1]))) { const c2 = personalPorApellido(norm(prev[1]) + " " + q); if (c2.length) { cand = c2; ini2 = ini - prev[0].length; } }
-        if (cand.length) { hallado = { ini: ini2, fin, palabra: v.slice(ini2, fin), cand, clave: ini + "|" + q }; break; }
-      }
+      const hallado = mencionPendiente(campo.value, ignorados);
       if (!hallado) { closeModal(); return despues(); }
       const h = hallado;
       openModal('<h2 style="margin:0 0 4px;color:var(--green-d)">👤 ¿Qué ' + esc(h.palabra.toUpperCase()) + ' es?</h2>' +
@@ -721,7 +722,7 @@
     $("#inCc").addEventListener("input", () => mostrarSugerenciasDestinatario("cc"));
     ["informe", "medidas"].forEach((id) => {
       const el = $("#" + id);
-      el.addEventListener("input", (ev) => { if (ev.isTrusted) sugerirPersonal(el); });
+      el.addEventListener("input", () => { clearTimeout(el._tPers); el._tPers = setTimeout(() => sugerirPersonal(el), 350); });
       Corrector.attach(el, $('.spell-btn[data-target="' + id + '"]'));
     });
     $$(".pers-btn").forEach((b) => b.addEventListener("click", () => buscarPersonal(b.dataset.target)));
