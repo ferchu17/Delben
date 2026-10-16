@@ -783,11 +783,13 @@
           <div class="sheet-t"><h4>Medidas Tomadas:</h4><div>${esc(it.medidas)}</div></div>
         </div></div>
       <div class="modal-actions">
+        <button class="btn" id="vVer">📄 Ver PDF</button>
         <button class="btn mail" id="vMail">✉ Enviar por correo</button>
         <button class="btn wa" id="vWa">↗ Compartir</button>
         <button class="btn dl" id="vDl">⬇ Descargar</button>
       </div><div id="vPanel"></div>`);
 
+    $("#vVer").onclick = async () => { try { overlay("Abriendo PDF…"); const p = await getPdfBlob(it); overlay(); verPdf(p.blob, "Informe N° " + it.numero, () => verInforme(it)); } catch (e) { overlay(); toast(e.message, true); } };
     $("#vDl").onclick = async () => { try { overlay("Preparando PDF…"); const p = await getPdfBlob(it); overlay(); descargarBlob(p.blob, p.nombre); } catch (e) { overlay(); toast(e.message, true); } };
 
     $("#vWa").onclick = async () => {

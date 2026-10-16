@@ -457,7 +457,17 @@ function buscar_(req) {
   const last = sh.getLastRow();
   if (last < 2) return { ok: true, items: [] };
   const vals = sh.getRange(2, 1, last - 1, HEADERS.length).getValues();
-  const tokens = norm_(req.q || '').split(/\s+/).filter(Boolean);
+  // Cada palabra buscada puede coincidir con sus parecidas: "ausencia" encuentra "faltó", "ausente", etc.
+  const SINONIMOS = [
+    ['ausencia', 'ausente', 'falta', 'falto', 'faltando', 'faltante', 'inasistencia', 'no se presento', 'no concurrio'],
+    ['tarde', 'tardanza', 'llegada tarde', 'demora', 'retraso'],
+    ['robo', 'hurto', 'faltante de', 'sustraccion'],
+    ['abandono', 'abandono de puesto', 'se retiro', 'dejo el puesto'],
+    ['accidente', 'lesion', 'herido', 'golpe'],
+    ['enfermedad', 'enfermo', 'medico', 'certificado']
+  ];
+  const variantes = t => { const g = SINONIMOS.find(l => l.some(w => w === t || (t.length >= 4 && w.startsWith(t)))); return g ? g.concat([t]) : [t]; };
+  const tokens = norm_(req.q || '').split(/\s+/).filter(Boolean).map(variantes);
   const desde = req.desde ? Number(String(req.desde).replace(/-/g, '')) : 0;   // 'yyyy-mm-dd'
   const hasta = req.hasta ? Number(String(req.hasta).replace(/-/g, '')) : 99999999;
   const items = [];
@@ -466,7 +476,7 @@ function buscar_(req) {
     const f = fechaTxt_(r[COL.FECHA]), fn = fechaNum_(f);
     if (fn && (fn < desde || fn > hasta)) return;
     const hay = norm_([r[COL.NUM], f, r[COL.DE], r[COL.PARA], r[COL.ASUNTO], r[COL.OBJ], r[COL.TEXTO], r[COL.MEDIDAS]].join(' '));
-    if (!tokens.every(t => hay.indexOf(t) >= 0)) return;
+    if (!tokens.every(vs => vs.some(t => hay.indexOf(t) >= 0))) return;
     items.push({
       id: r[COL.ID], numero: String(r[COL.NUM]), fecha: f, de: r[COL.DE], para: r[COL.PARA],
       asunto: r[COL.ASUNTO], objetivo: r[COL.OBJ], informe: r[COL.TEXTO], medidas: r[COL.MEDIDAS],
