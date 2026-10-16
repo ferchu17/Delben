@@ -187,7 +187,7 @@
       ? "Esta app instalada no trae el dictado de voz de Chrome, por eso el 🎤 de la pantalla no puede andar acá. " + ABRIR_EN_CHROME
       : "Este navegador no tiene dictado de voz. Usá Google Chrome actualizado. " + ABRIR_EN_CHROME, true);
 
-    const r = new SR(); r.lang = "es-AR"; r.continuous = true; r.interimResults = true; r.maxAlternatives = 1;
+    const r = new SR(); r.lang = "es-AR"; r.continuous = false; r.interimResults = true; r.maxAlternatives = 1;   // una frase por vez; la app la vuelve a arrancar sola
     // Android corta el reconocimiento después de cada frase: la app lo vuelve a arrancar sola
     // y sigue escuchando hasta que se toca otra vez el botón.
     let base = "", segmentos = [];
@@ -200,8 +200,11 @@
     r.onspeechstart = () => { vivo(); nota("🔴 Te oigo…"); };
     r.onresult = (ev) => {
       vivo(); huboTexto = true;
-      for (let i = 0; i < ev.results.length; i++) segmentos[i] = ev.results[i][0].transcript;
-      target.value = (base + segmentos.filter(Boolean).join(" ")).replace(/[ \t]+/g, " ").trimStart();
+      // Android manda la misma frase varias veces, cada vez más completa: se usa solo la última versión.
+      const frase = String(ev.results[ev.results.length - 1][0].transcript || "").trim();
+      if (!frase) return;
+      segmentos = [frase];
+      target.value = (base + frase).replace(/[ \t]+/g, " ").trimStart();
       target.dispatchEvent(new Event("input", { bubbles: true }));
       if (target.tagName === "TEXTAREA") target.scrollTop = target.scrollHeight;
       nota("🔴 Escuchando… texto recibido");
@@ -625,14 +628,48 @@
     document.body.appendChild(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1500);
   }
 
+  // Muestra el PDF dentro de la app (Android no abre PDF en el navegador y los supervisores no tienen acceso a Drive).
+  let pdfjsCarga = null;
+  function cargarPdfJs() {
+    if (window.pdfjsLib) return Promise.resolve(window.pdfjsLib);
+    if (!pdfjsCarga) pdfjsCarga = new Promise((ok, mal) => {
+      const sc = document.createElement("script");
+      sc.src = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js";
+      sc.onload = () => { window.pdfjsLib.GlobalWorkerOptions.workerSrc = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js"; ok(window.pdfjsLib); };
+      sc.onerror = () => { pdfjsCarga = null; mal(new Error("No se pudo cargar el visor de PDF (revisá la conexión).")); };
+      document.head.appendChild(sc);
+    });
+    return pdfjsCarga;
+  }
+  async function verPdf(blob, titulo, volver) {
+    openModal('<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:8px"><h2 style="margin:0;color:var(--green-d)">📄 ' + esc(titulo) + '</h2>' +
+      '<button class="btn small" id="pdfVolver">← Volver</button></div><div id="pdfPaginas" style="display:flex;flex-direction:column;gap:10px"><p class="hint">Abriendo PDF…</p></div>');
+    $("#pdfVolver").onclick = () => (volver ? volver() : closeModal());
+    try {
+      const lib = await cargarPdfJs();
+      const doc = await lib.getDocument({ data: new Uint8Array(await blob.arrayBuffer()) }).promise;
+      const cont = $("#pdfPaginas"); if (!cont) return; cont.innerHTML = "";
+      const ancho = Math.max(280, cont.clientWidth || 340);
+      for (let n = 1; n <= doc.numPages; n++) {
+        const pag = await doc.getPage(n), v1 = pag.getViewport({ scale: 1 });
+        const esc2 = (ancho / v1.width) * Math.min(2, window.devicePixelRatio || 1), vp = pag.getViewport({ scale: esc2 });
+        const cv = document.createElement("canvas"); cv.width = vp.width; cv.height = vp.height;
+        cv.style.cssText = "width:100%;height:auto;border:1px solid #d3dcd6;border-radius:6px;background:#fff";
+        cont.appendChild(cv);
+        await pag.render({ canvasContext: cv.getContext("2d"), viewport: vp }).promise;
+      }
+    } catch (e) { const c = $("#pdfPaginas"); if (c) c.innerHTML = '<p class="hint">' + esc(e.message || String(e)) + '</p>'; }
+  }
+
   function mostrarExito(fin, pdf, to, cc) {
     openModal(`<div class="ok-big"><div class="tick">✓</div><h2>¡Informe N° ${esc(fin.numero)} enviado!</h2>
       <p class="hint">Se guardó en la carpeta de informes y se envió en PDF.</p></div>
       <p style="font-size:14px"><b>Para:</b> ${esc(to.join(", "))}<br><b>Copia:</b> ${esc(cc.filter(Boolean).join(", "))}</p>
       <div class="modal-actions"><button class="btn dl" id="okDl">⬇ Descargar PDF</button>
-      ${DEMO ? "" : `<a class="btn" style="text-decoration:none;text-align:center" href="${esc(fin.url)}" target="_blank" rel="noopener">📁 Ver en Drive</a>`}
+      <button class="btn" id="okVer">📄 Ver PDF</button>
       <button class="btn send" id="okNuevo" style="flex:none">＋ Nuevo informe</button></div>`);
     $("#okDl").onclick = () => descargarBlob(pdf.blob, "Informe_de_Novedades_" + fin.numero + ".pdf");
+    $("#okVer").onclick = () => verPdf(pdf.blob, "Informe N° " + fin.numero, () => mostrarExito(fin, pdf, to, cc));
     $("#okNuevo").onclick = () => { closeModal(); limpiar(true); };
   }
 
