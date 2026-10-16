@@ -160,6 +160,21 @@
   // Dictado por voz con el botón 🎤 de la pantalla. Mismo funcionamiento que el 15/10, con diagnóstico visible.
   const ES_WEBVIEW = /; wv\)/.test(navigator.userAgent) || (/Android/.test(navigator.userAgent) && /Version\/[\d.]+/.test(navigator.userAgent) && !/SamsungBrowser/.test(navigator.userAgent));
   const ABRIR_EN_CHROME = "Abrí la app en Chrome: " + location.origin + location.pathname + " (desde Chrome, menú ⋮ › Agregar a pantalla principal, así queda el ícono y el micrófono funciona).";
+  // Datos para saber por qué no anda el dictado: modo de la app, permiso y si el micrófono responde.
+  async function diagnosticoMic() {
+    const d = { mic: "?", permiso: "?" };
+    const modo = window.matchMedia && matchMedia("(display-mode: standalone)").matches ? "ícono instalado" : "pestaña del navegador";
+    try { if (navigator.permissions) d.permiso = (await navigator.permissions.query({ name: "microphone" })).state; } catch (e) {}
+    if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+      try {
+        const st = await Promise.race([navigator.mediaDevices.getUserMedia({ audio: true }), new Promise((_, rej) => setTimeout(() => rej(new Error("sin respuesta")), 8000))]);
+        st.getTracks().forEach((t) => t.stop()); d.mic = "ok";
+      } catch (e) { d.mic = (e && e.name && e.name !== "Error" ? e.name : (e && e.message) || "error"); }
+    } else d.mic = "sin getUserMedia";
+    const nav = (navigator.userAgent.match(/(SamsungBrowser|EdgA|OPR|Firefox|Chrome)\/[\d]+/) || ["?"])[0];
+    d.texto = modo + " · permiso " + d.permiso + " · micrófono " + d.mic + " · " + nav + (ES_WEBVIEW ? " · WebView" : "");
+    return d;
+  }
   function toggleMic(btn) {
     if (recBtn === btn) return stopRec();
     stopRec();
@@ -178,7 +193,7 @@
     const segmentos = [];
     let eventos = 0, huboTexto = false, fallo = false;
     const vivo = () => { eventos++; };
-    r.onstart = () => { vivo(); nota("🔴 Escuchando… hablá ahora (tocá el botón para terminar)"); };
+    r.onstart = () => { vivo(); delete btn.dataset.reintento; nota("🔴 Escuchando… hablá ahora (tocá el botón para terminar)"); };
     r.onaudiostart = () => { vivo(); nota("🔴 Micrófono activo, te escucho…"); };
     r.onspeechstart = () => { vivo(); nota("🔴 Te oigo…"); };
     r.onresult = (ev) => {
@@ -210,14 +225,22 @@
       recBtn = null;
       if (!fallo) nota(huboTexto ? "Dictado terminado. Tocá 🎤 Hablar para seguir dictando." : "Terminó sin texto. Tocá 🎤 Hablar y hablá enseguida.");
     };
-    // Si en 7 segundos no llegó ninguna señal, el servicio de voz no está respondiendo en este celular/app.
-    const perro = setTimeout(() => {
+    // Si en 7 segundos no llegó ninguna señal: se prueba el micrófono directo (eso también pide el permiso)
+    // y se reintenta el dictado una vez. Si sigue sin responder, se muestra un diagnóstico para enviar.
+    const perro = setTimeout(async () => {
       if (rec !== r || eventos) return;
       fallo = true; try { r.abort(); } catch (e) {}
       rec = null; btn.classList.remove("rec"); const sp = $("span", btn); if (sp) sp.textContent = "Hablar"; recBtn = null;
-      nota(ES_WEBVIEW
-        ? "El dictado no responde dentro de esta app instalada. " + ABRIR_EN_CHROME
-        : "El servicio de voz del celular no respondió. Revisá que la app Google esté instalada y actualizada, y que Chrome tenga permiso de micrófono.", true);
+      const d = await diagnosticoMic();
+      if (d.mic === "ok" && !btn.dataset.reintento) {
+        btn.dataset.reintento = "1"; nota("Micrófono habilitado. Reintentando el dictado…");
+        setTimeout(() => toggleMic(btn), 300); return;
+      }
+      delete btn.dataset.reintento;
+      nota((ES_WEBVIEW ? "El dictado no responde dentro de esta app instalada. " + ABRIR_EN_CHROME
+        : d.mic === "ok" ? "El micrófono anda pero el servicio de voz de Google no responde. Probá abrir la misma dirección en una pestaña común de Chrome (no desde el ícono) y, si ahí anda, borrá el ícono y volvé a agregarlo desde Chrome › ⋮ › Agregar a pantalla principal."
+        : "El micrófono no está disponible para esta página. En Chrome: candado 🔒 › Permisos › Micrófono › Permitir.") +
+        "  [Diag: " + d.texto + "]", true);
     }, 7000);
     try { r.start(); }
     catch (e) { clearTimeout(perro); return nota("No se pudo iniciar el dictado (" + (e && e.message || e) + "). Volvé a tocar 🎤.", true); }
