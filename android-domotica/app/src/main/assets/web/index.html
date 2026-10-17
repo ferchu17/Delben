@@ -432,6 +432,8 @@ function aplicarConfig(){
 }
 
 function abrirAjustes(){
+  // Si ya está abierto (por ejemplo, al volver de copiar una clave en otra app), no se borra lo escrito
+  if ($('capa').classList.contains('abierta')){ aplicarConfig(); return; }
   $('fAccess').value = cfg.accessId || '';
   $('fSecret').value = '';
   $('fSecret').placeholder = cfg.tieneSecret ? '•••••••• (guardado)' : '';
