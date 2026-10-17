@@ -1026,16 +1026,7 @@ function marcarPedido_(id, estado, respuesta, quien) {
 /**
  * El mail de los lunes se programa desde el editor: Activadores (ícono del reloj) → Agregar activador →
  * función recordatorioSemanal → Basado en tiempo → Temporizador semanal → Todos los lunes → 8 a 9 h → Guardar.
- * (Esta función hace lo mismo, pero necesita agregar el permiso script.scriptapp en appsscript.json.)
  */
-function instalarRecordatorio() {
-  ScriptApp.getProjectTriggers()
-    .filter(t => t.getHandlerFunction() === 'recordatorioSemanal')
-    .forEach(t => ScriptApp.deleteTrigger(t));
-  ScriptApp.newTrigger('recordatorioSemanal').timeBased()
-    .onWeekDay(ScriptApp.WeekDay.MONDAY).atHour(8).inTimezone(CFG.TZ).create();
-  Logger.log('Recordatorio instalado: todos los lunes a las 8.');
-}
 
 /**
  * Mail de los lunes: le recuerda que envíe la rendición SOLO a las personas de la pestaña "quienRetira"
