@@ -51,6 +51,9 @@ jobs:
           # Juego Mansión Sombranegra (https://ferchu17.github.io/Delben/mansion/). Se arma con: python3 juego-mansion/build.py
           mkdir -p _site/mansion
           cp juego-mansion/index.html _site/mansion/index.html
+          # Instructivos interactivos de todas las apps (https://ferchu17.github.io/Delben/instructivos/). Se arman con: python3 instructivos/src/armar.py
+          mkdir -p _site/instructivos
+          cp instructivos/*.html instructivos/motor.css instructivos/motor.js _site/instructivos/
           # Portal DELBEN: página con todas las apps (https://ferchu17.github.io/Delben/portal/)
           cp -R portal _site/portal
           # DelBen Domótica: página con la descarga de la APK e instrucciones (https://ferchu17.github.io/Delben/domotica/)

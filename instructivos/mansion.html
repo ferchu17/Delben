@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Instructivo</title>
+<link rel="icon" type="image/png" sizes="64x64" href="/Delben/iconos/sgi-64.png">
+<link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" rel="stylesheet">
+<link href="motor.css" rel="stylesheet">
+</head>
+<body>
+<script>
+window.GUIA = {
+  app: 'Mansión Sombranegra', sub: 'Juego de terror y misterio (+16)',
+  icono: 'fa-solid fa-ghost', c1: '#2a0608', c2: '#7a1a1a', abrir: '../mansion/',
+  apk: 'https://github.com/ferchu17/Delben/releases/download/mansion-apk/MansionSombranegra.apk',
+  roles: [{
+    id: 'jugador', nombre: 'Jugador',
+    pasos: [
+      { t: 'La historia',
+        html: '<p>Una noche de tormenta llegás a la Mansión Sombranegra para investigar la muerte del Conde Ulrico. Lo que encontrás es mucho peor que un asesinato.</p><p>El juego tiene <b>tres capítulos</b> y es largo: no se termina en una sentada. <b>Se guarda solo.</b></p><div class="tip">El caso cambia en cada partida nueva: el culpable, el arma, la hora y las claves se sortean.</div>',
+        tel: { titulo: 'Mansión Sombranegra', salir: false, oscuro: true, cont: '<div class="cd" style="background:#1a0507;color:#f4e6e6;text-align:center;padding:20px"><b style="font-size:16px">MANSIÓN SOMBRANEGRA</b><br><br><span class="b r foco">Nueva partida</span><br><span class="b g">Cómo se juega</span></div>' } },
+      { t: 'Controles en el celular',
+        html: '<ul><li>La <b>rueda de la izquierda</b> mueve.</li><li>Botones de la derecha: <b>Acción</b>, <b>Correr</b> (mantener), <b>Linterna</b> y <b>Botella</b> (para distraer).</li><li>La linterna apunta hacia donde caminás.</li></ul><p>Se juega mejor con el teléfono acostado y con auriculares.</p>',
+        tel: { titulo: 'Mansión Sombranegra', salir: 'Pausa', oscuro: true, cont: '<div style="height:330px;background:#050208;border-radius:10px;position:relative"><div class="foco" style="position:absolute;left:16px;bottom:16px;width:70px;height:70px;border-radius:50%;background:rgba(255,255,255,.15)"></div><div style="position:absolute;right:12px;bottom:12px;display:grid;grid-template-columns:1fr 1fr;gap:5px"><span class="b g">Acción</span><span class="b g">Correr</span><span class="b g">Linterna</span><span class="b g">Botella</span></div></div>' } },
+      { t: 'Controles en la compu',
+        html: '<ul><li><b>W A S D</b> o flechas: caminar. <b>Shift</b> (mantener): correr.</li><li><b>Mouse</b>: apuntar la linterna. <b>F</b>: prender o apagar la linterna.</li><li><b>E</b> o espacio: examinar, hablar, abrir, esconderte y salir del escondite.</li><li><b>G</b>: tirar una botella. <b>Q</b> o Tab: diario. <b>Esc</b>: pausa.</li></ul>' },
+      { t: 'Sobrevivir',
+        html: '<ul><li><b>Linterna</b>: se gasta. Juntá pilas. Prendida ves más, pero también te ven desde más lejos.</li><li><b>Cordura</b>: baja en la oscuridad y con lo que no deberías ver. Si llega a cero te desmayás. Cerca de una vela se recupera.</li><li><b>Aliento</b>: correr lo gasta y hace ruido.</li><li><b>Escondites</b>: roperos y debajo de las camas. Si algo te vio entrar, no sirve.</li></ul><p>Si algo te atrapa, volvés al último punto seguro sin perder lo que encontraste.</p><div class="ojo">Cada criatura es distinta: los documentos explican cómo funciona cada una. Lo que sirve con una, con otra te mata.</div>' },
+      { t: 'Resolver el caso',
+        html: '<ul><li>El <b>Diario</b> guarda tu objetivo, las pistas, los documentos, los objetos y el mapa.</li><li>Las cosas para examinar brillan apenas cuando las alumbrás. Leé todo: las claves de los candados están en los textos.</li><li>Para acusar, <b>Llamar al Inspector</b>: ¿quién fue?, ¿con qué? y ¿por qué?</li><li>Si te trabás, en el Diario está <b>Necesito una pista</b> (no en Modo Pesadilla).</li></ul>' },
+      { t: 'Seguir en otro aparato o jugar en línea',
+        html: '<ul><li><b>Pasar la partida a otro aparato</b>: copiás el código (por ejemplo, te lo mandás por WhatsApp) y en el otro aparato lo pegás en <b>Cargar una partida</b>.</li><li><b>Jugar en línea</b>: creá una sala y pasales el código a tus amigos. Las pistas, llaves y puertas se comparten; cada uno tiene su linterna… y su propio monstruo.</li></ul>' }
+    ]
+  }]
+};
+
+</script>
+<script src="motor.js"></script>
+</body>
+</html>

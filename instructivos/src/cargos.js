@@ -1,0 +1,32 @@
+window.GUIA = {
+  app: 'Cargos del Personal', sub: 'Entrega y devolución de indumentaria con firma en pantalla',
+  icono: 'fa-solid fa-shirt', c1: '#2a4a7a', c2: '#3a70c0', abrir: '../cargos/', apk: '../portal/apk/Cargos.apk',
+  roles: [{
+    id: 'supervisor', nombre: 'Supervisor',
+    pasos: [
+      { t: 'Entrar',
+        html: '<p>Entrá con tu <b>usuario y contraseña de SGI</b> y tocá <b>Ingresar</b>.</p><p>En la pantalla principal tenés tres opciones:</p><ul><li><b>Cargos Nuevos</b>: preparar un cargo para que firme el empleado.</li><li><b>Devolución</b>: recibir indumentaria devuelta.</li><li><b>Cargos Firmados</b>: consultar los cargos firmados y sus PDF.</li></ul>',
+        tel: { quien: 'Supervisor', cont: '<div class="cd"><span class="b foco" style="display:block;padding:12px">Cargos Nuevos<br><small>Preparar un cargo para firma</small></span><span class="b" style="display:block;padding:12px">Devolución<br><small>Recibir indumentaria devuelta</small></span><span class="b" style="display:block;padding:12px">Cargos Firmados<br><small>Consultar cargos y PDF</small></span></div>' } },
+      { t: 'Cargo nuevo',
+        html: '<ol><li>Elegí el <b>empleado</b>: LP, DNI, empresa y objetivo se completan solos.</li><li>En <b>Se hace entrega de</b> cargá cada ítem con su código y cantidad. Con <b>+ Agregar fila</b> sumás más.</li><li>Si querés, poné observaciones y un mail para enviar el PDF.</li><li>Tocá <b>Generar cargo</b>.</li></ol>',
+        tel: { quien: 'Cargo nuevo', cont: '<div class="cd"><div class="lb">Empleado</div><div class="in">Pérez Juan</div><div class="lb">Objetivo</div><div class="in">Barrio San Francisco</div><div class="h">Se hace entrega de</div><div class="row"><span>1 · 101</span><span>Camisa celeste</span><b>2</b></div><div class="row"><span>2 · 205</span><span>Pantalón</span><b>1</b></div><span class="b g">+ Agregar fila</span><span class="b v foco">Generar cargo</span></div>' } },
+      { t: 'Firma en pantalla',
+        html: '<ol><li>Aparece el <b>Acta para firmar</b>. El empleado la lee y <b>firma con el dedo</b> en el recuadro.</li><li>Completá la aclaración.</li><li>Tocá <b>ENVIAR</b>. Si la firma salió mal, tocá <b>Firmar de nuevo</b>.</li><li>Al terminar podés <b>ABRIR PDF</b> o <b>COMPARTIR PDF</b>.</li></ol><div class="tip">Solo se guardan los cargos firmados. Quedan en la planilla de cargos y el PDF en Drive.</div>',
+        tel: { quien: 'Acta para firmar', cont: '<div class="cd"><div class="h">Firma</div><div class="foto foco" style="height:120px;font-size:20px;font-family:cursive">J. Pérez</div><div class="lb">Aclaración</div><div class="in">Juan Pérez</div><span class="b v">ENVIAR</span><span class="b g">Firmar de nuevo</span></div>' } },
+      { t: 'Devolución',
+        html: '<p>Para recibir indumentaria devuelta tocá <b>Devolución</b>. Es igual que un cargo, pero dice <b>Se recibe en devolución</b> y <b>firma el supervisor</b> (con aclaración, DNI y LP).</p>',
+        tel: { quien: 'Devolución', cont: '<div class="cd"><div class="h">Se recibe en devolución:</div><div class="row"><span>205</span><span>Pantalón</span><b>1</b></div><div class="h">Firma del supervisor</div><div class="foto foco" style="height:90px"></div><div class="lb">Aclaración (supervisor)</div><div class="in">Carlos Sandoval</div></div>' } },
+      { t: 'Cargos firmados',
+        html: '<p>En <b>Cargos Firmados</b> buscás por persona. En cada cargo podés tocar <b>VER CARGO</b> (o <b>VER DEVOLUCIÓN</b>) y <b>ABRIR PDF FIRMADO</b>.</p>',
+        tel: { quien: 'Cargos firmados', cont: '<div class="cd"><div class="lb">Buscar persona</div><div class="in foco">pérez</div><div class="row"><span>N° 58 · 12/10<br>Pérez Juan</span><span class="b">VER CARGO</span></div><div class="row" style="background:#eee"><span><b>N° 61 · 15/10</b><br><b>Pérez Juan</b></span><span class="b">VER DEVOLUCIÓN</span></div></div>' } }
+    ],
+    faq: [
+      ['El empleado no aparece', 'Tiene que estar en el listado de personal de SGI y no estar dado de baja.'],
+      ['¿Dónde queda el PDF?', 'En la carpeta de cargos de Drive, y se ve desde Cargos Firmados → ABRIR PDF FIRMADO.']
+    ],
+    quiz: [
+      { p: '¿Quién firma en una devolución?', o: ['El empleado', 'El supervisor', 'Nadie'], c: 1 },
+      { p: '¿Se guardan los cargos que no se firmaron?', o: ['Sí', 'No, solo los firmados'], c: 1 }
+    ]
+  }]
+};

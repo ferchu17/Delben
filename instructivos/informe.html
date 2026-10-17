@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Instructivo</title>
+<link rel="icon" type="image/png" sizes="64x64" href="/Delben/iconos/sgi-64.png">
+<link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" rel="stylesheet">
+<link href="motor.css" rel="stylesheet">
+</head>
+<body>
+<script>
+window.GUIA = {
+  app: 'Informe de Novedades', sub: 'Informes con fotos, PDF y envío por mail',
+  icono: 'fa-solid fa-file-pen', c1: '#1a7a40', c2: '#2db865', abrir: '../informe-de-novedades/',
+  apk: 'https://github.com/ferchu17/Delben/releases/download/informe-novedades-apk/InformeNovedades.apk',
+  roles: [{
+    id: 'usuario', nombre: 'Usuario',
+    pasos: [
+      { t: 'Nuevo informe',
+        html: '<p>Al abrir tenés dos botones: <b>✍️ Nuevo informe</b> y <b>🔎 Buscar informes</b>. Tocá Nuevo informe.</p><ol><li>La fecha se completa sola.</li><li>En <b>De</b> elegí quién informa.</li><li>Elegí el <b>Objetivo / servicio</b>.</li></ol>',
+        tel: { quien: 'Nuevo informe', cont: '<div class="cd"><span class="b foco">✍️ Nuevo informe</span><span class="b g">🔎 Buscar informes</span><div class="lb" style="margin-top:6px">De *</div><div class="in">Carlos Sandoval</div><div class="lb">Objetivo / servicio *</div><div class="in">Fincas de Iraola 2</div></div>' } },
+      { t: 'Para quién va',
+        html: '<ol><li>En <b>Para</b> elegí a quién le llega. Con <b>＋ Agregar</b> sumás varias personas.</li><li><b>Con copia</b> es opcional: el autor siempre recibe copia.</li><li>Escribí el <b>Asunto</b>.</li></ol>',
+        tel: { quien: 'Nuevo informe', cont: '<div class="cd"><div class="lb">Para * (podés sumar varias personas)</div><div class="in">Fernando Jacyno</div><span class="b g foco">＋ Agregar</span><div class="lb">Asunto *</div><div class="in">Ingreso de persona no autorizada</div></div>' } },
+      { t: 'Escribir o dictar el informe',
+        html: '<p>En el recuadro grande contá el hecho: <b>día, hora, lugar, quién, qué, cómo y por qué</b>.</p><ul><li><b>🎤 Hablar</b>: dictás y la app escribe.</li><li><b>👤 Personal</b>: inserta el nombre de una persona del listado.</li><li><b>ABC ✓ Corregir</b>: corrige ortografía y redacción.</li></ul><p>Abajo completá las <b>Medidas tomadas</b>.</p>',
+        tel: { quien: 'Nuevo informe', cont: '<div class="cd"><div class="lb">Día, hora, lugar del hecho, quién, qué, cómo y por qué *</div><div class="in" style="height:90px">El 16/10 a las 22 h, en el acceso principal...</div><span class="b foco">🎤 Hablar</span><span class="b g">👤 Personal</span><span class="b g">ABC ✓ Corregir</span></div>' } },
+      { t: 'Fotos y envío',
+        html: '<ol><li>En <b>Vistas fotográficas</b> agregá las fotos. Con <b>＋ Agregar más fotos</b> sumás otras.</li><li>Tocá <b>📨 Enviar informe</b>: se arma el PDF y les llega por mail a los destinatarios.</li></ol><p><b>Limpiar</b> borra el formulario para empezar otro.</p>',
+        tel: { quien: 'Nuevo informe', cont: '<div class="cd"><div class="h">Vistas fotográficas</div><div style="display:grid;grid-template-columns:1fr 1fr;gap:5px"><div class="foto">Foto 1</div><div class="foto">Foto 2</div></div><span class="b g">＋ Agregar más fotos</span><span class="b v foco">📨 Enviar informe</span></div>' } },
+      { t: 'Buscar informes',
+        html: '<p>En <b>🔎 Buscar informes</b> escribís (o dictás con 🎤) una palabra y podés filtrar por fechas <b>Desde</b> y <b>Hasta</b>. Tocá <b>Buscar</b>.</p>',
+        tel: { quien: 'Buscar informes', cont: '<div class="cd"><div class="in foco">acceso principal</div><div class="lb">Desde</div><div class="in">01/10/2026</div><span class="b">Buscar</span><div class="row"><span>N° 124 · 16/10<br>Ingreso no autorizado</span><span class="b" style="font-size:9px">PDF</span></div></div>' } }
+    ],
+    faq: [
+      ['El micrófono no anda', 'Usá la app instalada (APK) o Chrome, y aceptá el permiso de micrófono.'],
+      ['No llegó el mail', 'Revisá que el destinatario esté bien elegido y mirá la carpeta de spam.']
+    ]
+  }]
+};
+
+</script>
+<script src="motor.js"></script>
+</body>
+</html>

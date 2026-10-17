@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Instructivos DELBEN</title>
+<link rel="icon" type="image/png" sizes="64x64" href="/Delben/iconos/sgi-64.png">
+<link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" rel="stylesheet">
+<link href="motor.css" rel="stylesheet">
+<style>
+  .lista{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:14px}
+  .ap{background:#fff;border-radius:16px;overflow:hidden;box-shadow:0 2px 10px rgba(0,0,0,.06);display:flex;flex-direction:column}
+  .ap .cab{background:linear-gradient(135deg,var(--a),var(--b));color:#fff;padding:16px;display:flex;gap:12px;align-items:center;text-decoration:none}
+  .ap .cab i{font-size:26px;width:34px;text-align:center}
+  .ap .cab b{display:block;font-size:16px}
+  .ap .cab span{font-size:12.5px;opacity:.9}
+  .ap .acc{display:flex;gap:6px;padding:10px;flex-wrap:wrap}
+  .ap .acc a,.ap .acc button{flex:1;border:0;border-radius:9px;padding:9px 8px;font-weight:700;font-size:13px;text-align:center;text-decoration:none;background:#e6ebf1;color:#1f2933;white-space:nowrap}
+  .ap .acc .ver{background:var(--a);color:#fff}
+  .ap .acc .wsp{background:#25d366;color:#fff}
+</style>
+</head>
+<body>
+<header class="top"><span class="ic"><i class="fa-solid fa-book"></i></span>
+  <div class="t"><b>Instructivos DELBEN</b><span>Cómo usar cada aplicación, paso a paso</span></div>
+  <div class="acc"><a href="../portal/"><i class="fa-solid fa-table-cells-large"></i> <span class="txt">Portal</span></a></div></header>
+<main><div class="lista" id="lista"></div></main>
+<script>
+const GUIAS = [
+  ['DELBEN SGI','Sistema de Gestión Integral','fa-solid fa-gauge-high','#1040a0','#1e6fc8','sgi.html'],
+  ['Novedades del Personal','Planillas de cobertura y novedades','fa-solid fa-calendar-check','#5a1a7a','#8a30b0','novedades.html'],
+  ['Informe de Novedades','Informes con fotos, PDF y mail','fa-solid fa-file-pen','#1a7a40','#2db865','informe.html'],
+  ['Control de Móviles','Control de vehículos con fotos','fa-solid fa-car-side','#1a4a7a','#2060b0','moviles.html'],
+  ['Cargos del Personal','Entrega y devolución de indumentaria','fa-solid fa-shirt','#2a4a7a','#3a70c0','cargos.html'],
+  ['Documentación','Automotriz, ART y Seguro de vida','fa-solid fa-folder-open','#6b4a1a','#a07030','documentacion.html'],
+  ['Datos Personales','Ficha de datos del personal','fa-solid fa-id-card','#1a4a3a','#307060','datos-personales.html'],
+  ['Combustible','Fondos, tickets y rendición','fa-solid fa-gas-pump','#a0141e','#d42a2a','../combustible/ayuda.html'],
+  ['Mansión Sombranegra','Juego de terror y misterio (+16)','fa-solid fa-ghost','#2a0608','#7a1a1a','mansion.html'],
+  ['DelBen Domótica','Luces y equipos por botones y voz','fa-solid fa-house-signal','#2f6bff','#8a3bff','domotica.html']
+];
+const esc = s => String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+document.getElementById('lista').innerHTML = GUIAS.map((g, i) => `<div class="ap" style="--a:${g[3]};--b:${g[4]}">
+  <a class="cab" href="${g[5]}"><i class="${g[2]}"></i><div><b>${esc(g[0])}</b><span>${esc(g[1])}</span></div></a>
+  <div class="acc"><a class="ver" href="${g[5]}"><i class="fa-solid fa-book-open"></i> Ver instructivo</a>
+  <button class="wsp" onclick="compartir(${i})"><i class="fa-brands fa-whatsapp"></i> Compartir</button></div></div>`).join('');
+function compartir(i){
+  const g = GUIAS[i], url = new URL(g[5], location.href).href;
+  window.open('https://wa.me/?text=' + encodeURIComponent('*Instructivo: ' + g[0] + '* - DELBEN\n\nCómo usar la app, paso a paso:\n' + url), '_blank');
+}
+</script>
+</body>
+</html>

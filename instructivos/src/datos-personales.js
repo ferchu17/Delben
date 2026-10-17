@@ -1,0 +1,21 @@
+window.GUIA = {
+  app: 'Datos Personales', sub: 'Ficha de datos del personal',
+  icono: 'fa-solid fa-id-card', c1: '#1a4a3a', c2: '#307060', abrir: '../datos-personal.html', apk: '../portal/apk/DatosPersonal.apk',
+  roles: [{
+    id: 'empleado', nombre: 'Empleado',
+    pasos: [
+      { t: 'Datos personales',
+        html: '<p>La ficha se completa en varios pasos. Primero: tu correo, apellido y nombre, legajo, DNI y fecha de nacimiento. Los campos con * son obligatorios.</p><p>Tocá <b>Continuar →</b> para pasar al siguiente paso, o <b>← Anterior</b> para volver.</p>',
+        tel: { titulo: 'Ficha de Datos del Personal', salir: false, cont: '<div class="cd"><div class="h">Datos personales</div><div class="lb">Apellido y Nombre *</div><div class="in">Pérez Juan</div><div class="lb">DNI *</div><div class="in foco">30.123.456</div><span class="b">Continuar →</span></div>' } },
+      { t: 'Domicilio y contacto',
+        html: '<ul><li><b>Domicilio</b>: calle, altura, piso, entre calles, localidad y partido.</li><li><b>Contacto</b>: celular, teléfono fijo, otro teléfono, y el de otra persona a quien avisar.</li></ul>',
+        tel: { titulo: 'Ficha de Datos del Personal', salir: false, cont: '<div class="cd"><div class="h">Domicilio</div><div class="lb">Domicilio (calle)</div><div class="in">Av. Mitre</div><div class="lb">Altura</div><div class="in">1234</div><div class="h">Datos de contacto</div><div class="lb">Teléfono celular</div><div class="in foco">11 5555-1234</div></div>' } },
+      { t: 'Familia y educación',
+        html: '<ul><li><b>¿Con quién vive?</b>: marcá con quién vivís.</li><li><b>Familiares</b>: nombre del esposo/a y de los hijos con su fecha de nacimiento.</li><li><b>Educación</b>: si tenés secundario y si tenés el analítico o título.</li></ul>',
+        tel: { titulo: 'Ficha de Datos del Personal', salir: false, cont: '<div class="cd"><div class="h">¿Con quién vive?</div><div class="row"><span>Esposo/a</span><b>✓</b></div><div class="row"><span>Hijo 1</span><b>✓</b></div><div class="h">Educación</div><div class="row foco"><span>¿Posee secundario?</span><b>Sí</b></div></div>' } },
+      { t: 'Fotos del DNI y envío',
+        html: '<ol><li>Sacá la foto del <b>frente</b> del DNI (o adjuntala) y después la del <b>dorso</b>.</li><li>Aceptá las dos <b>declaraciones</b>.</li><li>Tocá <b>✓ ENVIAR DATOS</b>.</li></ol><div class="tip">Que el DNI se lea bien: buena luz, sin reflejos y entero en la foto.</div>',
+        tel: { titulo: 'Ficha de Datos del Personal', salir: false, cont: '<div class="cd"><div class="h">Fotos del DNI</div><span class="b foco">📷 SACAR FOTO DEL ANVERSO</span><span class="b">📷 SACAR FOTO DEL REVERSO</span><div class="h" style="margin-top:8px">Declaraciones</div><div class="row"><span>Acepto mantener informado el domicilio</span><b>✓</b></div><span class="b v">✓ ENVIAR DATOS</span></div>' } }
+    ]
+  }]
+};
