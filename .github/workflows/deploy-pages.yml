@@ -49,6 +49,8 @@ jobs:
           cp juego-mansion/index.html _site/mansion/index.html
           # Portal DELBEN: página con todas las apps (https://ferchu17.github.io/Delben/portal/)
           cp -R portal _site/portal
+          # DelBen Domótica: página con la descarga de la APK e instrucciones (https://ferchu17.github.io/Delben/domotica/)
+          cp -R domotica _site/domotica
           sed -i '0,/<head[^>]*>/s##&\n<link rel="icon" type="image/png" sizes="64x64" href="/Delben/iconos/sgi-64.png">\n<link rel="apple-touch-icon" href="/Delben/iconos/sgi-192.png">#' _site/sgi/index.html
           sed -i '0,/<head[^>]*>/s##&\n<link rel="icon" type="image/png" sizes="64x64" href="/Delben/iconos/sgi-64.png">\n<link rel="apple-touch-icon" href="/Delben/iconos/sgi-192.png">#' _site/novedades/index.html
             

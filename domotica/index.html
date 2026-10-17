@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>DelBen Domótica</title>
+<meta name="description" content="Controlá la casa con Smart Life desde DelBen: botones luminosos y órdenes por voz.">
+<link rel="icon" type="image/png" sizes="64x64" href="/Delben/iconos/domotica-64.png">
+<link rel="apple-touch-icon" href="/Delben/iconos/domotica-192.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;600;700;800&display=swap" rel="stylesheet">
+<style>
+:root{--fondo:#070B18;--tarjeta:#121833;--borde:#263055;--texto:#F4F6FF;--suave:#A9B2D6;--azul:#2F8BFF;--violeta:#8A3BFF;--rosa:#FF3EA5;--cian:#18E0FF;--verde:#22E37A;--amarillo:#FFD60A}
+:root:not([data-theme="light"]){color-scheme:dark}
+*{box-sizing:border-box}
+body{margin:0;background:var(--fondo);color:var(--texto);font-family:'Sora',system-ui,sans-serif;line-height:1.5}
+.pagina{max-width:760px;margin:0 auto;padding:20px 16px 48px;display:flex;flex-direction:column;gap:22px}
+.top{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.logo{background:#fff;border-radius:18px;padding:6px 14px;box-shadow:0 0 18px rgba(47,139,255,.45)}
+.logo img{height:48px;display:block}
+.volver{color:var(--suave);text-decoration:none;font-size:14px;font-weight:600;padding:10px 14px;border:1px solid var(--borde);border-radius:12px}
+.volver:hover{color:#fff;border-color:#3a477a}
+.hero{border-radius:28px;padding:26px 22px;background:linear-gradient(120deg,var(--azul) 0%,var(--violeta) 55%,var(--rosa) 100%);box-shadow:0 14px 40px rgba(138,59,255,.45);display:flex;flex-direction:column;gap:14px;position:relative;overflow:hidden}
+.hero::after{content:"";position:absolute;right:-50px;top:-60px;width:220px;height:220px;border-radius:50%;background:radial-gradient(circle,rgba(255,255,255,.35),rgba(255,255,255,0) 70%)}
+.hero h1{margin:0;font-size:clamp(28px,7vw,40px);line-height:1.1;font-weight:800;position:relative}
+.hero p{margin:0;font-size:16px;max-width:520px;position:relative}
+.descargar{align-self:flex-start;display:inline-flex;align-items:center;gap:10px;min-height:52px;padding:0 22px;border-radius:16px;background:#fff;color:#3A1C8C;font-weight:800;font-size:16px;text-decoration:none;position:relative;box-shadow:0 6px 20px rgba(7,11,24,.35)}
+.descargar:hover{background:#F1EBFF}
+.chips{display:flex;flex-wrap:wrap;gap:8px;position:relative}
+.chip{font-size:12px;font-weight:700;padding:5px 11px;border-radius:999px;background:rgba(7,11,24,.45)}
+h2{margin:0 0 4px;font-size:20px}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:12px}
+.card{background:var(--tarjeta);border:1px solid var(--borde);border-radius:20px;padding:16px;display:flex;flex-direction:column;gap:8px}
+.card .ico{width:44px;height:44px;border-radius:14px;display:flex;align-items:center;justify-content:center;background:var(--c);box-shadow:0 0 16px var(--c)}
+.card b{font-size:15px}
+.card span{font-size:13px;color:var(--suave)}
+.voz{display:flex;flex-direction:column;gap:8px}
+.g{max-width:88%;padding:10px 14px;font-size:14px}
+.g-yo{align-self:flex-end;background:#1C2442;border:1px solid #2F3A66;border-radius:18px 18px 4px 18px}
+.g-db{align-self:flex-start;background:var(--verde);color:#062313;font-weight:700;border-radius:18px 18px 18px 4px;box-shadow:0 0 18px rgba(34,227,122,.45)}
+ol{margin:0;padding-left:22px;display:flex;flex-direction:column;gap:10px;color:#D7DCF5;font-size:14px}
+ol b{color:#fff}
+.nota{font-size:13px;color:var(--suave);background:var(--tarjeta);border:1px solid var(--borde);border-radius:16px;padding:14px 16px}
+footer{text-align:center;font-size:12px;color:#6F78A0}
+</style>
+</head>
+<body>
+<div class="pagina">
+  <header class="top">
+    <div class="logo"><img src="logo.png" alt="DelBen"></div>
+    <a class="volver" href="../portal/">← Portal DELBEN</a>
+  </header>
+
+  <section class="hero">
+    <h1>DelBen Domótica</h1>
+    <p>Controlá las luces y los equipos de Smart Life desde una app con colores, botones luminosos y órdenes por voz.</p>
+    <div class="chips"><span class="chip">Luces</span><span class="chip">Energía</span><span class="chip">Voz «Delben…»</span><span class="chip">Pantalla apagada</span></div>
+    <a class="descargar" href="https://github.com/ferchu17/Delben/releases/download/domotica-apk/DelbenDomotica.apk" download>
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12M7 10l5 5 5-5M5 21h14"></path></svg>
+      Descargar APK para Android
+    </a>
+  </section>
+
+  <section>
+    <h2>Hablale a tu casa</h2>
+    <div class="voz">
+      <div class="g g-yo">«Delben, encendé el pasillo»</div>
+      <div class="g g-db">Listo, el pasillo ya está encendido.</div>
+      <div class="g g-yo">«Delben, apagá todas las luces»</div>
+      <div class="g g-db">Listo, apagué todas las luces.</div>
+      <div class="g g-yo">«Delben, ¿está prendido el termo?»</div>
+      <div class="g g-db">El termo está apagado.</div>
+    </div>
+  </section>
+
+  <section class="grid">
+    <div class="card" style="--c:#FFD60A"><div class="ico"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#070B18" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 18h6M10 21h4M12 3a6 6 0 0 0-3.5 10.9c.6.4 1 1.1 1 1.8V16h5v-.3c0-.7.4-1.4 1-1.8A6 6 0 0 0 12 3z"></path></svg></div><b>Botones que se iluminan</b><span>Cada equipo con su color; encendido brilla.</span></div>
+    <div class="card" style="--c:#18E0FF"><div class="ico"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#070B18" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3a3 3 0 0 0-3 3v6a3 3 0 0 0 6 0V6a3 3 0 0 0-3-3zM5 11a7 7 0 0 0 14 0M12 18v3"></path></svg></div><b>Escucha permanente</b><span>Funciona con la app cerrada y la pantalla apagada.</span></div>
+    <div class="card" style="--c:#22E37A"><div class="ico"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#070B18" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 11l9-7 9 7v9a1 1 0 0 1-1 1h-5v-6h-6v6H4a1 1 0 0 1-1-1z"></path></svg></div><b>Escenas</b><span>«Apagar todo» y «Modo noche» con un toque.</span></div>
+  </section>
+
+  <section>
+    <h2>Cómo instalarla</h2>
+    <ol>
+      <li>Descargá la APK y abrila. Si Android pregunta, permití <b>instalar apps de este origen</b>.</li>
+      <li>Al abrir DelBen Domótica, en <b>Ajustes</b> cargá el <b>Access ID</b> y el <b>Access Secret</b> (platform.tuya.com → Cloud → tu proyecto → Overview) y el <b>UID</b> de tu cuenta de Smart Life (Devices → Link App Account).</li>
+      <li>Activá <b>Escucha permanente</b> y aceptá los permisos de micrófono y notificaciones.</li>
+      <li>Tocá <b>Quitar restricción de batería</b> para que el teléfono no la cierre. En Samsung: Ajustes → Batería → Límites de uso en segundo plano, y que DelBen no esté en «Apps inactivas».</li>
+    </ol>
+  </section>
+
+  <p class="nota">Las claves de Tuya quedan guardadas solo en tu teléfono: la APK no trae ninguna, así que nadie más puede manejar tu casa con ella.</p>
+  <footer>DELBEN · Sistema de Gestión Integral</footer>
+</div>
+</body>
+</html>
