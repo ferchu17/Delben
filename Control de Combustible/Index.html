@@ -30,6 +30,8 @@
   header .tit span{font-size:12px;opacity:.85;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:block}
   header button{background:rgba(255,255,255,.15);border:0;color:#fff;border-radius:8px;padding:7px 12px;cursor:pointer}
 
+  .aviso-lunes{background:#fff4d6;border:2px solid var(--naranja);color:#7a4b00;border-radius:14px;padding:12px 14px;margin-bottom:14px;font-weight:600}
+  .b-Asignado{background:#dff3e2;color:#1d6b28}
   .como-bar{display:flex;align-items:center;justify-content:space-between;gap:10px;background:#fff4d6;color:#7a4b00;border-bottom:2px solid var(--naranja);padding:8px 14px;font-size:14px}
   nav{display:flex;gap:6px;overflow-x:auto;padding:10px 12px;background:#fff;border-bottom:1px solid var(--borde);position:sticky;top:60px;z-index:15}
   nav button{flex:0 0 auto;border:1px solid var(--borde);background:#fff;color:var(--azul2);border-radius:20px;padding:7px 14px;cursor:pointer;font-weight:600;font-size:14px}
@@ -161,6 +163,7 @@
 
     <!-- SUPERVISOR: INICIO -->
     <div id="v-inicio" class="vista hidden">
+      <div id="avisoLunes" class="aviso-lunes hidden"></div>
       <div class="card saldo" id="saldoCard">
         <div class="lbl" id="sdLbl">Disponible para gastar</div>
         <div class="big" id="sdSaldo">$ 0,00</div>
@@ -174,6 +177,11 @@
       <div class="fila-btn" style="margin-bottom:14px">
         <button class="btn verde" style="flex:1" onclick="go('cargar')">+ Cargar ticket</button>
         <button class="btn" style="flex:1" onclick="go('rendir')">Enviar rendición</button>
+        <button class="btn naranja" style="flex:1" onclick="pedirFondos()">Pedir fondos</button>
+      </div>
+      <div class="card hidden" id="pedCard">
+        <h2>Mis pedidos de fondos</h2>
+        <div id="misPed"></div>
       </div>
       <div class="card">
         <h2>Últimos movimientos</h2>
@@ -295,6 +303,10 @@
 
     <!-- ADMIN: ASIGNAR -->
     <div id="v-asignar" class="vista hidden">
+      <div class="card" id="pedAdmCard">
+        <h2>Pedidos de fondos</h2>
+        <div id="pedAdm"></div>
+      </div>
       <div class="card" id="asgForm">
         <h2>Asignar fondos</h2>
         <label>Supervisor *</label>
@@ -543,6 +555,63 @@ function armarNav(){
   return tabs;
 }
 
+/* ---- Supervisor: pedir fondos ---- */
+function pedirFondos(){
+  const disp = SD ? SD.saldo.saldo : 0;
+  modal('', 'Pedir fondos para combustible',
+    `<div style="text-align:left">Disponible actual: <b class="${claseSaldo(disp)}">${money(disp)}</b>
+     <label>¿Cuánto necesitás? *</label><input id="pfMonto" inputmode="decimal" placeholder="Ej: 150000" style="font-size:20px;font-weight:700">
+     <label>Motivo (opcional)</label><input id="pfMotivo" placeholder="Ej: recorridas de la semana"></div>`,
+    [{txt:'Cancelar', cls:'gris'}, {txt:'Enviar pedido', cls:'naranja', fn: enviarPedido}]);
+  setTimeout(() => $('pfMonto') && $('pfMonto').focus(), 100);
+}
+function enviarPedido(){
+  const p = { monto: num($('pfMonto').value), motivo: $('pfMotivo').value.trim() };
+  if (!(p.monto > 0)) return modal('err', 'Falta el monto', 'Ingresá cuánto necesitás.', [{txt:'Volver', fn: pedirFondos}]);
+  loader(true);
+  run('pedirFondos', S.token, p, COMO).then(() => cargarSup(true))
+    .then(() => modal('ok', 'Pedido enviado', `Pediste <b>${money(p.monto)}</b>.<br>Administración ya recibió el aviso por mail.`))
+    .catch(e => modal('err', 'No se envió', esc(errMsg(e)))).finally(() => loader(false));
+}
+
+/* ---- Administrador: pedidos de fondos ---- */
+let pedidoSel = null;
+function renderPedidosAdm(){
+  const pend = AD.pedidos.filter(p => p.estado === 'Pendiente');
+  const ult = AD.pedidos.filter(p => p.estado !== 'Pendiente').slice(0, 5);
+  const fila = (p, acciones) => {
+    const s = AD.saldos.find(x => norm(x.nombre) === norm(p.supervisor));
+    return `<div class="item"><div class="top"><div><b>${esc(p.supervisor)}</b> <span class="badge b-${esc(p.estado)}">${esc(p.estado)}</span>
+      <div class="det">${esc(p.fecha)}${p.motivo ? ' · ' + esc(p.motivo) : ''}${s ? '<br>Disponible actual: ' + money(s.saldo) : ''}${p.respuesta ? '<br>' + esc(p.respuesta) : ''}</div></div>
+      <div class="monto ing">${money(p.monto)}</div></div>
+      ${acciones && !AD.readOnly ? `<div class="fila-btn" style="margin-top:10px"><button class="btn verde sm" onclick="asignarPedido(${p.id})">Asignar</button><button class="btn rojo sm" onclick="rechazarPedido(${p.id})">Rechazar</button></div>` : ''}</div>`;
+  };
+  $('pedAdm').innerHTML = (pend.map(p => fila(p, true)).join('') || '<p class="muted">No hay pedidos pendientes.</p>') +
+    (ult.length ? '<p class="muted" style="margin:12px 0 6px">Últimos respondidos</p>' + ult.map(p => fila(p, false)).join('') : '');
+  const b = document.querySelector('nav button[data-v="asignar"]');
+  if (b) b.textContent = 'Asignaciones' + (pend.length ? ' (' + pend.length + ')' : '');
+}
+function asignarPedido(id){
+  const p = AD.pedidos.find(x => String(x.id) === String(id));
+  if (!p) return;
+  pedidoSel = { id: p.id, supervisor: p.supervisor };
+  $('asSup').value = p.supervisor; infoSaldo(p.supervisor);
+  $('asMonto').value = fmtNumInput(p.monto);
+  $('asObs').value = 'Pedido de fondos N° ' + p.id + (p.motivo ? ' - ' + p.motivo : '');
+  $('asFecha').value = hoyIso();
+  $('asgForm').scrollIntoView({ behavior: 'smooth' });
+  toast('Revisá el monto y tocá Guardar asignación');
+}
+function rechazarPedido(id){
+  modal('warn', 'Rechazar pedido', `<div style="text-align:left"><label>Motivo</label><input id="rpMotivo" placeholder="Ej: rendí primero los tickets pendientes"></div>`,
+    [{txt:'Cancelar', cls:'gris'}, {txt:'Rechazar', cls:'rojo', fn: () => {
+      const m = $('rpMotivo').value.trim();
+      loader(true);
+      run('responderPedido', S.token, id, 'Rechazado', m).then(() => cargarAdmin(true)).then(() => toast('Pedido rechazado'))
+        .catch(e => modal('err', 'Error', esc(errMsg(e)))).finally(() => loader(false));
+    }}]);
+}
+
 /* ---- Administrador: cargar tickets en nombre de un supervisor ---- */
 function comoInfo(nombre){
   const s = AD && AD.saldos.find(x => norm(x.nombre) === norm(nombre));
@@ -620,6 +689,22 @@ function renderSup(){
   $('misAsig').innerHTML = SD.asignaciones.map(a => `<div class="item"><div class="top"><div><b>${esc(a.fecha)}</b><div class="det">${esc(a.observacion || 'Asignación de fondos')}</div></div><div class="monto pos">${money(a.monto)}</div></div></div>`).join('') || '<p class="muted">Sin asignaciones.</p>';
 
   renderIngresos();
+
+  // Aviso de los lunes: hay que enviar la rendición
+  const esLunes = new Date().getDay() === 1;
+  const pendL = SD.tickets.filter(t => !t.planilla && t.estado !== 'Rechazado');
+  $('avisoLunes').classList.toggle('hidden', !esLunes);
+  $('avisoLunes').innerHTML = esLunes ? (pendL.length
+    ? `Hoy es lunes: enviá tu rendición de combustible. Tenés ${pendL.length} ticket(s) sin rendir por ${money(pendL.reduce((a, t) => a + t.total, 0))}. <button class="btn sm" style="margin-left:6px" onclick="go('rendir')">Rendir ahora</button>`
+    : 'Hoy es lunes: si cargaste combustible esta semana, cargá los tickets y enviá la rendición.') : '';
+
+  // Mis pedidos de fondos
+  const ped = SD.pedidos || [];
+  $('pedCard').classList.toggle('hidden', !ped.length);
+  $('misPed').innerHTML = ped.map(p => `<div class="item"><div class="top"><div>
+      <span class="badge b-${esc(p.estado === 'Pendiente' ? 'Pendiente' : p.estado)}">${esc(p.estado)}</span>
+      <div class="det">${esc(p.fecha)}${p.motivo ? ' · ' + esc(p.motivo) : ''}${p.respuesta ? '<br>' + esc(p.respuesta) : ''}</div></div>
+      <div class="monto ing">${money(p.monto)}</div></div></div>`).join('');
 
   const pend = SD.tickets.filter(t => !t.planilla && t.estado !== 'Rechazado');
   $('rdLista').innerHTML = pend.map(t => itemTicket(t, false)).join('') || '<p class="muted">No tenés tickets pendientes de rendir.</p>';
@@ -914,7 +999,7 @@ function cargarAdmin(silencioso){
     $('cfgEstado').innerHTML = d.geminiActiva
       ? '<b class="pos">Usando Gemini.</b> Lee los datos impresos y también lo escrito a mano (el servicio).'
       : '<b>Usando la lectura de Google (sin clave).</b> Lee los datos impresos del ticket. Con una clave de Gemini la lectura es más precisa y también lee lo escrito a mano.';
-    renderSaldos(); renderAsig(); renderRevision(); renderRend();
+    renderSaldos(); renderAsig(); renderRevision(); renderRend(); renderPedidosAdm();
   }).catch(e => modal('err', 'Error', esc(errMsg(e)))).finally(() => loader(false));
 }
 
@@ -944,6 +1029,7 @@ function infoSaldo(nombre){
 
 function guardarAsig(){
   const a = { supervisor: $('asSup').value.trim(), fecha: $('asFecha').value, monto: num($('asMonto').value), observacion: $('asObs').value.trim() };
+  if (pedidoSel && norm(pedidoSel.supervisor) === norm(a.supervisor)) a.pedidoId = pedidoSel.id;
   if (!a.supervisor) return modal('err', 'Falta el supervisor', 'Elegí un supervisor de la lista.');
   if (!(a.monto > 0)) return modal('err', 'Falta el monto', 'Ingresá un monto mayor a cero.');
   const s = AD.saldos.find(x => norm(x.nombre) === norm(a.supervisor));
@@ -951,7 +1037,7 @@ function guardarAsig(){
   confirmar('Asignar fondos', `${esc(a.supervisor)}<br>Disponible actual: ${money(ant)}<br>+ Asignación: <b>${money(a.monto)}</b><br>= Nuevo disponible: <b>${money(ant + a.monto)}</b>`, () => {
     loader(true);
     run('guardarAsignacion', S.token, a).then(() => {
-      $('asMonto').value = ''; $('asObs').value = '';
+      $('asMonto').value = ''; $('asObs').value = ''; pedidoSel = null;
       return cargarAdmin(true).then(() => { infoSaldo(a.supervisor); toast('Asignación guardada'); });
     }).catch(e => modal('err', 'Error', esc(errMsg(e)))).finally(() => loader(false));
   }, 'Guardar', 'verde');

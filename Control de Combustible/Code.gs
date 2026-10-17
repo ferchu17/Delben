@@ -245,6 +245,7 @@ function getSupervisorData(token, como) {
     asignaciones: asig.map(asigOut_).reverse(),
     tickets: tks.map(ticketOut_).reverse(),
     rendiciones: rend.reverse(),
+    pedidos: leerPedidos_().filter(p => norm_(p.supervisor) === norm_(s.nombre)).slice(0, 10),
     objetivos: getObjetivos_()
   };
 }
@@ -528,6 +529,7 @@ function getAdminData(token) {
     saldos: saldos,
     asignaciones: asig.map(asigOut_).reverse(),
     tickets: tks.map(ticketOut_).reverse(),
+    pedidos: leerPedidos_(),
     rendiciones: rend.map(r => ({
       nro: r['N° Planilla'], fecha: fmtD_(r.Fecha), supervisor: String(r.Supervisor || ''),
       cant: num_(r['Cant. Tickets']), total: num_(r.Total), excel: String(r['Link Excel'] || ''),
@@ -553,6 +555,7 @@ function guardarAsignacion(token, a) {
       'ID': id, 'Fecha': dateFromIso_(a.fecha), 'Supervisor': sup.nombre, 'Monto': monto,
       'Observacion': String(a.observacion || '').trim(), 'Cargado por': s.nombre, 'Fecha carga': new Date()
     });
+    if (a.pedidoId) marcarPedido_(a.pedidoId, 'Asignado', 'Se asignaron ' + money_(monto) + ' (asignación ' + id + ')', s.nombre);
     return { id: id };
   } finally {
     lock.releaseLock();
@@ -904,3 +907,127 @@ function isoFromAny_(v) {
 function dateVal_(v) { const d = dateFromAny_(v); return d instanceof Date ? d.getTime() : 0; }
 function fmtD_(v) { return v instanceof Date ? Utilities.formatDate(v, CFG.TZ, 'dd/MM/yyyy') : String(v || ''); }
 function fmtDT_(v) { return v instanceof Date ? Utilities.formatDate(v, CFG.TZ, 'dd/MM/yyyy HH:mm') : String(v || ''); }
+
+/* ======================= PEDIDOS DE FONDOS ======================= */
+
+const HOJA_PEDIDOS = 'Pedidos';
+const COLS_PEDIDOS = ['ID', 'Fecha', 'Supervisor', 'Monto', 'Motivo', 'Estado', 'Respuesta', 'Fecha respuesta', 'Atendido por'];
+
+/** Pestaña "Pedidos" de la planilla de registros (se crea sola la primera vez). */
+function hojaPedidos_() {
+  const ss = SpreadsheetApp.openById(CFG.REG_ID);
+  let sh = ss.getSheetByName(HOJA_PEDIDOS);
+  if (!sh) {
+    sh = ss.insertSheet(HOJA_PEDIDOS);
+    sh.getRange(1, 1, 1, COLS_PEDIDOS.length).setValues([COLS_PEDIDOS]).setFontWeight('bold');
+    sh.setFrozenRows(1);
+  }
+  return sh;
+}
+
+function leerPedidos_() {
+  return readSheet_(hojaPedidos_()).rows.map(p => ({
+    id: p.ID, fecha: fmtDT_(p.Fecha), supervisor: String(p.Supervisor || ''), monto: num_(p.Monto),
+    motivo: String(p.Motivo || ''), estado: String(p.Estado || 'Pendiente'), respuesta: String(p.Respuesta || ''),
+    fechaRespuesta: fmtDT_(p['Fecha respuesta'])
+  })).reverse();
+}
+
+/** El supervisor pide fondos: queda registrado y le llega un mail al administrador con el monto. */
+function pedirFondos(token, p, como) {
+  const s = sesRinde_(token, como);
+  const monto = num_(p && p.monto);
+  if (!(monto > 0)) throw new Error('Ingresá el monto que necesitás.');
+  const motivo = String((p && p.motivo) || '').trim();
+  const lock = LockService.getScriptLock();
+  lock.waitLock(30000);
+  let id;
+  try {
+    const tab = readSheet_(hojaPedidos_());
+    if (tab.rows.some(r => norm_(r.Supervisor) === norm_(s.nombre) && String(r.Estado) === 'Pendiente')) {
+      throw new Error('Ya tenés un pedido de fondos pendiente. Esperá la respuesta de administración.');
+    }
+    id = nextId_(tab.rows, 'ID');
+    appendObj_(tab, { 'ID': id, 'Fecha': new Date(), 'Supervisor': s.nombre, 'Monto': monto, 'Motivo': motivo, 'Estado': 'Pendiente' });
+  } finally {
+    lock.releaseLock();
+  }
+  const asig = readSheet_(regSheet_('Asignaciones')).rows.filter(a => norm_(a.Supervisor) === norm_(s.nombre));
+  const tks = readSheet_(regSheet_('Tickets')).rows.filter(t => norm_(t.Supervisor) === norm_(s.nombre));
+  const sal = calcularSaldos_(asig, tks)[norm_(s.nombre)] || { saldo: 0, sinRendir: 0, cantSinRendir: 0 };
+  const html =
+    '<div style="font-family:Arial,sans-serif;font-size:14px;color:#222">' +
+    '<p><b>' + esc_(s.nombre) + '</b> pidió fondos para combustible.</p>' +
+    '<table style="border-collapse:collapse">' +
+    '<tr><td style="padding:4px 12px 4px 0"><b>Monto pedido:</b></td><td style="font-size:18px"><b>' + money_(monto) + '</b></td></tr>' +
+    '<tr><td style="padding:4px 12px 4px 0"><b>Disponible actual:</b></td><td>' + money_(sal.saldo) + '</td></tr>' +
+    '<tr><td style="padding:4px 12px 4px 0"><b>Tickets sin rendir:</b></td><td>' + (sal.cantSinRendir || 0) + ' por ' + money_(sal.sinRendir || 0) + '</td></tr>' +
+    (motivo ? '<tr><td style="padding:4px 12px 4px 0"><b>Motivo:</b></td><td>' + esc_(motivo) + '</td></tr>' : '') +
+    '<tr><td style="padding:4px 12px 4px 0"><b>Fecha:</b></td><td>' + Utilities.formatDate(new Date(), CFG.TZ, 'dd/MM/yyyy HH:mm') + '</td></tr>' +
+    '</table><p>Para asignarlo entrá a la app Combustible → <b>Asignaciones</b> → Pedidos de fondos.</p>' +
+    '<p style="color:#777;font-size:12px">DELBEN - Control de Combustible</p></div>';
+  MailApp.sendEmail({
+    to: CFG.MAIL_ADMIN,
+    subject: 'DELBEN - Pedido de fondos de combustible - ' + s.nombre + ' - ' + money_(monto),
+    htmlBody: html, name: CFG.MAIL_NOMBRE, replyTo: s.correo || CFG.MAIL_ADMIN
+  });
+  return { id: id };
+}
+
+/** El administrador rechaza un pedido (o lo marca como atendido sin asignar). */
+function responderPedido(token, id, estado, respuesta) {
+  const s = ses_(token);
+  exigirAdmin_(s);
+  if (['Rechazado', 'Asignado'].indexOf(estado) < 0) throw new Error('Estado inválido.');
+  marcarPedido_(id, estado, String(respuesta || '').trim(), s.nombre);
+  return true;
+}
+
+function marcarPedido_(id, estado, respuesta, quien) {
+  const tab = readSheet_(hojaPedidos_());
+  const p = tab.rows.find(r => String(r.ID) === String(id));
+  if (!p) return;
+  setCell_(tab, p._r, 'Estado', estado);
+  setCell_(tab, p._r, 'Respuesta', respuesta);
+  setCell_(tab, p._r, 'Fecha respuesta', new Date());
+  setCell_(tab, p._r, 'Atendido por', quien);
+}
+
+/* ======================= RECORDATORIO DE LOS LUNES ======================= */
+
+/**
+ * Ejecutar UNA VEZ desde el editor (elegir instalarRecordatorio y tocar Ejecutar).
+ * Deja programado el mail de todos los lunes a las 8 a cada supervisor.
+ */
+function instalarRecordatorio() {
+  ScriptApp.getProjectTriggers()
+    .filter(t => t.getHandlerFunction() === 'recordatorioSemanal')
+    .forEach(t => ScriptApp.deleteTrigger(t));
+  ScriptApp.newTrigger('recordatorioSemanal').timeBased()
+    .onWeekDay(ScriptApp.WeekDay.MONDAY).atHour(8).inTimezone(CFG.TZ).create();
+  Logger.log('Recordatorio instalado: todos los lunes a las 8.');
+}
+
+/** Mail de los lunes: le recuerda a cada supervisor que envíe la rendición, con su disponible y lo que tiene sin rendir. */
+function recordatorioSemanal() {
+  const asig = readSheet_(regSheet_('Asignaciones')).rows;
+  const tks = readSheet_(regSheet_('Tickets')).rows;
+  const sal = calcularSaldos_(asig, tks);
+  getSupervisores_().forEach(u => {
+    if (!u.correo) return;
+    const x = sal[norm_(u.nombre)] || { saldo: 0, sinRendir: 0, cantSinRendir: 0 };
+    const pend = x.cantSinRendir
+      ? 'Tenés <b>' + x.cantSinRendir + ' ticket(s) sin rendir por ' + money_(x.sinRendir) + '</b>. Entrá a la app, revisá que estén todos y tocá <b>Enviar rendición</b>.'
+      : 'No tenés tickets cargados sin rendir. Si cargaste combustible esta semana, sacale foto a los tickets en la app y enviá la rendición.';
+    const html =
+      '<div style="font-family:Arial,sans-serif;font-size:14px;color:#222">' +
+      '<p>Hola ' + esc_(u.nombre) + ':</p>' +
+      '<p>Hoy es lunes: <b>enviá tu rendición de combustible de la semana</b>.</p>' +
+      '<p>' + pend + '</p>' +
+      '<p>Tu disponible para combustible: <b style="color:' + (x.saldo < 0 ? '#c62828' : '#1d4f9f') + '">' + money_(x.saldo) + '</b></p>' +
+      '<p style="color:#777;font-size:12px">DELBEN - Control de Combustible</p></div>';
+    try {
+      MailApp.sendEmail({ to: u.correo, subject: 'DELBEN - Recordatorio: enviá tu rendición de combustible', htmlBody: html, name: CFG.MAIL_NOMBRE });
+    } catch (e) { console.error('Recordatorio ' + u.nombre + ': ' + e); }
+  });
+}
