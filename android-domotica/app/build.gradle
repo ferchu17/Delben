@@ -1,0 +1,34 @@
+plugins { id 'com.android.application' }
+
+android {
+    namespace 'ar.com.delben.domotica'
+    compileSdk 34
+    defaultConfig {
+        applicationId 'ar.com.delben.domotica'
+        minSdk 24
+        targetSdk 34
+        versionCode Integer.parseInt(System.getenv('VERSION_CODE') ?: '1')
+        versionName '1.0.' + (System.getenv('VERSION_CODE') ?: '1')
+        // Solo los procesadores de los celulares (deja la APK más liviana)
+        ndk { abiFilters 'arm64-v8a', 'armeabi-v7a' }
+    }
+    signingConfigs {
+        release {
+            storeFile file('../../android-informe/firma/informe-novedades.keystore')
+            storePassword 'gMzA_RnzTlJ1dBoMQgtnvfml'
+            keyAlias 'informe'
+            keyPassword 'gMzA_RnzTlJ1dBoMQgtnvfml'
+        }
+    }
+    buildTypes {
+        release { minifyEnabled false; signingConfig signingConfigs.release }
+    }
+    compileOptions { sourceCompatibility JavaVersion.VERSION_17; targetCompatibility JavaVersion.VERSION_17 }
+    // El modelo de voz (assets/model-es) lo descarga el workflow al compilar; no está en el repositorio
+}
+
+dependencies {
+    // Reconocimiento de voz sin internet (para la escucha permanente de «Delben»)
+    implementation 'net.java.dev.jna:jna:5.13.0@aar'
+    implementation('com.alphacephei:vosk-android:0.3.47') { exclude group: 'net.java.dev.jna' }
+}

@@ -1,0 +1,516 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<title>DelBen Domótica</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;600;700;800&display=swap" rel="stylesheet">
+<style>
+:root{
+  --fondo:#070B18; --tarjeta:#121833; --borde:#263055; --texto:#F4F6FF; --suave:#A9B2D6; --tenue:#8A93B5;
+  --azul:#2F8BFF; --violeta:#8A3BFF; --rosa:#FF3EA5; --cian:#18E0FF; --verde:#22E37A; --amarillo:#FFD60A;
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;height:100%;background:var(--fondo);color:var(--texto);font-family:'Sora',system-ui,sans-serif;overscroll-behavior:none}
+body{display:flex;flex-direction:column;min-height:100%}
+body>*{flex-shrink:0}
+button{font-family:inherit;color:inherit}
+
+/* ---------- encabezado ---------- */
+.top{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:16px 16px 8px}
+.logo{background:#fff;border-radius:18px;padding:6px 12px;display:flex;align-items:center;box-shadow:0 0 18px rgba(47,139,255,.45)}
+.logo img{height:46px;width:auto;display:block}
+.top-der{display:flex;align-items:center;gap:10px}
+.cuenta{display:flex;flex-direction:column;align-items:flex-end;gap:2px}
+.cuenta small{font-size:12px;color:var(--suave)}
+.cuenta b{font-size:15px}
+.icon-btn{width:44px;height:44px;border-radius:14px;border:1px solid var(--borde);background:var(--tarjeta);display:flex;align-items:center;justify-content:center;cursor:pointer}
+.icon-btn:active{transform:scale(.94)}
+.icon-btn.girando svg{animation:girar .8s linear infinite}
+
+/* ---------- tarjeta principal ---------- */
+.hero{margin:8px 16px 0;border-radius:24px;padding:16px 18px;background:linear-gradient(120deg,var(--azul) 0%,var(--violeta) 55%,var(--rosa) 100%);box-shadow:0 10px 30px rgba(138,59,255,.45);display:flex;flex-direction:column;gap:12px;position:relative;overflow:hidden}
+.hero::after{content:"";position:absolute;right:-30px;top:-40px;width:160px;height:160px;border-radius:50%;background:radial-gradient(circle,rgba(255,255,255,.35),rgba(255,255,255,0) 70%);animation:flotar 6s ease-in-out infinite}
+.hero-fila{display:flex;justify-content:space-between;align-items:flex-start;position:relative;z-index:1}
+.hero small{font-size:13px;opacity:.92}
+.hero h1{margin:2px 0 0;font-size:22px;font-weight:800;line-height:1.2}
+.escenas{display:flex;gap:8px;position:relative;z-index:1}
+.escenas button{flex:1;min-height:44px;border:0;border-radius:14px;font-weight:700;font-size:13px;cursor:pointer}
+.esc-off{background:rgba(7,11,24,.55);color:#fff}
+.esc-noche{background:#fff;color:#3A1C8C}
+.escenas button:active{transform:scale(.97)}
+
+/* ---------- pestañas ---------- */
+.tabs{display:flex;gap:8px;padding:16px 16px 10px}
+.tab{flex:1;min-height:44px;border-radius:22px;cursor:pointer;font-weight:700;font-size:13px;background:#121833;color:#C5CCEA;border:1px solid var(--borde);transition:all .2s}
+.tab.on{background:var(--c);color:#070B18;border-color:transparent;box-shadow:0 0 18px var(--cg)}
+
+/* ---------- equipos ---------- */
+.lista{flex:1;padding:4px 16px 130px}
+.grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+.tile{min-height:128px;border-radius:22px;padding:14px;display:flex;flex-direction:column;justify-content:space-between;gap:12px;cursor:pointer;text-align:left;
+  background:var(--tarjeta);border:1px solid var(--borde);transition:transform .15s ease,box-shadow .3s ease,background .3s ease,border-color .3s;position:relative}
+.tile:active{transform:scale(.96)}
+.tile.lit{background:linear-gradient(150deg,var(--ct) 0%,#121833 75%);border:1.5px solid var(--c);
+  box-shadow:0 0 24px var(--cg),inset 0 0 14px var(--ci);animation:respirar 2.6s ease-in-out infinite}
+.tile.off{background:#10152A;border:1px dashed #2A3254;opacity:.55;cursor:not-allowed}
+.tile.espera{opacity:.7}
+.tile.espera::after{content:"";position:absolute;inset:-2px;border-radius:23px;border:2px solid transparent;border-top-color:var(--c);animation:girar .8s linear infinite}
+.tile-fila{display:flex;justify-content:space-between;align-items:center;width:100%}
+.ico{width:44px;height:44px;border-radius:14px;display:flex;align-items:center;justify-content:center;background:#1E2747;transition:background .3s,box-shadow .3s}
+.lit .ico{background:var(--c);box-shadow:0 0 16px var(--c)}
+.ico svg{stroke:#8A93B5}
+.lit .ico svg{stroke:#070B18}
+.llave{width:40px;height:24px;border-radius:12px;position:relative;background:#2A3254;transition:background .25s}
+.llave::after{content:"";position:absolute;top:3px;left:3px;width:18px;height:18px;border-radius:50%;background:#fff;transition:left .25s}
+.lit .llave{background:var(--c)}
+.lit .llave::after{left:19px}
+.nombre{font-size:15px;font-weight:700;color:var(--texto);overflow-wrap:anywhere}
+.estado{font-size:12px;margin-top:2px;font-weight:600;color:var(--suave)}
+.lit .estado{color:var(--c)}
+
+.aviso{border-radius:20px;padding:18px;background:var(--tarjeta);border:1px solid var(--borde);display:flex;flex-direction:column;gap:12px;font-size:14px;line-height:1.45;color:#D7DCF5}
+.aviso b{color:#fff}
+.btn{min-height:46px;border:0;border-radius:14px;padding:0 18px;font-weight:700;font-size:14px;cursor:pointer;background:linear-gradient(120deg,var(--azul),var(--violeta));color:#fff;box-shadow:0 0 18px rgba(47,139,255,.45)}
+.btn.sec{background:#1E2747;box-shadow:none;border:1px solid var(--borde)}
+.esqueleto{min-height:128px;border-radius:22px;background:linear-gradient(90deg,#121833 0%,#1B2347 50%,#121833 100%);background-size:200% 100%;animation:brillo 1.2s linear infinite}
+
+/* ---------- voz ---------- */
+.globos{position:fixed;left:16px;right:16px;bottom:118px;display:flex;flex-direction:column;gap:8px;pointer-events:none;z-index:5}
+.globo{max-width:85%;padding:10px 14px;font-size:14px;animation:aparecer .35s ease-out both}
+.g-yo{align-self:flex-end;background:#1C2442;border:1px solid #2F3A66;border-radius:18px 18px 4px 18px}
+.g-delben{align-self:flex-start;background:var(--verde);color:#062313;font-weight:700;border-radius:18px 18px 18px 4px;box-shadow:0 0 22px rgba(34,227,122,.55)}
+.g-delben.mal{background:#FF8A1F;color:#2B1200;box-shadow:0 0 22px rgba(255,138,31,.5)}
+.dock{position:fixed;left:0;right:0;bottom:0;height:110px;background:linear-gradient(180deg,rgba(7,11,24,0) 0%,#070B18 45%);display:flex;align-items:flex-end;justify-content:center;padding-bottom:max(18px,env(safe-area-inset-bottom));z-index:4;pointer-events:none}
+.mic-caja{position:relative;width:76px;height:76px;pointer-events:auto}
+.mic{position:relative;width:76px;height:76px;border-radius:50%;border:0;cursor:pointer;background:linear-gradient(140deg,var(--cian) 0%,var(--azul) 60%,var(--violeta) 100%);box-shadow:0 0 28px rgba(24,224,255,.7);display:flex;align-items:center;justify-content:center;gap:4px;z-index:1}
+.mic:active{transform:scale(.95)}
+.anillo{position:absolute;inset:0;border-radius:50%;border:3px solid var(--cian);opacity:0}
+.oyendo .anillo{animation:pulso 1.4s ease-out infinite}
+.oyendo .anillo.dos{animation-delay:.7s}
+.barras{display:none;gap:4px;align-items:center}
+.oyendo .barras{display:flex}
+.oyendo .mic-ico{display:none}
+.barra{width:5px;height:22px;border-radius:3px;background:#fff;animation:eq .9s ease-in-out infinite}
+.escucha-chip{position:absolute;left:50%;transform:translateX(-50%);bottom:84px;white-space:nowrap;font-size:11px;font-weight:700;padding:4px 10px;border-radius:12px;background:rgba(34,227,122,.15);color:var(--verde);border:1px solid rgba(34,227,122,.5);display:none}
+.escucha-chip.si{display:block}
+
+/* ---------- ajustes ---------- */
+.capa{position:fixed;inset:0;background:rgba(3,5,12,.7);backdrop-filter:blur(4px);display:none;align-items:flex-end;justify-content:center;z-index:10}
+.capa.abierta{display:flex}
+.hoja{width:100%;max-width:520px;max-height:92%;overflow-y:auto;background:#0E1430;border:1px solid var(--borde);border-radius:26px 26px 0 0;padding:20px 18px calc(24px + env(safe-area-inset-bottom));display:flex;flex-direction:column;gap:14px;animation:subir .3s ease-out}
+.hoja h2{margin:0;font-size:20px}
+.hoja p{margin:0;font-size:13px;color:var(--suave);line-height:1.5}
+.campo{display:flex;flex-direction:column;gap:6px}
+.campo label{font-size:13px;font-weight:700;color:#D7DCF5}
+.campo input,.campo select{min-height:46px;border-radius:12px;border:1px solid var(--borde);background:#121833;color:#fff;padding:0 12px;font:500 15px 'Sora',system-ui,sans-serif;width:100%}
+.campo input:focus,.campo select:focus{outline:2px solid var(--azul);border-color:transparent}
+.ayuda{font-size:12px;color:var(--tenue);line-height:1.5}
+.fila-switch{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 14px;border-radius:14px;background:#121833;border:1px solid var(--borde)}
+.fila-switch span{font-size:14px;font-weight:700}
+.fila-switch small{display:block;font-size:12px;color:var(--tenue);font-weight:500;margin-top:2px}
+.sw{position:relative;width:52px;height:30px;flex:none}
+.sw input{position:absolute;opacity:0;width:100%;height:100%;margin:0;cursor:pointer;z-index:1}
+.sw i{position:absolute;inset:0;border-radius:15px;background:#2A3254;transition:background .25s}
+.sw i::after{content:"";position:absolute;top:4px;left:4px;width:22px;height:22px;border-radius:50%;background:#fff;transition:left .25s}
+.sw input:checked + i{background:var(--verde)}
+.sw input:checked + i::after{left:26px}
+.botones{display:flex;gap:10px}
+.botones .btn{flex:1}
+.pasos{margin:0;padding-left:20px;font-size:13px;color:var(--suave);line-height:1.6}
+.toast{position:fixed;left:50%;top:18px;transform:translateX(-50%);background:#1C2442;border:1px solid #2F3A66;color:#fff;padding:10px 16px;border-radius:14px;font-size:13px;z-index:20;display:none;max-width:90%;text-align:center}
+.toast.si{display:block;animation:aparecer .25s ease-out}
+
+@keyframes pulso{0%{transform:scale(1);opacity:.75}100%{transform:scale(1.9);opacity:0}}
+@keyframes eq{0%,100%{transform:scaleY(.3)}50%{transform:scaleY(1)}}
+@keyframes aparecer{0%{transform:translateY(10px);opacity:0}100%{transform:none;opacity:1}}
+@keyframes respirar{0%,100%{filter:brightness(1)}50%{filter:brightness(1.22)}}
+@keyframes girar{to{transform:rotate(360deg)}}
+@keyframes brillo{to{background-position:-200% 0}}
+@keyframes flotar{0%,100%{transform:translateY(0)}50%{transform:translateY(14px)}}
+@keyframes subir{from{transform:translateY(40px);opacity:0}to{transform:none;opacity:1}}
+</style>
+</head>
+<body>
+
+<header class="top">
+  <div class="logo"><img src="logo.png" alt="DelBen"></div>
+  <div class="top-der">
+    <div class="cuenta"><small>Mi casa</small><b id="contador">—</b></div>
+    <button class="icon-btn" id="btnActualizar" aria-label="Actualizar">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#C5CCEA" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a9 9 0 1 1-3-6.7L21 8M21 3v5h-5"></path></svg>
+    </button>
+    <button class="icon-btn" id="btnAjustes" aria-label="Ajustes">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#C5CCEA" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"></path></svg>
+    </button>
+  </div>
+</header>
+
+<section class="hero">
+  <div class="hero-fila">
+    <div><small id="saludo">Hola</small><h1>Tu casa, a tu voz</h1></div>
+    <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 11l9-7 9 7v9a1 1 0 0 1-1 1h-5v-6h-6v6H4a1 1 0 0 1-1-1z"></path></svg>
+  </div>
+  <div class="escenas">
+    <button class="esc-off" id="escApagar">Apagar todo</button>
+    <button class="esc-noche" id="escNoche">Modo noche</button>
+  </div>
+</section>
+
+<nav class="tabs" id="tabs"></nav>
+<main class="lista"><div class="grid" id="grid"></div></main>
+
+<div class="globos" id="globos"></div>
+<div class="dock">
+  <div class="mic-caja" id="micCaja">
+    <div class="escucha-chip" id="chipEscucha">Escuchando «Delben»</div>
+    <div class="anillo"></div><div class="anillo dos"></div>
+    <button class="mic" id="mic" aria-label="Hablar con DelBen">
+      <span class="barras"><i class="barra"></i><i class="barra" style="animation-delay:.15s"></i><i class="barra" style="animation-delay:.3s"></i><i class="barra" style="animation-delay:.45s"></i></span>
+      <svg class="mic-ico" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3a3 3 0 0 0-3 3v6a3 3 0 0 0 6 0V6a3 3 0 0 0-3-3zM5 11a7 7 0 0 0 14 0M12 18v3"></path></svg>
+    </button>
+  </div>
+</div>
+
+<div class="capa" id="capa">
+  <div class="hoja" role="dialog" aria-modal="true" aria-labelledby="tituloAjustes">
+    <h2 id="tituloAjustes">Ajustes</h2>
+    <p>Datos de tu proyecto en la plataforma de Tuya (platform.tuya.com → Cloud → tu proyecto). Quedan guardados solo en este teléfono.</p>
+    <div class="campo">
+      <label for="fAccess">Access ID</label>
+      <input id="fAccess" autocomplete="off" autocapitalize="off" spellcheck="false">
+      <span class="ayuda">Pestaña <b>Overview</b> del proyecto, «Access ID/Client ID».</span>
+    </div>
+    <div class="campo">
+      <label for="fSecret">Access Secret</label>
+      <input id="fSecret" type="password" autocomplete="off" autocapitalize="off" spellcheck="false">
+      <span class="ayuda">También en <b>Overview</b> (tocá el ojito para verlo). Si ya está guardado, dejalo vacío.</span>
+    </div>
+    <div class="campo">
+      <label for="fUid">UID de tu cuenta de Smart Life</label>
+      <input id="fUid" autocomplete="off" autocapitalize="off" spellcheck="false">
+      <span class="ayuda"><b>Devices → Link App Account</b>, columna UID (empieza con «az…»).</span>
+    </div>
+    <div class="campo">
+      <label for="fServidor">Centro de datos</label>
+      <select id="fServidor">
+        <option value="https://openapi.tuyaus.com">Western America (Argentina)</option>
+        <option value="https://openapi-ueaz.tuyaus.com">Eastern America</option>
+        <option value="https://openapi.tuyaeu.com">Central Europe</option>
+        <option value="https://openapi-weaz.tuyaeu.com">Western Europe</option>
+        <option value="https://openapi.tuyain.com">India</option>
+        <option value="https://openapi.tuyacn.com">China</option>
+      </select>
+    </div>
+
+    <div class="fila-switch">
+      <div><span>Escucha permanente</span><small>Decí «Delben, encender pasillo» aunque la app esté cerrada y la pantalla apagada.</small></div>
+      <label class="sw"><input type="checkbox" id="fEscucha" aria-label="Escucha permanente"><i></i></label>
+    </div>
+    <div class="aviso" id="avisoBateria" style="display:none">
+      <span>Para que el teléfono no corte la escucha: dejá DelBen <b>sin restricciones de batería</b>. En Samsung también: Ajustes → Batería → Límites de uso en segundo plano → que DelBen no esté en «Apps inactivas».</span>
+      <button class="btn sec" id="btnBateria">Quitar restricción de batería</button>
+    </div>
+    <ol class="pasos">
+      <li>Cada tanto Tuya pide renovar el período de prueba gratuito de IoT Core desde la plataforma; si un día deja de responder, revisalo ahí.</li>
+      <li>Para que un equipo nuevo aparezca, agregalo en Smart Life y tocá el botón de actualizar (las flechitas de arriba).</li>
+    </ol>
+    <div class="botones">
+      <button class="btn sec" id="btnCerrar">Cerrar</button>
+      <button class="btn" id="btnGuardar">Guardar</button>
+    </div>
+    <span class="ayuda" id="version" style="text-align:center"></span>
+  </div>
+</div>
+
+<div class="toast" id="toast" role="status"></div>
+
+<script>
+'use strict';
+const nativo = window.Delben || null;
+
+const ICONOS = {
+  luz: 'M9 18h6M10 21h4M12 3a6 6 0 0 0-3.5 10.9c.6.4 1 1.1 1 1.8V16h5v-.3c0-.7.4-1.4 1-1.8A6 6 0 0 0 12 3z',
+  enchufe: 'M9 2v6M15 2v6M6 8h12v3a6 6 0 0 1-12 0V8zM12 17v5',
+  tv: 'M3 6h18v11H3zM8 21h8M12 17v4',
+  aire: 'M12 2v20M4.9 7l14.2 10M4.9 17L19.1 7',
+  agua: 'M12 3s6 6.5 6 11a6 6 0 0 1-12 0c0-4.5 6-11 6-11z',
+  fuego: 'M12 3c1 4 5 5.5 5 10a5 5 0 0 1-10 0c0-2.5 1.5-3.5 2-5 1 1.5 2 2 3 1.5-.5-2 0-4.5 0-6.5z',
+  control: 'M8 2h8v20H8zM12 6v.01M10 10h4M10 14h4'
+};
+const PALETA = ['#FFD60A','#FF8A1F','#FF3EA5','#8A3BFF','#18E0FF','#22E37A','#2F8BFF','#FF5A36','#7CF0FF','#C6FF3D'];
+const TABS = [
+  { id:'luces',   label:'Luces',       c:'#FFD60A' },
+  { id:'energia', label:'Energía',     c:'#22E37A' },
+  { id:'ir',      label:'Tele y aire', c:'#FF3EA5' }
+];
+
+let equipos = [];
+let tab = 'luces';
+let cargando = true;
+let estadoMsg = null;          // {tipo:'falta'|'error', texto}
+const pendientes = new Set();
+let cfg = {};
+
+const $ = id => document.getElementById(id);
+const esc = t => String(t).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const clave = e => e.id + '|' + e.codigo;
+
+function color(e){
+  let h = 0; const s = clave(e);
+  for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) >>> 0;
+  return PALETA[h % PALETA.length];
+}
+function icono(e){
+  const n = e.nombre.toLowerCase();
+  if (/aire|split/.test(n)) return ICONOS.aire;
+  if (/flow|deco|control/.test(n)) return ICONOS.control;
+  if (/termo|calef|estufa/.test(n)) return ICONOS.fuego;
+  if (/bomba|pileta|riego|agua/.test(n)) return ICONOS.agua;
+  if (e.grupo === 'ir' || /\btv\b|tele|tcl|bgh/.test(n)) return ICONOS.tv;
+  if (e.grupo === 'energia') return ICONOS.enchufe;
+  return ICONOS.luz;
+}
+
+function toast(t){
+  const el = $('toast'); el.textContent = t; el.classList.add('si');
+  clearTimeout(toast.t); toast.t = setTimeout(() => el.classList.remove('si'), 3200);
+}
+
+function saludo(){
+  const h = new Date().getHours();
+  $('saludo').textContent = h < 6 ? 'Buenas noches' : h < 13 ? 'Buen día' : h < 20 ? 'Buenas tardes' : 'Buenas noches';
+}
+
+/* ---------------- dibujar ---------------- */
+function dibujarTabs(){
+  $('tabs').innerHTML = TABS.map(t => {
+    const n = equipos.filter(e => e.grupo === t.id).length;
+    return `<button class="tab${tab === t.id ? ' on' : ''}" style="--c:${t.c};--cg:${t.c}99" data-tab="${t.id}">${t.label}${n ? ' · ' + n : ''}</button>`;
+  }).join('');
+}
+
+function dibujar(){
+  dibujarTabs();
+  const prendidos = equipos.filter(e => e.control && e.online && e.prendido).length;
+  $('contador').textContent = equipos.length ? `${prendidos} encendido${prendidos === 1 ? '' : 's'}` : '—';
+  const g = $('grid');
+
+  if (cargando && !equipos.length){
+    g.innerHTML = '<div class="esqueleto"></div>'.repeat(6);
+    return;
+  }
+  if (estadoMsg && estadoMsg.tipo === 'falta'){
+    g.style.gridTemplateColumns = '1fr';
+    g.innerHTML = `<div class="aviso"><b>¡Bienvenido a DelBen Domótica!</b>
+      <span>Para conectar tus equipos de Smart Life, cargá las claves de tu proyecto de Tuya.</span>
+      <button class="btn" data-accion="ajustes">Configurar ahora</button></div>`;
+    return;
+  }
+  g.style.gridTemplateColumns = '';
+  const lista = equipos.filter(e => e.grupo === tab);
+  let html = '';
+  if (estadoMsg && estadoMsg.tipo === 'error'){
+    html += `<div class="aviso" style="grid-column:1/-1"><b>No pude conectar con Tuya</b><span>${esc(estadoMsg.texto)}</span>
+      <div class="botones"><button class="btn sec" data-accion="ajustes">Ajustes</button><button class="btn" data-accion="reintentar">Reintentar</button></div></div>`;
+  }
+  if (!lista.length && !(estadoMsg && estadoMsg.tipo === 'error')){
+    html += `<div class="aviso" style="grid-column:1/-1"><span>No hay equipos en esta pestaña.</span></div>`;
+  }
+  html += lista.map(e => {
+    const c = color(e), k = clave(e);
+    const sinConexion = !e.online, sinControl = !e.control;
+    const lit = !sinConexion && !sinControl && e.prendido;
+    const clases = ['tile', lit ? 'lit' : '', sinConexion ? 'off' : '', pendientes.has(k) ? 'espera' : ''].join(' ');
+    const estado = sinConexion ? 'Sin conexión' : sinControl ? 'Próximamente' : e.prendido ? 'Encendido' : 'Apagado';
+    return `<button class="${clases}" style="--c:${c};--cg:${c}73;--ct:${c}47;--ci:${c}26" data-k="${esc(k)}" aria-label="${esc(e.nombre)}, ${estado}">
+      <div class="tile-fila">
+        <div class="ico"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="${icono(e)}"></path></svg></div>
+        ${sinControl ? '' : '<div class="llave"></div>'}
+      </div>
+      <div><div class="nombre">${esc(e.nombre)}</div><div class="estado">${estado}</div></div>
+    </button>`;
+  }).join('');
+  g.innerHTML = html;
+}
+
+/* ---------------- acciones ---------------- */
+function tocar(k){
+  const e = equipos.find(x => clave(x) === k);
+  if (!e) return;
+  if (!e.online){ toast(`${e.nombre} está sin conexión`); return; }
+  if (!e.control){ toast('Las teles y el aire por infrarrojo llegan en la próxima versión'); return; }
+  if (pendientes.has(k)) return;
+  const nuevo = !e.prendido;
+  e.prendido = nuevo;
+  pendientes.add(k);
+  dibujar();
+  if (navigator.vibrate) navigator.vibrate(15);
+  if (nativo) nativo.cambiar(e.id, e.codigo, nuevo);
+  else setTimeout(() => window.delbenResultado({ ok:true, id:e.id, codigo:e.codigo, valor:nuevo }), 500);
+}
+
+window.delbenResultado = function(r){
+  const k = r.id + '|' + r.codigo;
+  pendientes.delete(k);
+  const e = equipos.find(x => clave(x) === k);
+  if (!r.ok){
+    if (e) e.prendido = !r.valor;
+    toast(r.error || 'No se pudo cambiar');
+  }
+  dibujar();
+};
+
+window.delbenDatos = function(d){
+  cargando = false;
+  $('btnActualizar').classList.remove('girando');
+  if (d.falta){ estadoMsg = { tipo:'falta' }; equipos = []; dibujar(); abrirAjustes(); return; }
+  estadoMsg = d.ok ? null : { tipo:'error', texto: d.error || 'Error desconocido' };
+  if (Array.isArray(d.equipos) && (d.equipos.length || d.ok)){
+    // no pisar los que están esperando respuesta
+    const espera = new Map(equipos.filter(e => pendientes.has(clave(e))).map(e => [clave(e), e.prendido]));
+    equipos = d.equipos.map(e => espera.has(clave(e)) ? Object.assign(e, { prendido: espera.get(clave(e)) }) : e);
+  }
+  dibujar();
+};
+
+window.delbenEscena = function(d){ mostrarGlobos(null, d.texto, false); };
+
+window.delbenVolvio = function(){ refrescar(); };
+
+window.delbenAtras = function(){
+  if ($('capa').classList.contains('abierta')){ cerrarAjustes(); return true; }
+  return false;
+};
+
+function refrescar(){
+  if (!nativo) return;
+  $('btnActualizar').classList.add('girando');
+  nativo.refrescar();
+}
+
+/* ---------------- voz ---------------- */
+let globosT = null;
+function mostrarGlobos(yo, delben, mal){
+  const g = $('globos');
+  g.innerHTML = (yo ? `<div class="globo g-yo">${esc(yo)}</div>` : '') +
+                (delben ? `<div class="globo g-delben${mal ? ' mal' : ''}">${esc(delben)}</div>` : '');
+  clearTimeout(globosT);
+  if (delben) globosT = setTimeout(() => { g.innerHTML = ''; }, 6500);
+}
+
+window.delbenVoz = function(v){
+  const caja = $('micCaja');
+  if (v.estado === 'escuchando'){ caja.classList.add('oyendo'); mostrarGlobos('Escuchando…'); }
+  else if (v.estado === 'oyendo' || v.estado === 'pensando'){ caja.classList.add('oyendo'); mostrarGlobos(v.texto); }
+  else if (v.estado === 'resultado'){ caja.classList.remove('oyendo'); mostrarGlobos(v.texto, v.respuesta, false); }
+  else if (v.estado === 'error'){ caja.classList.remove('oyendo'); mostrarGlobos(null, v.respuesta, true); }
+};
+
+function hablar(){
+  if (nativo){ nativo.hablar(); return; }
+  // Vista previa en el navegador
+  const p = equipos.find(e => /pasillo/i.test(e.nombre));
+  window.delbenVoz({ estado:'escuchando' });
+  setTimeout(() => window.delbenVoz({ estado:'oyendo', texto:'«Delben, encender pasillo»' }), 1200);
+  setTimeout(() => { if (p){ p.prendido = true; dibujar(); } window.delbenVoz({ estado:'resultado', texto:'«Delben, encender pasillo»', respuesta:'Listo, el pasillo ya está encendido.' }); }, 2300);
+}
+
+/* ---------------- ajustes ---------------- */
+function leerConfig(){
+  try { cfg = nativo ? JSON.parse(nativo.config()) : { servidor:'https://openapi.tuyaus.com' }; } catch(e){ cfg = {}; }
+  aplicarConfig();
+}
+window.delbenConfig = function(c){ cfg = c || {}; aplicarConfig(); };
+
+function aplicarConfig(){
+  $('chipEscucha').classList.toggle('si', !!cfg.escuchaActiva);
+  $('fEscucha').checked = !!cfg.escucha;
+  $('avisoBateria').style.display = cfg.escucha && !cfg.bateriaOk ? 'flex' : 'none';
+  if (cfg.version) $('version').textContent = 'DelBen Domótica ' + cfg.version;
+}
+
+function abrirAjustes(){
+  $('fAccess').value = cfg.accessId || '';
+  $('fSecret').value = '';
+  $('fSecret').placeholder = cfg.tieneSecret ? '•••••••• (guardado)' : '';
+  $('fUid').value = cfg.uid || '';
+  $('fServidor').value = cfg.servidor || 'https://openapi.tuyaus.com';
+  aplicarConfig();
+  $('capa').classList.add('abierta');
+}
+function cerrarAjustes(){ $('capa').classList.remove('abierta'); }
+
+function guardar(){
+  const datos = {
+    accessId: $('fAccess').value.trim(),
+    secret: $('fSecret').value.trim(),
+    uid: $('fUid').value.trim(),
+    servidor: $('fServidor').value
+  };
+  if (!datos.accessId || !datos.uid || (!datos.secret && !cfg.tieneSecret)){
+    toast('Completá Access ID, Access Secret y UID'); return;
+  }
+  cargando = true; estadoMsg = null; dibujar();
+  if (nativo) nativo.guardar(JSON.stringify(datos));
+  cerrarAjustes();
+  toast('Conectando con Tuya…');
+}
+
+/* ---------------- eventos ---------------- */
+$('tabs').addEventListener('click', ev => {
+  const b = ev.target.closest('[data-tab]'); if (!b) return;
+  tab = b.dataset.tab; dibujar();
+});
+$('grid').addEventListener('click', ev => {
+  const a = ev.target.closest('[data-accion]');
+  if (a){ if (a.dataset.accion === 'ajustes') abrirAjustes(); else { cargando = true; refrescar(); } return; }
+  const t = ev.target.closest('[data-k]'); if (t) tocar(t.dataset.k);
+});
+$('mic').addEventListener('click', hablar);
+$('btnAjustes').addEventListener('click', abrirAjustes);
+$('btnActualizar').addEventListener('click', () => { refrescar(); if (!nativo) toast('Actualizado'); });
+$('btnCerrar').addEventListener('click', cerrarAjustes);
+$('btnGuardar').addEventListener('click', guardar);
+$('capa').addEventListener('click', ev => { if (ev.target === $('capa')) cerrarAjustes(); });
+$('fEscucha').addEventListener('change', ev => {
+  cfg.escucha = ev.target.checked; aplicarConfig();
+  if (nativo) nativo.escuchaPermanente(ev.target.checked);
+  if (ev.target.checked) toast('Escucha permanente activada: decí «Delben…»');
+});
+$('btnBateria').addEventListener('click', () => nativo && nativo.bateria());
+$('escApagar').addEventListener('click', () => escena('apagar'));
+$('escNoche').addEventListener('click', () => escena('noche'));
+function escena(cual){
+  toast(cual === 'noche' ? 'Activando modo noche…' : 'Apagando todo…');
+  if (nativo) nativo.escena(cual);
+}
+document.addEventListener('visibilitychange', () => { if (!document.hidden){ leerConfig(); } });
+
+/* ---------------- inicio ---------------- */
+saludo();
+leerConfig();
+if (nativo){
+  try {
+    const c = JSON.parse(nativo.cache());
+    if (c.length){ equipos = c; cargando = false; }
+  } catch(e){}
+  dibujar();
+  if (!cfg.configurado){ window.delbenDatos({ ok:false, falta:true }); }
+  else refrescar();
+  setInterval(() => { if (!document.hidden) refrescar(); }, 60000);
+} else {
+  // Vista previa en el navegador, con equipos de ejemplo
+  equipos = [
+    ['Pasillo','luces',false],['Cocina','luces',true],['Estante','luces',false],['Colores','luces',true],
+    ['WC 1','luces',false],['WC 2','luces',false],['Dormitorio Chicos','luces',false],['Lampara 1','luces',false],
+    ['Lampara 2','luces',false,false],['Termo','energia',true],['Bomba','energia',false],['Tele chicos','energia',false],
+    ['TV Comedor','energia',true],['TCL','ir',false,true,false],['Aire Comedo','ir',false,true,false],['FLOW','ir',false,true,false]
+  ].map((x,i) => ({ id:'d'+i, codigo:'switch_1', nombre:x[0], grupo:x[1], prendido:x[2], online:x[3] !== false, control:x[4] !== false }));
+  cargando = false;
+  dibujar();
+}
+</script>
+</body>
+</html>

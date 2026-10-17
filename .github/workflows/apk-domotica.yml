@@ -1,0 +1,50 @@
+name: APK DelBen Domótica
+
+# Arma la APK de DelBen Domótica (control de la casa con Smart Life/Tuya, botones y voz)
+# y la publica siempre en el mismo link:
+# https://github.com/ferchu17/Delben/releases/download/domotica-apk/DelbenDomotica.apk
+# El modelo de voz en español (Vosk, ~40 MB) se descarga acá al compilar: no está en el repositorio.
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths: ["android-domotica/**", ".github/workflows/apk-domotica.yml"]
+
+permissions:
+  contents: write
+
+jobs:
+  apk:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-java@v5
+        with: { distribution: temurin, java-version: "17" }
+      - name: SDK de Android (ya viene en el servidor de GitHub)
+        run: echo "sdk.dir=$ANDROID_HOME" > android-domotica/local.properties && (yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses >/dev/null || true)
+      - name: Modelo de voz en español (reconoce «Delben…» sin internet)
+        run: |
+          curl -fsSL --retry 3 -o /tmp/modelo.zip https://alphacephei.com/vosk/models/vosk-model-small-es-0.42.zip
+          unzip -q /tmp/modelo.zip -d /tmp/modelo
+          mkdir -p android-domotica/app/src/main/assets
+          rm -rf android-domotica/app/src/main/assets/model-es
+          mv /tmp/modelo/vosk-model-small-es-0.42 android-domotica/app/src/main/assets/model-es
+          # Marca de versión: el teléfono descomprime el modelo una sola vez por versión
+          echo "es-0.42" > android-domotica/app/src/main/assets/model-es/uuid
+          du -sh android-domotica/app/src/main/assets/model-es
+      - uses: gradle/actions/setup-gradle@v4
+        with: { gradle-version: "8.7" }
+      - name: Compilar APK
+        env: { VERSION_CODE: "${{ github.run_number }}" }
+        run: gradle -p android-domotica :app:assembleRelease --no-daemon --stacktrace
+      - name: Renombrar
+        run: cp android-domotica/app/build/outputs/apk/release/app-release.apk DelbenDomotica.apk && ls -la DelbenDomotica.apk
+      - uses: actions/upload-artifact@v4
+        with: { name: DelbenDomotica-apk, path: DelbenDomotica.apk }
+      - name: Publicar en el link fijo
+        env: { GH_TOKEN: "${{ github.token }}" }
+        run: |
+          gh release view domotica-apk >/dev/null 2>&1 || \
+            gh release create domotica-apk --title "DelBen Domótica (APK)" \
+              --notes "Control de la casa (Smart Life / Tuya) con botones y por voz: «Delben, encender pasillo». Descargar DelbenDomotica.apk e instalar."
+          gh release upload domotica-apk DelbenDomotica.apk --clobber
