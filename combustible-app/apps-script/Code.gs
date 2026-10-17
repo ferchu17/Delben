@@ -787,8 +787,14 @@ function generarArchivos_(nro, supervisor, tickets, fecha) {
  */
 function armarPdf_(nombre, nro, supervisor, tickets, fecha) {
   const e = esc_;
-  let logo = '';
-  try { logo = dataUrl_(DriveApp.getFileById(CFG.LOGO_KTL_ID).getBlob()); } catch (err) {}
+  // Logo KTL con su proporción real (alto 17 mm, ancho según la foto), para que no salga deformado
+  let logo = '', logoW = 29.5;
+  try {
+    const lb = DriveApp.getFileById(CFG.LOGO_KTL_ID).getBlob();
+    const ld = medidaImagen_(lb.getBytes());
+    if (ld && ld.h) logoW = 17 * ld.w / ld.h;
+    logo = dataUrl_(lb);
+  } catch (err) {}
   const filas = tickets.map(t => ({
     fecha: fmtD_(t['Fecha ticket']), numero: String(t['N° Comprobante'] || ''), prov: String(t.Proveedor || ''),
     corr: String(t['Corresponde a'] || ''), total: num_(t['Total con IVA'])
@@ -824,7 +830,7 @@ function armarPdf_(nombre, nro, supervisor, tickets, fecha) {
   let html = '<html><head><meta charset="utf-8"><style>' + css + '</style></head><body>' +
     '<div class="hoja">' +
     '<table class="cab"><tr><td class="tit">FORMULARIO DE RENDICION DE FONDOS FIJO - REINTEGRO DE GASTOS COMBUSTIBLE</td>' +
-    '<td style="width:34mm;text-align:right">' + (logo ? '<img src="' + logo + '" style="height:17mm">' : '') + '</td></tr></table>' +
+    '<td style="width:' + (logoW + 4).toFixed(1) + 'mm;text-align:right">' + (logo ? '<img src="' + logo + '" style="height:17mm;width:' + logoW.toFixed(1) + 'mm">' : '') + '</td></tr></table>' +
     '<table class="campos" style="margin-top:4mm">' +
     '<tr><td class="lbl" style="width:52mm">EMPRESA:</td><td class="box" colspan="3"></td></tr>' +
     '<tr><td class="lbl">FECHA:</td><td class="box" style="width:38mm">' + e(fmtD_(fecha)) + '</td>' +
