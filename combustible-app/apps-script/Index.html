@@ -383,6 +383,13 @@
   </main>
 </section>
 
+<div id="rcView" class="pdfv hidden">
+  <div class="pdfbar"><b>Recortar el ticket</b><span class="fila-btn"><button class="btn gris sm" onclick="cerrarRecorte()">Cancelar</button><button class="btn verde sm" onclick="aplicarRecorte()">Listo</button></span></div>
+  <div class="muted" style="background:#fff;padding:6px 12px">Arrastrá las esquinas verdes hasta los bordes del ticket. Tocá adentro del recuadro para moverlo.</div>
+  <div id="rcArea" style="flex:1;display:flex;align-items:center;justify-content:center;overflow:hidden;padding:8px">
+    <canvas id="rcCanvas" style="touch-action:none;max-width:100%;max-height:100%"></canvas>
+  </div>
+</div>
 <div id="pdfView" class="pdfv hidden">
   <div class="pdfbar"><b id="pdfTit">Rendición</b><span class="fila-btn"><a id="pdfAbrir" class="btn gris sm" href="#" target="_blank">Abrir en Drive</a><button class="btn gris sm" onclick="cerrarPdf()">Cerrar</button></span></div>
   <div id="pdfPags"></div>
@@ -777,16 +784,18 @@ function itemTicket(t, acciones){
 }
 
 /* ---- Foto ---- */
-let fotoOrig = '', fotoRec = '';
+let fotoOrig = '', fotoRec = '', fotoImg = null, fotoReg = null;
 function onFoto(inp){
   const f = inp.files && inp.files[0];
   inp.value = '';
   if (!f) return;
   $('prev').innerHTML = '<div class="leyendo"><div class="spin"></div>Preparando la foto...</div>';
   procesarFoto(f).then(r => {
-    fotoOrig = r.original; fotoRec = r.recorte || '';
+    fotoOrig = r.original; fotoRec = r.recorte || ''; fotoImg = r.img; fotoReg = r.reg;
     fotoData = fotoRec || fotoOrig;
     pintarPrev();
+    // Si no encontró el ticket solo, se abre el recorte para marcarlo con el dedo
+    if (!fotoRec) abrirRecorte();
     $('prevMsg').innerHTML = '<div class="leyendo"><div class="spin"></div>Leyendo el ticket...</div>';
     // Se lee la foto completa (así no se pierde ningún dato si el recorte quedó justo); se guarda el recorte
     return run('leerTicket', S.token, fotoOrig).then(d => {
@@ -811,10 +820,81 @@ function onFoto(inp){
 function pintarPrev(){
   const msg = $('prevMsg') ? $('prevMsg').innerHTML : '';
   $('prev').innerHTML = `<img src="${fotoData}">` +
-    (fotoRec ? `<div style="margin-top:8px"><button class="btn gris sm" onclick="toggleRecorte()">${fotoData === fotoRec ? 'Usar la foto completa' : 'Usar el ticket recortado'}</button></div>` : '') +
-    `<div id="prevMsg">${msg}</div>`;
+    `<div class="fila-btn" style="margin-top:8px;justify-content:center"><button class="btn sm" onclick="abrirRecorte()">✂ Recortar ticket</button>` +
+    (fotoRec ? `<button class="btn gris sm" onclick="toggleRecorte()">${fotoData === fotoRec ? 'Usar la foto completa' : 'Usar el ticket recortado'}</button>` : '') +
+    `</div><div id="prevMsg">${msg}</div>`;
 }
 function toggleRecorte(){ fotoData = (fotoData === fotoRec) ? fotoOrig : fotoRec; pintarPrev(); }
+
+/* ---- Recorte manual: se arrastran las esquinas del recuadro con el dedo ---- */
+const RC = { k: 1, r: null, drag: null, ox: 0, oy: 0 };
+function abrirRecorte(){
+  if (!fotoImg) return;
+  const W = fotoImg.naturalWidth, H = fotoImg.naturalHeight;
+  const cv = $('rcCanvas'), box = $('rcArea');
+  $('rcView').classList.remove('hidden');
+  const aw = box.clientWidth - 16, ah = box.clientHeight - 16;
+  RC.k = Math.min(aw / W, ah / H);
+  cv.width = Math.round(W * RC.k); cv.height = Math.round(H * RC.k);
+  const r = fotoReg || { x: W * 0.06, y: H * 0.04, w: W * 0.88, h: H * 0.92 };
+  RC.r = { x: r.x * RC.k, y: r.y * RC.k, w: r.w * RC.k, h: r.h * RC.k };
+  dibujarRecorte();
+}
+function dibujarRecorte(){
+  const cv = $('rcCanvas'), x = cv.getContext('2d'), r = RC.r;
+  x.clearRect(0, 0, cv.width, cv.height);
+  x.drawImage(fotoImg, 0, 0, cv.width, cv.height);
+  x.fillStyle = 'rgba(0,0,0,.55)';
+  x.fillRect(0, 0, cv.width, r.y);
+  x.fillRect(0, r.y + r.h, cv.width, cv.height - r.y - r.h);
+  x.fillRect(0, r.y, r.x, r.h);
+  x.fillRect(r.x + r.w, r.y, cv.width - r.x - r.w, r.h);
+  x.strokeStyle = '#2e9b3a'; x.lineWidth = 3; x.strokeRect(r.x, r.y, r.w, r.h);
+  x.fillStyle = '#2e9b3a';
+  [[r.x, r.y], [r.x + r.w, r.y], [r.x, r.y + r.h], [r.x + r.w, r.y + r.h]].forEach(p => { x.beginPath(); x.arc(p[0], p[1], 11, 0, Math.PI * 2); x.fill(); });
+}
+function rcPos(e){ const cv = $('rcCanvas'), b = cv.getBoundingClientRect(), sx = cv.width / (b.width || 1), sy = cv.height / (b.height || 1); return { x: (e.clientX - b.left) * sx, y: (e.clientY - b.top) * sy }; }
+function rcDown(e){
+  const p = rcPos(e), r = RC.r, d = 36;
+  const esq = [['tl', r.x, r.y], ['tr', r.x + r.w, r.y], ['bl', r.x, r.y + r.h], ['br', r.x + r.w, r.y + r.h]]
+    .map(c => [c[0], Math.hypot(p.x - c[1], p.y - c[2])]).sort((a, b) => a[1] - b[1])[0];
+  if (esq[1] < d) RC.drag = esq[0];
+  else if (p.x > r.x && p.x < r.x + r.w && p.y > r.y && p.y < r.y + r.h) { RC.drag = 'mover'; RC.ox = p.x - r.x; RC.oy = p.y - r.y; }
+  else RC.drag = null;
+  if (RC.drag) { $('rcCanvas').setPointerCapture(e.pointerId); e.preventDefault(); }
+}
+function rcMove(e){
+  if (!RC.drag) return;
+  e.preventDefault();
+  const cv = $('rcCanvas'), p = rcPos(e), r = RC.r, min = 30;
+  const X = v => Math.max(0, Math.min(cv.width, v)), Y = v => Math.max(0, Math.min(cv.height, v));
+  let x1 = r.x, y1 = r.y, x2 = r.x + r.w, y2 = r.y + r.h;
+  if (RC.drag === 'mover'){
+    const nx = Math.max(0, Math.min(cv.width - r.w, p.x - RC.ox)), ny = Math.max(0, Math.min(cv.height - r.h, p.y - RC.oy));
+    RC.r = { x: nx, y: ny, w: r.w, h: r.h }; dibujarRecorte(); return;
+  }
+  if (RC.drag[0] === 't') y1 = Math.min(Y(p.y), y2 - min); else y2 = Math.max(Y(p.y), y1 + min);
+  if (RC.drag[1] === 'l') x1 = Math.min(X(p.x), x2 - min); else x2 = Math.max(X(p.x), x1 + min);
+  RC.r = { x: x1, y: y1, w: x2 - x1, h: y2 - y1 };
+  dibujarRecorte();
+}
+function rcUp(){ RC.drag = null; }
+function cerrarRecorte(){ $('rcView').classList.add('hidden'); }
+function aplicarRecorte(){
+  const r = RC.r, k = RC.k;
+  fotoReg = { x: r.x / k, y: r.y / k, w: r.w / k, h: r.h / k };
+  fotoRec = aJpeg(fotoImg, fotoReg);
+  fotoData = fotoRec;
+  cerrarRecorte();
+  pintarPrev();
+}
+(function(){
+  const cv = $('rcCanvas');
+  cv.addEventListener('pointerdown', rcDown);
+  cv.addEventListener('pointermove', rcMove);
+  cv.addEventListener('pointerup', rcUp);
+  cv.addEventListener('pointercancel', rcUp);
+})();
 
 /* Marca en naranja los datos obligatorios que no se pudieron leer */
 function marcarFaltantes(){
@@ -840,7 +920,7 @@ function procesarFoto(file){
       img.onload = () => {
         let reg = null;
         try { reg = detectarTicket(img); } catch(e) { reg = null; }
-        ok({ original: aJpeg(img), recorte: reg ? aJpeg(img, reg) : '' });
+        ok({ original: aJpeg(img), recorte: reg ? aJpeg(img, reg) : '', img: img, reg: reg });
       };
       img.src = rd.result;
     };
@@ -951,7 +1031,7 @@ function guardarTkOk(t){
     .finally(() => { $('tkGuardar').disabled = false; loader(false); });
 }
 function limpiarTk(){
-  fotoData = ''; fotoOrig = ''; fotoRec = '';
+  fotoData = ''; fotoOrig = ''; fotoRec = ''; fotoImg = null; fotoReg = null;
   $('prev').innerHTML = '';
   ['tkCorr','tkNum','tkProv','tkCuit','tkProd','tkLit','tkPre','tkTot'].forEach(id => { $(id).value = ''; $(id).classList.remove('falta'); });
   $('tkFecha').value = hoyIso();
@@ -1187,7 +1267,7 @@ function regenerar(nro){
 function regenerarOk(nro, mail){
   loader(true);
   run('regenerarRendicion', S.token, nro, mail).then(r => cargarAdmin(true).then(() =>
-    modal('ok', 'Rendición regenerada', `Total: <b>${money(r.total)}</b><br><a href="${esc(r.pdfUrl)}" target="_blank">Abrir PDF</a> · <a href="${esc(r.excelUrl)}" target="_blank">Abrir Excel</a>`)))
+    modal('ok', 'Rendición regenerada', `Total: <b>${money(r.total)}</b>`, [{txt:'Ver PDF', fn: () => verPdf(nro)}, {txt:'Aceptar', cls:'gris'}])))
     .catch(e => modal('err', 'Error', esc(errMsg(e)))).finally(() => loader(false));
 }
 </script>

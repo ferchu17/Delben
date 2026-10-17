@@ -769,73 +769,16 @@ function cambiarEstadoRendicion(token, nro, estado) {
 
 /* ======================= EXCEL + PDF ======================= */
 
+/** Arma el PDF de la rendición (ya no se genera Excel: con el PDF alcanza) y lo guarda en la carpeta. */
 function generarArchivos_(nro, supervisor, tickets, fecha) {
   const folder = DriveApp.getFolderById(CFG.FOLDER_ID);
   const fechaTxt = Utilities.formatDate(fecha, CFG.TZ, 'dd-MM-yyyy');
   const nombre = 'Rendicion Combustible N° ' + nro + ' - ' + supervisor + ' - ' + fechaTxt;
-  const copia = DriveApp.getFileById(CFG.TEMPLATE_ID).makeCopy(nombre, folder);
-  const ss = SpreadsheetApp.openById(copia.getId());
-  try {
-    const sh = ss.getSheets()[0];
-
-    // Logo KTL arriba a la derecha (columna H)
-    try {
-      const img = sh.insertImage(DriveApp.getFileById(CFG.LOGO_KTL_ID).getBlob(), 8, 1, 6, 8);
-      const h = 70;
-      img.setHeight(h).setWidth(Math.round(h * img.getWidth() / img.getHeight()));
-    } catch (e) { console.error('Logo KTL: ' + e); }
-
-    sh.getRange('C6').setValue(fecha).setNumberFormat('dd/MM/yyyy');
-    sh.getRange('G6').setValue(nro);
-    sh.getRange('C8').setValue(supervisor);
-
-    // Filas extra si hay más de 9 tickets (se insertan antes de la última fila de la tabla)
-    const extra = Math.max(0, tickets.length - CFG.FILAS_PLANILLA);
-    const ultimaTabla = CFG.FILA_INICIO + CFG.FILAS_PLANILLA - 1; // 27
-    if (extra > 0) {
-      sh.insertRowsAfter(ultimaTabla - 1, extra);
-      const alto = sh.getRowHeight(ultimaTabla - 1);
-      for (let i = 0; i < extra; i++) {
-        const r = ultimaTabla + i;
-        sh.getRange(ultimaTabla - 1, 1, 1, 9).copyTo(sh.getRange(r, 1, 1, 9), SpreadsheetApp.CopyPasteType.PASTE_FORMAT, false);
-        sh.setRowHeight(r, alto);
-        try { sh.getRange(r, 6, 1, 2).merge(); } catch (e) {}
-      }
-    }
-
-    const vals = tickets.map(t => [
-      'Combustible',
-      t['Fecha ticket'] instanceof Date ? t['Fecha ticket'] : dateFromAny_(t['Fecha ticket']),
-      String(t['N° Comprobante'] || ''),
-      String(t.Proveedor || ''),
-      String(t['Corresponde a'] || ''),
-      '',
-      num_(t['Total con IVA'])
-    ]);
-    if (vals.length) {
-      sh.getRange(CFG.FILA_INICIO, 4, vals.length, 1).setNumberFormat('@');
-      sh.getRange(CFG.FILA_INICIO, 2, vals.length, 7).setValues(vals);
-      sh.getRange(CFG.FILA_INICIO, 3, vals.length, 1).setNumberFormat('dd/MM/yyyy');
-    }
-    // Nombre del empleado sobre la firma (B33 en la plantilla)
-    sh.getRange(33 + extra, 2).setValue(supervisor);
-    SpreadsheetApp.flush();
-
-    // Excel (solo la planilla)
-    const token = ScriptApp.getOAuthToken();
-    const xlsx = UrlFetchApp.fetch('https://docs.google.com/spreadsheets/d/' + ss.getId() + '/export?format=xlsx',
-      { headers: { Authorization: 'Bearer ' + token } }).getBlob().setName(nombre + '.xlsx');
-    const xlsxFile = folder.createFile(xlsx);
-
-    // PDF: hoja 1 = la planilla; después las fotos de los tickets, 2 por hoja
-    const pdf = armarPdf_(nombre, nro, supervisor, tickets, fecha);
-    const pdfFile = folder.createFile(pdf);
-    try { pdfFile.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW); } catch (e) {}
-
-    return { xlsxUrl: xlsxFile.getUrl(), pdfUrl: pdfFile.getUrl(), pdfBlob: pdf };
-  } finally {
-    try { copia.setTrashed(true); } catch (e) {}
-  }
+  // PDF: hoja 1 = la planilla; después las fotos de los tickets, 2 por hoja (A4 vertical)
+  const pdf = armarPdf_(nombre, nro, supervisor, tickets, fecha);
+  const pdfFile = folder.createFile(pdf);
+  try { pdfFile.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW); } catch (e) {}
+  return { xlsxUrl: '', pdfUrl: pdfFile.getUrl(), pdfBlob: pdf };
 }
 
 /**
