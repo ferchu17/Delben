@@ -43,6 +43,7 @@ public class Comandos {
         String n = Normalizer.normalize(s.toLowerCase(Locale.ROOT), Normalizer.Form.NFD).replaceAll("\\p{M}", "");
         n = n.replaceAll("[^a-z0-9 ]", " ");
         n = " " + n.replaceAll("\\s+", " ") + " ";
+        n = n.replaceAll(" a pag", " apag").replaceAll(" en cend", " encend");
         n = n.replace(" uno ", " 1 ").replace(" dos ", " 2 ").replace(" tres ", " 3 ").replace(" cuatro ", " 4 ")
                 .replace(" cinco ", " 5 ").replace(" seis ", " 6 ");
         n = n.replace(" television ", " tv ").replace(" televisor ", " tv ").replace(" tele ", " tv ")
@@ -66,13 +67,26 @@ public class Comandos {
         return ALIAS_DELBEN.contains(w) || distancia(w, "delben") <= 1;
     }
 
-    /** true = encender, false = apagar, null = no dijo. */
+    /**
+     * true = encender, false = apagar, null = no dijo.
+     * Reconoce cualquier forma del verbo (apagá, apague, apagalo, apaguen, «a pagar»…),
+     * pero no los estados («prendido», «apagada»), que son preguntas.
+     */
     public static Boolean accion(String n) {
         for (String w : n.split(" ")) {
-            if (PRENDER.contains(w)) return Boolean.TRUE;
             if (APAGAR.contains(w)) return Boolean.FALSE;
+            if (PRENDER.contains(w)) return Boolean.TRUE;
+            if (esEstado(w)) continue;
+            if (w.startsWith("apag") || w.startsWith("desactiv") || w.startsWith("descon")
+                    || w.startsWith("desenchuf")) return Boolean.FALSE;
+            if (w.startsWith("encend") || w.startsWith("encien") || w.startsWith("prend")
+                    || w.startsWith("activ") || w.startsWith("conect") || w.startsWith("enchuf")) return Boolean.TRUE;
         }
         return null;
+    }
+
+    private static boolean esEstado(String w) {
+        return w.matches(".*(ido|ida|idos|idas|ado|ada|ados|adas)$");
     }
 
     public static boolean tieneAccion(String n) {
@@ -142,6 +156,9 @@ public class Comandos {
         String encendido = fem ? "encendida" : "encendido";
         String apagado = fem ? "apagada" : "apagado";
 
+        if (accion == null && !consulta) {
+            return new Resultado("¿Querés que encienda o que apague " + nombre + "?", true);
+        }
         if (accion == null) {
             if (!eq.optBoolean("online")) return new Resultado(mayuscula(nombre) + " está sin conexión.", true);
             if (!eq.optBoolean("control")) return new Resultado("Todavía no puedo ver el estado de " + nombre + ".", true);
