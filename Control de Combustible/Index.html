@@ -30,6 +30,7 @@
   header .tit span{font-size:12px;opacity:.85;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:block}
   header button{background:rgba(255,255,255,.15);border:0;color:#fff;border-radius:8px;padding:7px 12px;cursor:pointer}
 
+  .como-bar{display:flex;align-items:center;justify-content:space-between;gap:10px;background:#fff4d6;color:#7a4b00;border-bottom:2px solid var(--naranja);padding:8px 14px;font-size:14px}
   nav{display:flex;gap:6px;overflow-x:auto;padding:10px 12px;background:#fff;border-bottom:1px solid var(--borde);position:sticky;top:60px;z-index:15}
   nav button{flex:0 0 auto;border:1px solid var(--borde);background:#fff;color:var(--azul2);border-radius:20px;padding:7px 14px;cursor:pointer;font-weight:600;font-size:14px}
   nav button.on{background:var(--azul);border-color:var(--azul);color:#fff}
@@ -151,6 +152,10 @@
     <div class="tit"><b>Control de Combustible</b><span id="hdrUser"></span></div>
     <button onclick="doLogout()">Salir</button>
   </header>
+  <div id="comoBar" class="como-bar hidden">
+    <span>Cargando tickets de <b id="comoNom"></b></span>
+    <button class="btn rojo sm" onclick="salirComo()">Salir (Esc)</button>
+  </div>
   <nav id="nav"></nav>
   <main>
 
@@ -255,6 +260,18 @@
       </div>
     </div>
 
+    <!-- ADMIN: CARGAR TICKET COMO SUPERVISOR -->
+    <div id="v-como" class="vista hidden">
+      <div class="card">
+        <h2>Cargar ticket de un supervisor</h2>
+        <p class="muted" style="margin-top:-6px">Para cuando te dejan el ticket a vos. Elegí el supervisor y vas a ver lo mismo que ve él en la app: su disponible, cargar tickets, sus tickets, rendiciones e ingresos y enviar su rendición.</p>
+        <label>Supervisor *</label>
+        <div class="ac"><input id="comoSup" placeholder="Escribí el nombre"></div>
+        <div id="comoInfo" class="muted" style="margin-top:8px"></div>
+        <button class="btn verde block" onclick="entrarComo()">Entrar como este supervisor</button>
+      </div>
+    </div>
+
     <!-- ADMIN: SALDOS -->
     <div id="v-saldos" class="vista hidden">
       <div class="card">
@@ -348,6 +365,7 @@ let SD = null;         // datos supervisor
 let AD = null;         // datos admin
 let fotoData = '';     // foto comprimida (dataURL)
 let vistaActual = '';
+let COMO = '';         // administrador cargando tickets en nombre de un supervisor
 const AC = {};         // autocompletables
 
 /* ================== UTILES ================== */
@@ -499,18 +517,60 @@ function iniciar(){
   $('app').classList.remove('hidden');
   const rolTxt = S.rol === 'admin' ? 'Administrador' : S.rol === 'visor' ? 'Visor' : 'Supervisor';
   $('hdrUser').textContent = S.nombre + ' · ' + rolTxt;
-  const tabs = [];
-  if (RINDE.includes(S.rol)) tabs.push(['inicio','Inicio'], ['cargar','Cargar ticket'], ['tickets','Mis tickets'], ['ingresos','Rendiciones e ingresos'], ['rendir','Rendir']);
-  if (S.rol === 'admin' || S.rol === 'visor'){
-    if (tabs.length) tabs.push(['|']);
-    tabs.push(['saldos','Saldos'], ['asignar','Asignaciones'], ['revision','Revisión'], ['rendiciones','Rendiciones']);
-  }
-  $('nav').innerHTML = tabs.map(t => t[0] === '|' ? '<span class="sep"></span>' : `<button data-v="${t[0]}" onclick="go('${t[0]}')">${t[1]}</button>`).join('');
   $('tkFecha').value = hoyIso();
   $('asFecha').value = hoyIso();
   initAC();
+  const tabs = armarNav();
   go(tabs[0][0]);
 }
+
+const TABS_SUP = [['inicio','Inicio'], ['cargar','Cargar ticket'], ['tickets','Mis tickets'], ['ingresos','Rendiciones e ingresos'], ['rendir','Rendir']];
+function armarNav(){
+  let tabs = [];
+  if (COMO){
+    tabs = TABS_SUP.map(t => t[0] === 'tickets' ? ['tickets','Tickets'] : t);
+  } else {
+    if (RINDE.includes(S.rol)) tabs = tabs.concat(TABS_SUP);
+    if (S.rol === 'admin' || S.rol === 'visor'){
+      if (tabs.length) tabs.push(['|']);
+      if (S.rol === 'admin') tabs.push(['como','Cargar ticket']);
+      tabs.push(['saldos','Saldos'], ['asignar','Asignaciones'], ['revision','Revisión'], ['rendiciones','Rendiciones']);
+    }
+  }
+  $('nav').innerHTML = tabs.map(t => t[0] === '|' ? '<span class="sep"></span>' : `<button data-v="${t[0]}" onclick="go('${t[0]}')">${t[1]}</button>`).join('');
+  $('comoBar').classList.toggle('hidden', !COMO);
+  $('comoNom').textContent = COMO;
+  return tabs;
+}
+
+/* ---- Administrador: cargar tickets en nombre de un supervisor ---- */
+function comoInfo(nombre){
+  const s = AD && AD.saldos.find(x => norm(x.nombre) === norm(nombre));
+  $('comoInfo').innerHTML = s
+    ? `Disponible: <b class="${claseSaldo(s.saldo)}">${money(s.saldo)}</b> · Sin rendir: ${s.cantSinRendir} ticket(s) por ${money(s.sinRendir)}`
+    : '';
+}
+function entrarComo(){
+  const n = $('comoSup').value.trim();
+  if (!n || !AD || !AD.supervisores.some(x => norm(x.nombre) === norm(n))) return modal('err', 'Elegí el supervisor', 'Escribí el nombre y elegilo de la lista.');
+  COMO = AD.supervisores.find(x => norm(x.nombre) === norm(n)).nombre;
+  SD = null; limpiarTk();
+  armarNav();
+  go('inicio');
+}
+function salirComo(){
+  if (!COMO) return;
+  COMO = ''; SD = null; limpiarTk();
+  armarNav();
+  go('como');
+}
+document.addEventListener('keydown', e => {
+  if (e.key !== 'Escape') return;
+  if (!$('pdfView').classList.contains('hidden')) { cerrarPdf(); return; }
+  if (!$('modal').classList.contains('hidden')) { cerrarModal(); return; }
+  if (document.activeElement && document.activeElement.closest && document.activeElement.closest('.ac')) return;
+  if (COMO) salirComo();
+});
 
 function go(v){
   vistaActual = v;
@@ -524,6 +584,7 @@ function go(v){
 
 function initAC(){
   AC.corr = makeAC($('tkCorr'), () => [SUP_LABEL].concat((SD && SD.objetivos) || (AD && AD.objetivos) || []), null, {estricto:true});
+  AC.como = makeAC($('comoSup'), () => AD ? AD.supervisores.map(s => s.nombre) : [], v => comoInfo(v), {estricto:true});
   AC.asSup = makeAC($('asSup'), () => AD ? AD.supervisores.map(s => s.nombre) : [], v => infoSaldo(v), {estricto:true});
   AC.asFil = makeAC($('asFil'), () => AD ? AD.supervisores.map(s => s.nombre) : [], () => renderAsig(), {estricto:true, onType: () => renderAsig(), onBlur: () => renderAsig()});
   AC.rvSup = makeAC($('rvSup'), () => AD ? AD.supervisores.map(s => s.nombre) : [], () => renderRevision(), {estricto:true, onType: v => { if (!v) renderRevision(); }, onBlur: () => renderRevision()});
@@ -532,7 +593,7 @@ function initAC(){
 /* ================== SUPERVISOR ================== */
 function cargarSup(silencioso){
   if (!silencioso) loader(true);
-  return run('getSupervisorData', S.token).then(d => { SD = d; renderSup(); })
+  return run('getSupervisorData', S.token, COMO).then(d => { SD = d; renderSup(); })
     .catch(e => modal('err', 'Error', esc(errMsg(e))))
     .finally(() => loader(false));
 }
@@ -542,7 +603,7 @@ function renderSup(){
   const neg = Math.round(s.saldo * 100) < 0;
   $('sdSaldo').textContent = money(s.saldo);
   $('saldoCard').classList.toggle('neg', neg);
-  $('sdLbl').textContent = neg ? 'Saldo a tu favor' : 'Disponible para gastar';
+  $('sdLbl').textContent = (neg ? 'Saldo a favor' : 'Disponible para gastar') + (COMO ? ' · ' + COMO : '');
   $('sdSub').textContent = neg ? 'Gastaste más de lo que te depositaron: te deben ' + money(-s.saldo) : '';
   $('sdAsig').textContent = money(s.asignado);
   $('sdCons').textContent = money(s.consumido);
@@ -796,7 +857,7 @@ function guardarTk(){
 }
 function guardarTkOk(t){
   $('tkGuardar').disabled = true; loader(true);
-  run('guardarTicket', S.token, t).then(() => {
+  run('guardarTicket', S.token, t, COMO).then(() => {
     limpiarTk();
     return cargarSup(true).then(() => {
       const pend = SD.tickets.filter(x => !x.planilla && x.estado !== 'Rechazado');
@@ -833,9 +894,9 @@ function enviarRend(){
   const pend = SD.tickets.filter(t => !t.planilla && t.estado !== 'Rechazado');
   if (!pend.length) return;
   const tot = pend.reduce((a, t) => a + t.total, 0);
-  confirmar('Enviar rendición', `Se va a enviar la rendición con <b>${pend.length}</b> ticket(s) por <b>${money(tot)}</b>.<br>Te llega el PDF por mail.`, () => {
+  confirmar('Enviar rendición', `Se va a enviar la rendición con <b>${pend.length}</b> ticket(s) por <b>${money(tot)}</b>.<br>${COMO ? 'El PDF le llega por mail a ' + esc(COMO) + ', con copia a administración.' : 'Te llega el PDF por mail.'}`, () => {
     $('rdBtn').disabled = true; loader(true);
-    run('enviarRendicion', S.token).then(r => {
+    run('enviarRendicion', S.token, COMO).then(r => {
       return cargarSup(true).then(() => modal('ok', 'Rendición enviada', `Planilla N° <b>${r.nro}</b> · ${r.cant} ticket(s) · ${money(r.total)}<br>El PDF se envió por mail.`,
         [{txt:'Ver PDF', fn: () => verPdf(r.nro)}, {txt:'Aceptar', cls:'gris'}]));
     }).catch(e => modal('err', 'No se pudo enviar', esc(errMsg(e))))

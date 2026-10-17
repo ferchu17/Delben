@@ -122,6 +122,22 @@ function exigirRinde_(s) {
   if (CFG.ROLES_CON_FONDO.indexOf(s.rol) < 0) throw new Error('Tu usuario no rinde combustible.');
 }
 
+/**
+ * Sesión para las pantallas del supervisor.
+ * Si el administrador entra con "Cargar ticket" y elige un supervisor (como), trabaja en nombre de ese supervisor:
+ * ve su disponible, carga sus tickets y envía su rendición (el mail le llega a ese supervisor con copia a administración).
+ */
+function sesRinde_(token, como) {
+  const s = ses_(token);
+  if (como && s.rol === 'admin') {
+    const u = getSupervisores_().find(x => norm_(x.nombre) === norm_(como));
+    if (!u) throw new Error('Elegí un supervisor de la lista.');
+    return { nombre: u.nombre, correo: u.correo, rol: 'supervisor', admin: s.nombre };
+  }
+  exigirRinde_(s);
+  return s;
+}
+
 /* ======================= DATOS BASE ======================= */
 
 function getUsuarios_() {
@@ -209,9 +225,8 @@ function calcularSaldos_(asig, tickets) {
 
 /* ======================= SUPERVISOR ======================= */
 
-function getSupervisorData(token) {
-  const s = ses_(token);
-  exigirRinde_(s);
+function getSupervisorData(token, como) {
+  const s = sesRinde_(token, como);
   const asig = readSheet_(regSheet_('Asignaciones')).rows.filter(a => norm_(a.Supervisor) === norm_(s.nombre));
   const tks = readSheet_(regSheet_('Tickets')).rows.filter(t => norm_(t.Supervisor) === norm_(s.nombre));
   const sal = calcularSaldos_(asig, tks)[norm_(s.nombre)] || { asignado: 0, consumido: 0, saldo: 0, sinRendir: 0, cantSinRendir: 0 };
@@ -398,9 +413,8 @@ function guardarClaveGemini(token, clave) {
   return { ok: true, activa: true };
 }
 
-function guardarTicket(token, t) {
-  const s = ses_(token);
-  exigirRinde_(s);
+function guardarTicket(token, t, como) {
+  const s = sesRinde_(token, como);
   validarTicket_(t);
   if (!t.foto) throw new Error('Falta la foto del ticket.');
   const lock = LockService.getScriptLock();
@@ -455,9 +469,8 @@ function eliminarTicket(token, id) {
 }
 
 /** El supervisor envía su rendición: todos sus tickets sin rendir (no rechazados). */
-function enviarRendicion(token) {
-  const s = ses_(token);
-  exigirRinde_(s);
+function enviarRendicion(token, como) {
+  const s = sesRinde_(token, como);
   const lock = LockService.getScriptLock();
   lock.waitLock(60000);
   try {
