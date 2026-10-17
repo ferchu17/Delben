@@ -9,11 +9,6 @@ android {
         targetSdk 34
         versionCode Integer.parseInt(System.getenv('VERSION_CODE') ?: '1')
         versionName '1.0.' + (System.getenv('VERSION_CODE') ?: '1')
-        // Dirección de la app (GitHub Pages)
-        manifestPlaceholders = [
-            hostName: 'ferchu17.github.io',
-            defaultUrl: 'https://ferchu17.github.io/Delben/combustible/'
-        ]
     }
     signingConfigs {
         release {
@@ -30,5 +25,5 @@ android {
 }
 
 dependencies {
-    implementation 'com.google.androidbrowserhelper:androidbrowserhelper:2.5.0'
+    implementation 'androidx.core:core:1.12.0'
 }

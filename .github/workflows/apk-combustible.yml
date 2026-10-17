@@ -1,6 +1,6 @@
 name: APK Control de Combustible
 
-# Arma la APK de Control de Combustible (abre la página con el motor de Chrome, así anda la cámara)
+# Arma la APK de Control de Combustible (pantalla completa, sin barra de dirección; con cámara y galería)
 # y la publica siempre en el mismo link:
 # https://github.com/ferchu17/Delben/releases/download/combustible-apk/Combustible.apk
 on:

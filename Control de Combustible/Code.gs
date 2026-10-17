@@ -234,14 +234,24 @@ function getSupervisorData(token) {
   };
 }
 
-/** Lee el ticket con Gemini y devuelve los datos para confirmar. */
+/**
+ * Lee el ticket y devuelve los datos para confirmar.
+ * - Si hay clave de Gemini (GEMINI_API_KEY) usa Gemini, que también lee lo escrito a mano.
+ * - Si no hay clave o Gemini falla, usa la lectura de texto (OCR) de Google Drive, que no necesita clave.
+ */
 function leerTicket(token, dataUrl) {
   ses_(token);
+  const opciones = [CFG.SUPERVISOR_LABEL].concat(getObjetivos_());
   const key = PropertiesService.getScriptProperties().getProperty('GEMINI_API_KEY');
-  if (!key) throw new Error('Falta configurar la clave GEMINI_API_KEY. Cargá los datos a mano.');
+  if (key) {
+    try { return leerConGemini_(key, dataUrl, opciones); } catch (e) { console.error('Gemini: ' + e.message); }
+  }
+  return leerConOcrDrive_(dataUrl, opciones);
+}
+
+function leerConGemini_(key, dataUrl, opciones) {
   const parts = String(dataUrl).split(',');
   const mime = (parts[0].match(/data:(.*?);/) || [])[1] || 'image/jpeg';
-  const opciones = [CFG.SUPERVISOR_LABEL].concat(getObjetivos_());
   const prompt =
     'Sos un lector de tickets/facturas de combustible de Argentina. Leé la imagen y devolvé SOLO un JSON con estas claves:\n' +
     '{"fecha":"DD/MM/AAAA","numero":"punto de venta y número tal cual figura, ej 00014-00021464","proveedor":"razón social del EMISOR (la estación)",' +
@@ -258,18 +268,10 @@ function leerTicket(token, dataUrl) {
   };
   const url = 'https://generativelanguage.googleapis.com/v1beta/models/' + CFG.GEMINI_MODEL + ':generateContent?key=' + encodeURIComponent(key);
   const res = UrlFetchApp.fetch(url, { method: 'post', contentType: 'application/json', payload: JSON.stringify(body), muteHttpExceptions: true });
-  if (res.getResponseCode() !== 200) {
-    console.error('Gemini ' + res.getResponseCode() + ': ' + res.getContentText());
-    throw new Error('No se pudo leer el ticket automáticamente (error ' + res.getResponseCode() + '). Cargá los datos a mano.');
-  }
-  let d;
-  try {
-    const j = JSON.parse(res.getContentText());
-    const txt = j.candidates[0].content.parts.map(p => p.text || '').join('').replace(/```json|```/g, '').trim();
-    d = JSON.parse(txt);
-  } catch (e) {
-    throw new Error('No se pudo interpretar el ticket. Cargá los datos a mano.');
-  }
+  if (res.getResponseCode() !== 200) throw new Error('HTTP ' + res.getResponseCode() + ': ' + res.getContentText().slice(0, 300));
+  const j = JSON.parse(res.getContentText());
+  const txt = j.candidates[0].content.parts.map(p => p.text || '').join('').replace(/```json|```/g, '').trim();
+  const d = JSON.parse(txt);
   return {
     fecha: isoFromAny_(d.fecha),
     numero: d.numero ? String(d.numero).trim() : '',
@@ -279,8 +281,121 @@ function leerTicket(token, dataUrl) {
     litros: d.litros === null || d.litros === undefined ? '' : num_(d.litros),
     precio: d.precio_litro === null || d.precio_litro === undefined ? '' : num_(d.precio_litro),
     total: d.total === null || d.total === undefined ? '' : num_(d.total),
-    correspondeA: d.servicio ? (opciones.find(o => norm_(o) === norm_(d.servicio)) || '') : ''
+    correspondeA: d.servicio ? (opciones.find(o => norm_(o) === norm_(d.servicio)) || '') : '',
+    via: 'gemini'
   };
+}
+
+/** OCR de Google Drive: sube la foto como documento de Google (Drive lee el texto), lo exporta como texto y lo borra. */
+function leerConOcrDrive_(dataUrl, opciones) {
+  const parts = String(dataUrl).split(',');
+  const mime = (parts[0].match(/data:(.*?);/) || [])[1] || 'image/jpeg';
+  const token = ScriptApp.getOAuthToken();
+  const b = 'delben' + Date.now();
+  const meta = JSON.stringify({ name: 'OCR ticket temporal', mimeType: 'application/vnd.google-apps.document' });
+  const head = '--' + b + '\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n' + meta + '\r\n--' + b + '\r\nContent-Type: ' + mime + '\r\n\r\n';
+  const tail = '\r\n--' + b + '--';
+  const payload = Utilities.newBlob(head).getBytes().concat(Utilities.base64Decode(parts[1])).concat(Utilities.newBlob(tail).getBytes());
+  const res = UrlFetchApp.fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&ocrLanguage=es&fields=id', {
+    method: 'post', contentType: 'multipart/related; boundary=' + b, payload: payload,
+    headers: { Authorization: 'Bearer ' + token }, muteHttpExceptions: true
+  });
+  if (res.getResponseCode() !== 200) {
+    console.error('OCR Drive ' + res.getResponseCode() + ': ' + res.getContentText());
+    throw new Error('No se pudo leer el ticket automáticamente. Cargá los datos a mano.');
+  }
+  const id = JSON.parse(res.getContentText()).id;
+  let texto = '';
+  try {
+    texto = UrlFetchApp.fetch('https://docs.google.com/document/d/' + id + '/export?format=txt',
+      { headers: { Authorization: 'Bearer ' + token }, muteHttpExceptions: true }).getContentText();
+  } finally {
+    UrlFetchApp.fetch('https://www.googleapis.com/drive/v3/files/' + id,
+      { method: 'delete', headers: { Authorization: 'Bearer ' + token }, muteHttpExceptions: true });
+  }
+  const r = parsearTicket_(texto, opciones);
+  r.via = 'ocr';
+  return r;
+}
+
+/** Saca los datos del texto de un ticket fiscal argentino (YPF, Shell, Axion, etc.). */
+function parsearTicket_(texto, opciones) {
+  const t = String(texto || '').replace(/\r/g, '').replace(/﻿/g, '');
+  const lineas = t.split('\n').map(l => l.trim()).filter(Boolean);
+  const r = { fecha: '', numero: '', proveedor: '', cuit: '', producto: '', litros: '', precio: '', total: '', correspondeA: '' };
+  let m;
+
+  m = t.match(/fecha[^\d\n]{0,15}(\d{1,2}[\/\-.]\d{1,2}[\/\-.]\d{2,4})/i) || t.match(/\b(\d{1,2}\/\d{1,2}\/\d{4})\b/);
+  if (m) r.fecha = isoFromAny_(m[1]);
+
+  m = t.match(/N[°ºo.]{0,2}\s*:?\s*(\d{4,5})\s*-\s*(\d{6,8})/i) || t.match(/\b(\d{4,5})\s*-\s*(\d{8})\b/);
+  if (m) r.numero = m[1] + '-' + m[2];
+
+  m = t.match(/\b(2[03457]|3[034])\s?-?\s?(\d{8})\s?-?\s?(\d)\b/);
+  if (m) r.cuit = m[1] + '-' + m[2] + '-' + m[3];
+
+  const propias = /P\.?\s?P\.?\s?Q|KONTROL|GUYET|\bLEG\b|TRIMMER/i;
+  const prov = lineas.find(l => /(S\.?\s?R\.?\s?L\.?|S\.?\s?A\.?(\s?U\.?)?|S\.?\s?A\.?\s?S\.?)$/i.test(l) && !propias.test(l) && l.length < 60);
+  if (prov) r.proveedor = prov.replace(/\s+/g, ' ');
+
+  m = t.match(/\b(NAFTA[^\n]{0,20}|INFINIA[^\n]{0,15}|SUPER\s*XXI|GAS\s*-?\s*OIL[^\n]{0,12}|EURO\s*DIESEL|ULTRA\s*DIESEL|DIESEL[^\n]{0,15}|V-?\s?POWER[^\n]{0,15}|QUANTIUM[^\n]{0,15}|PREMIUM|GNC)/i);
+  if (m) r.producto = m[1].replace(/\s+/g, ' ').trim().toUpperCase();
+
+  m = t.match(/(\d{1,3}[.,]\d{1,4})\s*x\s*\$\s*(\d[\d.]*[.,]\d{2,4})/i);
+  if (m) { r.litros = num_(m[1]); r.precio = num_(m[2]); }
+  else {
+    m = t.match(/(\d{1,3}[.,]\d{2,4})\s*(?:u|lts?|litros)\.?\s*x/i);
+    if (m) r.litros = num_(m[1]);
+  }
+
+  let total = 0;
+  for (let i = 0; i < lineas.length && !total; i++) {
+    const l = lineas[i];
+    if (/^TOTAL\b/i.test(l) && !/OTROS|TRIBUT|SUB/i.test(l)) {
+      let mm = l.match(/(\d[\d.]*[.,]\d{2})\s*$/);
+      if (!mm && lineas[i + 1]) mm = lineas[i + 1].match(/^\$?\s*(\d[\d.]*[.,]\d{2})\s*$/);
+      if (mm) total = num_(mm[1]);
+    }
+  }
+  if (!total) {
+    const nums = (t.match(/\b\d{1,3}(?:\.\d{3})+,\d{2}\b|\b\d+,\d{2}\b/g) || []).map(num_).filter(n => n >= 500 && n < 20000000);
+    if (nums.length) total = Math.max.apply(null, nums);
+  }
+  if (total) r.total = round2_(total);
+  if (r.litros && r.total && !r.precio) r.precio = round2_(r.total / r.litros);
+
+  const nt = ' ' + norm_(t).replace(/[^a-z0-9 ]/g, ' ').replace(/\s+/g, ' ') + ' ';
+  const stop = ['barrio', 'consorcio', 'servicio', 'servicios', 'supervisores', 'centro', 'comercial', 'lopez', 'manzana'];
+  const cands = opciones.filter(o => o !== CFG.SUPERVISOR_LABEL).filter(o =>
+    norm_(o).replace(/[^a-z0-9 ]/g, ' ').split(' ').filter(w => w.length >= 5 && stop.indexOf(w) < 0)
+      .some(w => nt.indexOf(' ' + w + ' ') >= 0));
+  if (cands.length === 1) r.correspondeA = cands[0];
+  return r;
+}
+
+/** PDF de una rendición (para verlo dentro de la app). */
+function getRendicionPdf(token, nro) {
+  const s = ses_(token);
+  const r = readSheet_(regSheet_('Rendiciones')).rows.find(x => String(x['N° Planilla']) === String(nro));
+  if (!r) throw new Error('No se encontró la rendición N° ' + nro);
+  if (s.rol === 'supervisor' && norm_(r.Supervisor) !== norm_(s.nombre)) throw new Error('Esa rendición no es tuya.');
+  const id = driveId_(r['Link PDF']);
+  if (!id) throw new Error('La rendición no tiene PDF.');
+  return Utilities.base64Encode(DriveApp.getFileById(id).getBlob().getBytes());
+}
+
+/** El administrador carga la clave de Gemini desde la app (opcional: mejora la lectura y lee lo escrito a mano). */
+function guardarClaveGemini(token, clave) {
+  const s = ses_(token);
+  exigirAdmin_(s);
+  clave = String(clave || '').trim();
+  const props = PropertiesService.getScriptProperties();
+  if (!clave) { props.deleteProperty('GEMINI_API_KEY'); return { ok: true, activa: false }; }
+  const url = 'https://generativelanguage.googleapis.com/v1beta/models/' + CFG.GEMINI_MODEL + '?key=' + encodeURIComponent(clave);
+  const res = UrlFetchApp.fetch(url, { muteHttpExceptions: true });
+  if (res.getResponseCode() !== 200) throw new Error('La clave no funciona (error ' + res.getResponseCode() + '). Revisá que esté bien copiada.');
+  props.setProperty('GEMINI_API_KEY', clave);
+  return { ok: true, activa: true };
 }
 
 function guardarTicket(token, t) {
@@ -394,6 +509,7 @@ function getAdminData(token) {
   Object.keys(sal).forEach(k => { if (!saldos.some(x => norm_(x.nombre) === k)) saldos.push(sal[k]); });
   return {
     readOnly: s.rol !== 'admin',
+    geminiActiva: !!PropertiesService.getScriptProperties().getProperty('GEMINI_API_KEY'),
     supervisores: sups,
     objetivos: getObjetivos_(),
     saldos: saldos,
