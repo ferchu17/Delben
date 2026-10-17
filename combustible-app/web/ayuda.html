@@ -1,0 +1,439 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Instructivo - Control de Combustible</title>
+<link rel="icon" type="image/png" sizes="64x64" href="/Delben/iconos/combustible-64.png">
+<link rel="apple-touch-icon" href="/Delben/iconos/combustible-192.png">
+<style>
+  :root{
+    --azul:#1d4f9f; --azul2:#163d7a; --verde:#2e9b3a; --rojo:#c62828; --naranja:#e08a00;
+    --fondo:#eef2f7; --card:#fff; --texto:#1f2933; --gris:#6b7785; --borde:#d6dde6;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;background:var(--fondo);color:var(--texto);font-family:"Segoe UI",Roboto,Arial,sans-serif;font-size:15px}
+  button{font:inherit;cursor:pointer}
+  .hidden{display:none!important}
+
+  header{background:var(--azul);color:#fff;display:flex;align-items:center;gap:12px;padding:12px 16px;position:sticky;top:0;z-index:20}
+  header img{width:44px;height:44px;border-radius:10px;box-shadow:0 1px 4px rgba(0,0,0,.25)}
+  header .t{flex:1;min-width:0}
+  header b{display:block;font-size:17px}
+  header span{font-size:13px;opacity:.85}
+  header a{color:#fff;background:rgba(255,255,255,.15);border-radius:8px;padding:7px 12px;text-decoration:none;font-size:14px;white-space:nowrap}
+
+  .roles{display:flex;gap:8px;padding:12px 16px;background:#fff;border-bottom:1px solid var(--borde);position:sticky;top:68px;z-index:15}
+  .roles button{flex:1;border:2px solid var(--azul);background:#fff;color:var(--azul2);border-radius:12px;padding:10px;font-weight:700}
+  .roles button.on{background:var(--azul);color:#fff}
+
+  main{max-width:1100px;margin:0 auto;padding:16px}
+  .layout{display:grid;grid-template-columns:260px 1fr;gap:16px;align-items:start}
+  .indice{background:#fff;border-radius:14px;padding:10px;box-shadow:0 2px 10px rgba(0,0,0,.05);position:sticky;top:140px}
+  .indice h3{margin:6px 8px 8px;font-size:13px;color:var(--gris);text-transform:uppercase;letter-spacing:.4px}
+  .indice button{display:flex;align-items:center;gap:8px;width:100%;text-align:left;border:0;background:none;padding:8px;border-radius:8px;color:var(--texto);font-size:14px}
+  .indice button:hover{background:#f2f6fb}
+  .indice button.on{background:#e8f0fc;color:var(--azul2);font-weight:700}
+  .indice .n{flex:0 0 24px;height:24px;border-radius:50%;background:#e6ebf1;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700}
+  .indice button.on .n{background:var(--azul);color:#fff}
+  .indice button.ok .n{background:var(--verde);color:#fff}
+
+  .paso{display:grid;grid-template-columns:minmax(0,1fr) 300px;gap:18px;background:#fff;border-radius:16px;padding:18px;box-shadow:0 2px 10px rgba(0,0,0,.05)}
+  .paso h2{margin:0 0 4px;color:var(--azul2);font-size:21px}
+  .paso .num{color:var(--gris);font-size:13px;font-weight:600}
+  .paso p{line-height:1.5;margin:10px 0}
+  .paso ol,.paso ul{padding-left:20px;line-height:1.55;margin:8px 0}
+  .paso li{margin:4px 0}
+  .tip{background:#f2f6fb;border-left:4px solid var(--azul);border-radius:8px;padding:10px 12px;margin:12px 0;font-size:14px}
+  .ojo{background:#fff4e5;border-left:4px solid var(--naranja);border-radius:8px;padding:10px 12px;margin:12px 0;font-size:14px}
+  .nav{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-top:16px}
+  .btn{border:0;border-radius:10px;padding:11px 16px;font-weight:700;background:var(--azul);color:#fff}
+  .btn.gris{background:#e6ebf1;color:var(--texto)}
+  .btn.verde{background:var(--verde)}
+  .btn:disabled{opacity:.4;cursor:default}
+  .barra{height:6px;background:#e6ebf1;border-radius:6px;overflow:hidden;margin:4px 0 14px}
+  .barra div{height:100%;background:var(--verde);transition:width .3s}
+
+  /* Teléfono simulado */
+  .tel{width:290px;height:560px;border:10px solid #1f2933;border-radius:34px;background:var(--fondo);overflow:hidden;position:relative;box-shadow:0 10px 30px rgba(0,0,0,.25);margin:0 auto}
+  .tel .bar{background:var(--azul);color:#fff;display:flex;align-items:center;gap:8px;padding:9px 10px}
+  .tel .bar img{width:28px;height:28px;border-radius:7px}
+  .tel .bar b{font-size:12px;display:block}
+  .tel .bar span{font-size:10px;opacity:.85}
+  .tel .bar .s{margin-left:auto;font-size:10px;background:rgba(255,255,255,.15);border-radius:6px;padding:4px 7px}
+  .tel .tabs{display:flex;gap:4px;padding:6px;background:#fff;border-bottom:1px solid var(--borde);overflow:hidden;white-space:nowrap}
+  .tel .tabs i{font-style:normal;font-size:10px;border:1px solid var(--borde);border-radius:12px;padding:4px 8px;color:var(--azul2);font-weight:700}
+  .tel .tabs i.on{background:var(--azul);color:#fff;border-color:var(--azul)}
+  .tel .cont{padding:8px;font-size:11px;height:calc(100% - 80px);overflow:hidden}
+  .tel .cd{background:#fff;border-radius:10px;padding:9px;margin-bottom:8px;box-shadow:0 1px 4px rgba(0,0,0,.06)}
+  .tel .h{font-weight:700;color:var(--azul2);font-size:12px;margin-bottom:6px}
+  .tel .in{border:1px solid var(--borde);border-radius:7px;padding:6px;margin:3px 0 6px;background:#fff;min-height:24px}
+  .tel .lb{font-size:9.5px;color:var(--gris);font-weight:700}
+  .tel .b{display:inline-block;border-radius:7px;padding:6px 9px;font-weight:700;color:#fff;background:var(--azul);font-size:10.5px;margin:2px 2px 2px 0}
+  .tel .b.v{background:var(--verde)} .tel .b.r{background:var(--rojo)} .tel .b.n{background:var(--naranja)} .tel .b.g{background:#e6ebf1;color:var(--texto)}
+  .tel .saldo{text-align:center;border:3px solid var(--azul);background:#fff;border-radius:10px;padding:12px 6px}
+  .tel .saldo .l{font-size:10px;font-weight:800;color:var(--azul2);text-transform:uppercase}
+  .tel .saldo .m{font-size:25px;font-weight:800;color:var(--azul);margin:4px 0}
+  .tel .saldo.neg{border-color:var(--rojo);background:#fff5f5}
+  .tel .saldo.neg .l,.tel .saldo.neg .m{color:var(--rojo)}
+  .tel .row{display:flex;justify-content:space-between;align-items:center;border:1px solid var(--borde);border-radius:8px;padding:6px 7px;margin-bottom:5px;background:#fff}
+  .tel .bd{display:inline-block;font-size:8.5px;font-weight:800;border-radius:10px;padding:2px 6px;text-transform:uppercase}
+  .bd.p{background:#fff4d6;color:#8a5a00} .bd.a{background:#dff3e2;color:#1d6b28} .bd.o{background:#ffe6cc;color:#a24d00} .bd.x{background:#fde0e0;color:#a31515} .bd.z{background:#e3ebf8;color:var(--azul2)}
+  .tel .falta{border-color:var(--naranja);background:#fff8ec}
+  .tel .amarilla{background:#fff4d6;color:#7a4b00;border-bottom:2px solid var(--naranja);padding:5px 8px;font-size:10px;display:flex;justify-content:space-between;align-items:center}
+  .tel .foto{height:150px;border-radius:8px;background:repeating-linear-gradient(0deg,#fff 0 8px,#eef0f3 8px 10px);border:1px solid var(--borde);position:relative}
+  .foco{position:relative;outline:3px solid #ff3d7f;outline-offset:2px;border-radius:8px;animation:pulso 1.2s infinite}
+  @keyframes pulso{0%,100%{outline-color:#ff3d7f}50%{outline-color:rgba(255,61,127,.25)}}
+
+  /* Pruebas interactivas */
+  .prueba{border:2px dashed var(--azul);border-radius:12px;padding:12px;margin:14px 0;background:#fbfdff}
+  .prueba h4{margin:0 0 8px;color:var(--azul2)}
+  .prueba input[type=text],.prueba input[type=number]{width:100%;padding:9px 10px;border:1px solid var(--borde);border-radius:8px;font:inherit}
+  .lista{border:1px solid var(--borde);border-radius:8px;margin-top:4px;max-height:170px;overflow:auto;background:#fff}
+  .lista div{padding:7px 10px;border-bottom:1px solid #f0f2f5}
+  .lista mark{background:#fff3b0}
+  .res{font-size:22px;font-weight:800;margin-top:8px}
+  .crop{position:relative;width:220px;height:260px;margin:8px auto;background:#5a6470;border-radius:8px;overflow:hidden;touch-action:none}
+  .crop .papel{position:absolute;left:55px;top:25px;width:110px;height:210px;background:repeating-linear-gradient(0deg,#fff 0 7px,#e9ecef 7px 9px);box-shadow:0 2px 6px rgba(0,0,0,.4)}
+  .crop .rect{position:absolute;border:3px solid var(--verde);box-shadow:0 0 0 999px rgba(0,0,0,.45)}
+  .crop .h{position:absolute;width:22px;height:22px;border-radius:50%;background:var(--verde);margin:-11px 0 0 -11px;touch-action:none}
+
+  .faq details{background:#fff;border-radius:12px;padding:12px 14px;margin-bottom:8px;box-shadow:0 1px 6px rgba(0,0,0,.05)}
+  .faq summary{font-weight:700;cursor:pointer;color:var(--azul2)}
+  .faq p{margin:8px 0 0;line-height:1.5}
+  .quiz .op{display:block;width:100%;text-align:left;border:1px solid var(--borde);background:#fff;border-radius:10px;padding:10px 12px;margin:6px 0}
+  .quiz .op.bien{border-color:var(--verde);background:#e8f6ea}
+  .quiz .op.mal{border-color:var(--rojo);background:#fdecec}
+
+  @media (max-width:860px){
+    .layout{grid-template-columns:1fr}
+    .indice{position:static;display:flex;overflow-x:auto;gap:6px;padding:8px}
+    .indice h3{display:none}
+    .indice button{flex:0 0 auto;width:auto;white-space:nowrap;border:1px solid var(--borde)}
+    .paso{grid-template-columns:1fr}
+    .tel{transform:scale(.92);transform-origin:top center;margin-bottom:-40px}
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <img src="/Delben/iconos/combustible-192.png" alt="">
+  <div class="t"><b>Instructivo interactivo</b><span>Control de Combustible · DELBEN</span></div>
+  <a href="./">Abrir la app</a>
+</header>
+
+<div class="roles">
+  <button id="rSup" class="on" onclick="rol('sup')">Supervisor</button>
+  <button id="rAdm" onclick="rol('adm')">Administrador</button>
+</div>
+
+<main>
+  <div class="layout">
+    <nav class="indice" id="indice"></nav>
+    <section>
+      <div class="barra"><div id="prog"></div></div>
+      <div id="paso"></div>
+    </section>
+  </div>
+</main>
+
+<script>
+/* ===================== Teléfono simulado ===================== */
+const TABS_SUP = ['Inicio','Cargar ticket','Mis tickets','Rendiciones e ingresos','Rendir'];
+const TABS_ADM = ['Cargar ticket','Saldos','Asignaciones','Revisión','Rendiciones','Corresponde'];
+function tel(cont, opt){
+  opt = opt || {};
+  const tabs = opt.tabs || TABS_SUP, on = opt.on || '';
+  const quien = opt.adm ? 'Fernando Jacyno · Administrador' : 'Carlos Sandoval · Supervisor';
+  return `<div class="tel">
+    <div class="bar"><img src="/Delben/iconos/combustible-192.png" alt=""><div><b>Control de Combustible</b><span>${quien}</span></div><span class="s">Salir</span></div>
+    ${opt.amarilla ? '<div class="amarilla"><span>Cargando tickets de <b>Carlos Sandoval</b></span><span class="b r" style="font-size:9px">Salir (Esc)</span></div>' : ''}
+    ${opt.sinTabs ? '' : '<div class="tabs">' + tabs.map(t => `<i class="${t === on ? 'on' : ''}">${t}</i>`).join('') + '</div>'}
+    <div class="cont">${cont}</div></div>`;
+}
+const F = (on, x) => on ? ` class="foco"` + (x ? ` style="${x}"` : '') : (x ? ` style="${x}"` : '');
+
+/* ===================== Pruebas interactivas ===================== */
+const SERVICIOS = ['Jefe de Operaciones','Supervisor','Comercial','Fincas de Iraola 2','Barrio San Francisco','Raizen Supervisor','Arauco Zarate'];
+function norm(s){ return String(s||'').normalize('NFD').replace(/[̀-ͯ]/g,'').toLowerCase().trim(); }
+function esc(s){ return String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+function money(n){ const v = Math.round(n * 100) / 100; return (v < 0 ? '- ' : '') + '$ ' + Math.abs(v).toLocaleString('es-AR', {minimumFractionDigits:2, maximumFractionDigits:2}); }
+
+function pruebaBuscar(){
+  return `<div class="prueba"><h4>Probalo: escribí parte del nombre</h4>
+    <input type="text" id="pbBus" placeholder="Ej: franc, fincas, super" oninput="buscar()">
+    <div class="lista" id="pbLis"></div></div>`;
+}
+function buscar(){
+  const q = norm(document.getElementById('pbBus').value).split(' ').filter(Boolean);
+  const it = SERVICIOS.filter(s => q.every(w => norm(s).includes(w)));
+  document.getElementById('pbLis').innerHTML = it.map(s => {
+    let h = esc(s); q.forEach(w => { const i = norm(s).indexOf(w); if (i >= 0){ const o = s.substr(i, w.length); h = h.replace(esc(o), '<mark>' + esc(o) + '</mark>'); } });
+    return '<div>' + h + '</div>';
+  }).join('') || '<div style="color:#6b7785">Sin resultados</div>';
+}
+function pruebaSaldo(){
+  return `<div class="prueba"><h4>Probalo: cómo se ve el disponible</h4>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+      <label>Te depositaron<input type="number" id="psDep" value="440000" oninput="saldo()"></label>
+      <label>Gastaste en tickets<input type="number" id="psGas" value="300000" oninput="saldo()"></label>
+    </div>
+    <div id="psRes" class="res"></div></div>`;
+}
+function saldo(){
+  const s = (+document.getElementById('psDep').value || 0) - (+document.getElementById('psGas').value || 0);
+  document.getElementById('psRes').innerHTML = s < 0
+    ? `<span style="color:var(--rojo)">SALDO A FAVOR: ${money(s)}</span><div style="font-size:14px;font-weight:400;color:var(--gris)">Gastaste más de lo depositado: te deben ${money(-s)}.</div>`
+    : `<span style="color:var(--azul)">DISPONIBLE PARA GASTAR: ${money(s)}</span>`;
+}
+function pruebaRecorte(){
+  return `<div class="prueba"><h4>Probalo: arrastrá las esquinas verdes hasta el papel</h4>
+    <div class="crop" id="cr"><div class="papel"></div><div class="rect" id="crR"></div>
+      <div class="h" data-c="tl"></div><div class="h" data-c="tr"></div><div class="h" data-c="bl"></div><div class="h" data-c="br"></div></div>
+    <div id="crMsg" style="text-align:center;font-weight:700"></div></div>`;
+}
+let CR = {x:15,y:12,w:190,h:236};
+function iniciarRecorte(){
+  const box = document.getElementById('cr'); if (!box) return;
+  const pinta = () => {
+    const r = CR, R = document.getElementById('crR');
+    R.style.left = r.x+'px'; R.style.top = r.y+'px'; R.style.width = r.w+'px'; R.style.height = r.h+'px';
+    const p = {tl:[r.x,r.y],tr:[r.x+r.w,r.y],bl:[r.x,r.y+r.h],br:[r.x+r.w,r.y+r.h]};
+    box.querySelectorAll('.h').forEach(h => { const q = p[h.dataset.c]; h.style.left = q[0]+'px'; h.style.top = q[1]+'px'; });
+    const ok = Math.abs(r.x-55) < 12 && Math.abs(r.y-25) < 12 && Math.abs(r.x+r.w-165) < 12 && Math.abs(r.y+r.h-235) < 12;
+    document.getElementById('crMsg').innerHTML = ok ? '<span style="color:var(--verde)">¡Perfecto! Ahora tocarías Listo.</span>' : 'Dejá el recuadro justo sobre el papel blanco.';
+  };
+  box.querySelectorAll('.h').forEach(h => {
+    h.onpointerdown = e => {
+      h.setPointerCapture(e.pointerId);
+      h.onpointermove = ev => {
+        const b = box.getBoundingClientRect(), x = Math.max(0, Math.min(220, ev.clientX - b.left)), y = Math.max(0, Math.min(260, ev.clientY - b.top));
+        let x1 = CR.x, y1 = CR.y, x2 = CR.x + CR.w, y2 = CR.y + CR.h, c = h.dataset.c;
+        if (c[0] === 't') y1 = Math.min(y, y2 - 20); else y2 = Math.max(y, y1 + 20);
+        if (c[1] === 'l') x1 = Math.min(x, x2 - 20); else x2 = Math.max(x, x1 + 20);
+        CR = {x:x1, y:y1, w:x2-x1, h:y2-y1}; pinta();
+      };
+      h.onpointerup = () => { h.onpointermove = null; };
+    };
+  });
+  pinta();
+}
+
+/* ===================== Pasos ===================== */
+const SUP = [
+ { t:'Entrar a la app', tel:() => tel(`<div style="text-align:center;padding-top:30px"><img src="/Delben/iconos/combustible-192.png" style="width:90px;border-radius:18px"><div class="h" style="margin-top:8px">Control de Combustible</div>
+     <div class="in"${F(1,'margin:10px 14px 6px')}>Usuario</div><div class="in" style="margin:0 14px 6px">••••••</div><span class="b">Ingresar</span></div>`, {sinTabs:1}),
+   h:`<p>Abrí la app <b>Combustible</b> (ícono azul con el surtidor) o entrá desde el <b>Portal DELBEN</b> → tarjeta Combustible.</p>
+   <ol><li>Escribí tu <b>usuario y contraseña de SGI</b> (son los mismos).</li><li>Tocá <b>Ingresar</b>.</li><li>La próxima vez entra directo. Para salir, tocá <b>Salir</b> arriba a la derecha.</li></ol>
+   <div class="tip">Para instalar la app: Portal DELBEN → Combustible → <b>Descargar APK</b>. Si el celular pregunta, permití instalar desde esa fuente.</div>` },
+
+ { t:'Tu disponible', tel:() => tel(`<div class="saldo foco"><div class="l">Disponible para gastar</div><div class="m">$ 440.000,00</div>
+     <div style="display:flex;gap:4px;font-size:9px;color:#6b7785"><div style="flex:1">Recibido<br><b>$ 740.000</b></div><div style="flex:1">Gastado<br><b>$ 300.000</b></div><div style="flex:1">Sin rendir<br><b>$ 45.956</b></div></div></div>
+     <span class="b v">+ Cargar ticket</span><span class="b">Enviar rendición</span><span class="b n">Pedir fondos</span>`, {on:'Inicio'}),
+   h:`<p>En <b>Inicio</b> el número grande es la plata que te queda para combustible: todo lo depositado menos lo que gastaste.</p>
+   <ul><li><b style="color:var(--azul)">En azul:</b> lo que tenés para gastar.</li><li><b style="color:var(--rojo)">En rojo con signo menos:</b> gastaste de más y te deben esa plata (saldo a favor).</li></ul>`,
+   extra:pruebaSaldo, init:saldo },
+
+ { t:'Sacar la foto del ticket', tel:() => tel(`<div class="cd"><div class="h">1. Foto del ticket</div>
+     <div style="display:flex;gap:6px"><div class="in foco" style="flex:1;text-align:center;padding:14px 4px">📷<br>Sacar foto</div><div class="in" style="flex:1;text-align:center;padding:14px 4px">🖼<br>Elegir de la galería</div></div></div>
+     <div class="cd"><div class="h">2. Datos del ticket</div><div class="lb">¿A quién corresponde? *</div><div class="in"></div><div class="lb">Total con IVA *</div><div class="in"></div></div>`, {on:'Cargar ticket'}),
+   h:`<ol><li>Tocá <b>Cargar ticket</b>.</li><li><b>Sacar foto</b> abre la cámara. <b>Elegir de la galería</b> sirve si ya tenés la foto (por ejemplo, la que te mandaron por WhatsApp).</li></ol>
+   <div class="tip">Foto ideal: ticket estirado, sobre una superficie oscura, con buena luz, entero y con el <b>TOTAL</b> bien visible.</div>
+   <div class="ojo">No le saques foto a la pantalla de otro celular: elegí la imagen original desde la galería.</div>` },
+
+ { t:'Recortar el ticket', tel:() => tel(`<div class="cd"><div class="foto" style="background:#5a6470"><div style="position:absolute;left:30%;top:8%;width:40%;height:84%;background:repeating-linear-gradient(0deg,#fff 0 7px,#e9ecef 7px 9px);outline:3px solid var(--verde)"></div></div>
+     <div style="text-align:center;margin-top:6px"><span class="b foco">✂ Recortar ticket</span><span class="b g">Usar la foto completa</span></div></div>`, {on:'Cargar ticket'}),
+   h:`<p>La app busca el papel y recorta el fondo sola. Si no lo encuentra, se abre la pantalla <b>Recortar el ticket</b>.</p>
+   <ol><li>Arrastrá las <b>4 esquinas verdes</b> hasta los bordes del papel. Tocando adentro del recuadro lo movés entero.</li><li>Tocá <b>Listo</b>.</li></ol>
+   <p>Debajo de la foto siempre tenés <b>✂ Recortar ticket</b> para ajustarlo, y <b>Usar la foto completa</b> si preferís no recortar.</p>`,
+   extra:pruebaRecorte, init:iniciarRecorte },
+
+ { t:'Revisar los datos leídos', tel:() => tel(`<div class="cd"><div style="color:var(--verde);font-weight:700;text-align:center">✓ Datos leídos</div>
+     <div class="lb">Fecha *</div><div class="in">16/10/2026</div><div class="lb">N° comprobante *</div><div class="in">00014-00021464</div>
+     <div class="lb">Proveedor</div><div class="in">ENERPLUS SRL</div><div class="lb">Total con IVA *</div><div class="in falta foco"></div></div>`, {on:'Cargar ticket'}),
+   h:`<p>La app lee sola la fecha, el N° de comprobante, el proveedor, el CUIT, el producto, los litros, el precio y el <b>total con IVA</b>.</p>
+   <ol><li>Esperá el mensaje <b>"Datos leídos"</b>.</li><li>Compará cada dato con el ticket.</li><li>Los campos en <b style="color:var(--naranja)">naranja</b> no se pudieron leer: completalos a mano.</li></ol>` },
+
+ { t:'¿A quién corresponde?', tel:() => tel(`<div class="cd"><div class="lb">¿A quién corresponde? *</div><div class="in foco">franc</div>
+     <div style="border:1px solid #d6dde6;border-radius:7px;background:#fff"><div style="padding:6px;background:#e8f0fc">Barrio San <mark>Franc</mark>isco</div></div></div>`, {on:'Cargar ticket'}),
+   h:`<p>Elegí el <b>servicio o puesto</b> al que corresponde la carga. Si la carga es tuya, elegí <b>Supervisor</b>.</p>
+   <p>No hace falta escribir el nombre completo: con una parte ya aparece en la lista.</p>
+   <div class="tip">Si escribís a mano sobre el ticket a qué servicio corresponde, la app intenta completarlo sola. Revisalo igual.</div>`,
+   extra:pruebaBuscar, init:buscar },
+
+ { t:'Guardar y sacar otra', tel:() => tel(`<div class="cd" style="text-align:center;padding:16px"><div style="width:40px;height:40px;border-radius:50%;background:var(--verde);color:#fff;font-size:22px;margin:0 auto">✓</div>
+     <div class="h" style="margin-top:6px">Ticket guardado</div><div>Disponible: <b>$ 394.043,81</b></div><div style="margin:6px 0">Llevás <b>2</b> tickets sin rendir.</div>
+     <span class="b v foco">Sacar otra foto</span><span class="b">Enviar rendición</span><span class="b g">Listo</span></div>`, {on:'Cargar ticket'}),
+   h:`<ol><li>Tocá <b>Guardar ticket</b>.</li><li>Para el próximo, tocá <b>Sacar otra foto</b>: se abre la cámara directo.</li><li>Repetí con todos los tickets de la semana.</li></ol>
+   <div class="ojo">Si el ticket supera tu disponible, la app te avisa y pregunta si lo guardás igual. Un ticket con el mismo N° de comprobante no se puede cargar dos veces.</div>` },
+
+ { t:'Enviar la rendición', tel:() => tel(`<div class="cd"><div class="h">Enviar rendición</div>
+     <div class="row"><span>Fincas de Iraola 2<br><span class="bd p">Sin rendir</span></span><b>- $ 45.956,19</b></div>
+     <div class="row"><span>Supervisor<br><span class="bd p">Sin rendir</span></span><b>- $ 94.023,50</b></div>
+     <div style="display:flex;justify-content:space-between;background:#f2f6fb;border-radius:7px;padding:7px;font-weight:700"><span>2 tickets</span><span>$ 139.979,69</span></div>
+     <div style="text-align:center;margin-top:6px"><span class="b foco">Enviar rendición</span></div></div>`, {on:'Rendir'}),
+   h:`<p>Una vez por semana juntás todos tus tickets sin rendir en la planilla oficial.</p>
+   <ol><li>Tocá <b>Rendir</b> y revisá que estén todos.</li><li>Tocá <b>Enviar rendición</b> y confirmá.</li><li>Se arma el PDF: la hoja 1 es la planilla, y después van las fotos de los tickets, 2 por hoja.</li><li>El PDF te llega por mail, con copia a administración. También lo podés ver con <b>Ver PDF</b>.</li></ol>
+   <div class="ojo">Una vez enviada, esos tickets ya no se pueden borrar. Si hay un error, avisá a administración.</div>` },
+
+ { t:'Mis tickets y estados', tel:() => tel(`<div class="cd"><div class="h">Mis tickets</div>
+     <div class="row"><span>Fincas de Iraola 2<br><span class="bd a">Aprobado</span> <span class="bd z">Rendición N° 14</span></span><b>$ 45.956</b></div>
+     <div class="row foco"><span>Supervisor<br><span class="bd o">Observado</span></span><b>$ 94.023</b></div>
+     <div style="background:#fff4e5;border-left:3px solid var(--naranja);padding:5px;border-radius:5px;font-size:9.5px">Observación: falta la firma en el ticket</div></div>`, {on:'Mis tickets'}),
+   h:`<p>En <b>Mis tickets</b> ves todos tus tickets. Con <b>Ver foto</b> mirás la imagen, y los que todavía no rendiste se pueden <b>Borrar</b>.</p>
+   <ul><li><span class="bd p" style="font-size:11px">Pendiente</span> todavía no se revisó.</li><li><span class="bd a" style="font-size:11px">Aprobado</span> está bien.</li><li><span class="bd o" style="font-size:11px">Observado</span> hay algo para aclarar: leé la observación.</li><li><span class="bd x" style="font-size:11px">Rechazado</span> no se acepta y no descuenta de tu disponible.</li></ul>` },
+
+ { t:'Rendiciones e ingresos', tel:() => tel(`<div class="cd"><div class="h">Rendiciones e ingresos</div>
+     <div class="row" style="background:#f2f6fb"><b>DISPONIBLE</b><b style="color:var(--azul)">$ 300.020,31</b></div>
+     <div class="row"><span>13/10 · Ingreso de fondos</span><b style="color:var(--azul)">$ 300.000</b></div>
+     <div class="row"><span>15/10 · Rendición N° 7<br><span class="b foco" style="font-size:9px">Ver PDF</span></span><b style="color:var(--rojo)">- $ 139.979</b></div></div>`, {on:'Rendiciones e ingresos'}),
+   h:`<p>Muestra cada depósito que recibiste (en azul) y cada rendición que enviaste (en rojo), con la fecha y cómo quedó tu saldo después de cada movimiento.</p>
+   <p>En cada rendición tocá <b>Ver PDF</b> para verla dentro de la app.</p>` },
+
+ { t:'Pedir fondos', tel:() => tel(`<div class="cd" style="padding:12px"><div class="h">Pedir fondos para combustible</div><div>Disponible actual: <b style="color:var(--azul)">$ 25.000,00</b></div>
+     <div class="lb" style="margin-top:6px">¿Cuánto necesitás? *</div><div class="in foco" style="font-size:15px;font-weight:800">150000</div>
+     <div class="lb">Motivo</div><div class="in">Recorridas de la semana</div><span class="b n">Enviar pedido</span></div>`, {on:'Inicio'}),
+   h:`<ol><li>En <b>Inicio</b> tocá el botón naranja <b>Pedir fondos</b>.</li><li>Poné el monto y, si querés, el motivo.</li><li>Tocá <b>Enviar pedido</b>: administración recibe un mail con tu pedido.</li></ol>
+   <p>En Inicio ves el estado del pedido: <b>Pendiente</b>, <b>Asignado</b> o <b>Rechazado</b> (con el motivo). Mientras haya uno pendiente no podés hacer otro.</p>` },
+
+ { t:'El recordatorio de los lunes', tel:() => tel(`<div style="background:#fff4d6;border:2px solid var(--naranja);border-radius:10px;padding:8px;font-weight:700;color:#7a4b00" class="foco">Hoy es lunes: enviá tu rendición de combustible. Tenés 2 tickets sin rendir.<br><span class="b" style="margin-top:5px">Rendir ahora</span></div>
+     <div class="saldo" style="margin-top:8px"><div class="l">Disponible para gastar</div><div class="m">$ 300.020,31</div></div>`, {on:'Inicio'}),
+   h:`<p>Todos los <b>lunes a las 8</b> te llega un mail que te recuerda enviar la rendición, con tu disponible y los tickets sin rendir.</p>
+   <p>Ese día también aparece un aviso amarillo en Inicio con el botón <b>Rendir ahora</b>.</p>` }
+];
+
+const ADM = [
+ { t:'El circuito completo', tel:() => tel(`<div class="cd"><div class="h">Cómo funciona</div>
+     ${['1. Asignás fondos','2. El supervisor carga tickets','3. Envía la rendición (PDF por mail)','4. Revisás los tickets','5. Regenerás si corregiste algo','6. Enviás el PDF a Finanzas'].map((x,i) => `<div class="row"${i===0?' style="outline:3px solid #ff3d7f"':''}>${x}</div>`).join('')}</div>`, {adm:1, tabs:TABS_ADM, on:'Saldos'}),
+   h:`<p>Vos asignás la plata. El supervisor carga sus tickets y envía la rendición. Vos la revisás y la mandás a Finanzas.</p>
+   <ol><li><b>Asignaciones:</b> le das fondos a cada supervisor.</li><li>El supervisor carga cada ticket con foto.</li><li>Envía la rendición: el PDF le llega a él y a <b>fjacyno@ktl-seguridad.com</b>.</li><li><b>Revisión:</b> aprobás, observás o rechazás.</li><li><b>Rendiciones:</b> regenerás si corregiste algo y marcás <b>Enviada a Finanzas</b>.</li></ol>
+   <div class="tip">Gustavo San Martin (Visor) ve tu panel sin poder cambiar nada, y también rinde su propio combustible.</div>` },
+
+ { t:'Saldos', tel:() => tel(`<div class="cd"><div class="h">Saldos por supervisor</div>
+     <div class="row"><span>Gerardo Vica</span><b style="color:var(--verde)">$ 434.042</b></div>
+     <div class="row"><span>Carlos Sandoval</span><b style="color:var(--verde)">$ 790.398</b></div>
+     <div class="row foco"><span>Daniel Cruz</span><b style="color:var(--rojo)">- $ 12.500</b></div></div>
+     <div class="cd"><div class="h">Lectura automática de tickets</div><div class="in">Pegá la clave (AIza...)</div><span class="b">Guardar clave</span></div>`, {adm:1, tabs:TABS_ADM, on:'Saldos'}),
+   h:`<p>Por supervisor ves lo recibido, lo gastado, lo que tiene sin rendir y el <b>disponible</b>. Un disponible en rojo con signo menos significa que gastó más de lo depositado.</p>
+   <p>Las rendiciones viejas cargadas a mano en la planilla (sin tickets) también descuentan, con su columna <b>Total</b>.</p>
+   <div class="tip"><b>Lectura automática:</b> sin clave, la app lee el texto impreso con Google. Con una clave de Gemini (botón <b>Sacar una clave gratis</b>) lee mejor y también lo escrito a mano.</div>` },
+
+ { t:'Asignar fondos y pedidos', tel:() => tel(`<div class="cd"><div class="h">Pedidos de fondos</div><div class="row"><span><b>Carlos Sandoval</b> <span class="bd p">Pendiente</span><br>Recorridas</span><b>$ 150.000</b></div>
+     <span class="b v foco">Asignar</span><span class="b r">Rechazar</span></div>
+     <div class="cd"><div class="h">Asignar fondos</div><div class="lb">Supervisor *</div><div class="in">Carlos Sandoval</div><div class="lb">Monto *</div><div class="in">150000</div><span class="b v">Guardar asignación</span></div>`, {adm:1, tabs:TABS_ADM, on:'Asignaciones'}),
+   h:`<p><b>Asignar plata:</b></p><ol><li>En <b>Asignaciones</b> elegí el supervisor (abajo aparece su disponible).</li><li>Poné la fecha, el monto y, si querés, una observación.</li><li>Tocá <b>Guardar asignación</b>: antes de confirmar, la app te muestra la cuenta (disponible + asignación = nuevo disponible).</li></ol>
+   <p><b>Pedidos de fondos:</b> te llega un mail con el monto. En Asignaciones, el número entre paréntesis indica cuántos pedidos hay pendientes.</p>
+   <ul><li><b>Asignar:</b> completa el formulario; revisás y guardás.</li><li><b>Rechazar:</b> con un motivo, que el supervisor ve en su Inicio.</li></ul>` },
+
+ { t:'Cargar tickets por un supervisor', tel:() => tel(`<div class="saldo"><div class="l">Disponible para gastar · Carlos Sandoval</div><div class="m">$ 790.398,00</div></div>
+     <span class="b v">+ Cargar ticket</span><span class="b">Enviar rendición</span>`, {adm:1, amarilla:1, on:'Inicio'}),
+   h:`<p>Cuando te dejan los tickets a vos:</p>
+   <ol><li>Tocá la pestaña <b>Cargar ticket</b>.</li><li>Elegí el supervisor (ves su disponible) y tocá <b>Entrar como este supervisor</b>.</li><li>Ves exactamente lo que ve él: cargás sus tickets y enviás su rendición. El PDF le llega a él con copia a vos.</li><li>Para volver, tocá <b>Salir (Esc)</b> en la franja amarilla o la tecla <b>Esc</b>.</li></ol>` },
+
+ { t:'Revisión de tickets', tel:() => tel(`<div class="cd"><div class="row"><span><b>Carlos Sandoval</b> <span class="bd p">Pendiente</span></span><b>$ 45.956</b></div>
+     <div class="lb">Corresponde a</div><div class="in">Fincas de Iraola 2</div><div class="lb">Control</div><div style="color:var(--verde);font-weight:700">Litros x precio OK</div>
+     <span class="b g">Ver foto</span><span class="b v foco">Aprobar</span><span class="b n">Observar</span><span class="b r">Rechazar</span></div>`, {adm:1, tabs:TABS_ADM, on:'Revisión'}),
+   h:`<p>Filtrás por supervisor, estado o N° de planilla, y controlás cada ticket contra su foto.</p>
+   <ul><li><b>Aprobar:</b> está bien.</li><li><b>Observar:</b> hay algo para aclarar. El motivo es obligatorio y el supervisor lo ve.</li><li><b>Rechazar:</b> no corresponde. No descuenta del disponible ni entra al regenerar.</li><li><b>Guardar cambios:</b> solo corregiste datos.</li></ul>
+   <div class="tip">Si litros × precio no da el total, el <b>Control</b> lo marca en rojo.</div>` },
+
+ { t:'Rendiciones', tel:() => tel(`<div class="cd"><div class="h">Rendiciones</div>
+     <div class="row"><span>N° 13 · Gustavo San Martin<br><b>$ 67.884,72</b></span><span><span class="b foco">Ver PDF</span><br><span class="b n">Regenerar</span></span></div>
+     <div class="lb">Estado</div><div class="in">Enviada a Finanzas</div></div>`, {adm:1, tabs:TABS_ADM, on:'Rendiciones'}),
+   h:`<ul><li><b>Ver PDF:</b> lo abre dentro de la app (planilla con logo KTL y los tickets, 2 por hoja, A4 vertical). Con <b>Abrir en Drive</b> lo descargás o reenviás.</li>
+   <li><b>Tickets:</b> te lleva a Revisión filtrado por esa planilla.</li><li><b>Regenerar:</b> rearma el PDF con los datos corregidos, sin los tickets rechazados. Podés hacerlo con o sin mail.</li><li><b>Estado:</b> marcala <b>Revisada</b> cuando la controlaste y <b>Enviada a Finanzas</b> cuando la mandaste.</li></ul>` },
+
+ { t:'Corresponde', tel:() => tel(`<div class="cd"><div class="h">A quién corresponde</div><div class="in foco">Barrio Laguna Grande</div><span class="b v">Agregar</span></div>
+     <div class="cd">${SERVICIOS.slice(0,5).map((s,i) => `<div class="row"><span>${i+1} · <b>${s}</b></span><span class="b r" style="font-size:9px">Borrar</span></div>`).join('')}</div>`, {adm:1, tabs:TABS_ADM, on:'Corresponde'}),
+   h:`<p>Es la lista de servicios y puestos que aparece al cargar un ticket. Se guarda en la pestaña <b>a_quien_corresponde</b> de la planilla de registros.</p>
+   <ol><li>Escribí el servicio o puesto y tocá <b>Agregar</b>.</li><li>Con <b>Borrar</b> lo sacás de la lista (los tickets ya cargados no cambian).</li></ol>`,
+   extra:pruebaBuscar, init:buscar },
+
+ { t:'Configuración y actualizar', tel:() => tel(`<div class="cd"><div class="h">Apps Script</div><div class="row foco">Implementar → Administrar implementaciones</div><div class="row">Lápiz → Nueva versión → Implementar</div>
+     <div class="row">Activadores → recordatorioSemanal → lunes 8 a 9 h</div></div>`, {adm:1, tabs:TABS_ADM, on:'Saldos'}),
+   h:`<ul><li><b>Usuarios:</b> "Usuarios y contraseñas" de Stock Manager. Rinden los de rol Supervisor y Visor.</li>
+   <li><b>Registros:</b> planilla "Rendicion de Combustible", con las pestañas Asignaciones, Tickets, Rendiciones, Pedidos y a_quien_corresponde.</li>
+   <li><b>PDF:</b> carpeta de Combustible en Drive. Las fotos van en la subcarpeta "Fotos de tickets".</li>
+   <li><b>Mail de los lunes:</b> le llega solo a quien tiene <b>SI</b> en "correo de combustible" (pestaña quienRetira de Stock Manager). Se programa en <b>Activadores</b> → recordatorioSemanal → semanal, lunes, 8 a 9 h. Tiene que haber <b>uno solo</b>.</li></ul>
+   <div class="ojo"><b>Para actualizar la app:</b> reemplazá los archivos en Apps Script y andá a <b>Implementar → Administrar implementaciones → lápiz → Nueva versión → Implementar</b>. Nunca uses "Nueva implementación", porque cambia el link.</div>` }
+];
+
+const PREG = {
+  sup: [
+    { p:'Tu disponible aparece en rojo con signo menos. ¿Qué significa?', o:['No tengo plata para cargar','Gasté más de lo depositado: me deben esa plata','Hay un error en la app'], c:1 },
+    { p:'La carga de combustible es para vos. ¿Qué elegís en "A quién corresponde"?', o:['Jefe de Operaciones','Supervisor','Comercial'], c:1 },
+    { p:'¿Cada cuánto se envía la rendición?', o:['Una vez por semana','Una vez por mes','Con cada ticket'], c:0 },
+    { p:'La app no encontró el ticket en la foto. ¿Qué hacés?', o:['Saco otra foto con flash','Arrastro las esquinas verdes hasta el papel y toco Listo','Cargo el ticket sin foto'], c:1 }
+  ],
+  adm: [
+    { p:'¿Cómo actualizás la app sin cambiar el link?', o:['Nueva implementación','Administrar implementaciones → Nueva versión','Copiando el proyecto'], c:1 },
+    { p:'Rechazás un ticket de una rendición ya enviada. ¿Qué hacés después?', o:['Nada','Regenerar la rendición','Borrar la rendición'], c:1 },
+    { p:'¿Quién recibe el mail de los lunes?', o:['Todos los supervisores','Quien tiene SI en "correo de combustible"','Solo el administrador'], c:1 }
+  ]
+};
+
+/* ===================== Navegación ===================== */
+let R = 'sup', I = 0;
+const vistos = { sup:new Set(), adm:new Set() };
+function pasos(){ return R === 'sup' ? SUP : ADM; }
+function rol(r){
+  R = r; I = 0;
+  document.getElementById('rSup').classList.toggle('on', r === 'sup');
+  document.getElementById('rAdm').classList.toggle('on', r === 'adm');
+  try { history.replaceState(null, '', '#' + r); } catch(e){}
+  pintar();
+}
+function ir(i){ I = i; pintar(); window.scrollTo({ top:0, behavior:'smooth' }); }
+function pintar(){
+  const P = pasos(), total = P.length + 2; // + preguntas frecuentes + autoevaluación
+  vistos[R].add(I);
+  const items = P.map(p => p.t).concat(['Preguntas frecuentes', 'Autoevaluación']);
+  document.getElementById('indice').innerHTML = '<h3>' + (R === 'sup' ? 'Supervisor' : 'Administrador') + '</h3>' +
+    items.map((t, i) => `<button class="${i === I ? 'on' : ''} ${vistos[R].has(i) && i !== I ? 'ok' : ''}" onclick="ir(${i})"><span class="n">${vistos[R].has(i) && i !== I ? '✓' : i + 1}</span>${t}</button>`).join('');
+  const act = document.querySelector('.indice button.on'); if (act && act.scrollIntoView) act.scrollIntoView({ block:'nearest', inline:'center' });
+  document.getElementById('prog').style.width = Math.round(vistos[R].size / total * 100) + '%';
+  const nav = `<div class="nav"><button class="btn gris" ${I === 0 ? 'disabled' : ''} onclick="ir(${I - 1})">← Anterior</button>
+    <span style="color:var(--gris);font-size:13px">${I + 1} de ${total}</span>
+    ${I < total - 1 ? `<button class="btn" onclick="ir(${I + 1})">Siguiente →</button>` : `<a class="btn verde" href="./" style="text-decoration:none">Abrir la app</a>`}</div>`;
+  const el = document.getElementById('paso');
+  if (I < P.length){
+    const p = P[I];
+    el.innerHTML = `<div class="paso"><div><div class="num">Paso ${I + 1}</div><h2>${p.t}</h2>${p.h}${p.extra ? p.extra() : ''}${nav}</div><div>${p.tel()}</div></div>`;
+    if (p.init) p.init();
+  } else if (I === P.length){
+    el.innerHTML = `<div class="paso" style="grid-template-columns:1fr"><div><div class="num">Ayuda</div><h2>Preguntas frecuentes</h2><div class="faq">${faq()}</div>${nav}</div></div>`;
+  } else {
+    el.innerHTML = `<div class="paso" style="grid-template-columns:1fr"><div class="quiz"><div class="num">Para terminar</div><h2>Autoevaluación</h2><p>Tocá la respuesta correcta.</p>${quiz()}${nav}</div></div>`;
+  }
+}
+function faq(){
+  const q = R === 'sup' ? [
+    ['No se leyeron los datos del ticket','Completalos a mano: el ticket se guarda igual. Para que lea mejor, sacá la foto con buena luz y con el ticket entero.'],
+    ['Aparece "Sesión vencida"','Volvé a entrar con tu usuario y contraseña de SGI.'],
+    ['La cámara no abre','Aceptá el permiso de cámara cuando la app lo pida, o usá Elegir de la galería.'],
+    ['Cargué un ticket mal','Si todavía no lo rendiste: Mis tickets → Borrar, y cargalo de nuevo. Si ya lo rendiste, avisá a administración.'],
+    ['Mi disponible no coincide','Revisá "Rendiciones e ingresos" movimiento por movimiento y consultá con administración.']
+  ] : [
+    ['La app no deja entrar a nadie','Fijate que la última versión esté implementada (Nueva versión) y que no haya permisos sin aceptar en Apps Script.'],
+    ['Un supervisor no aparece en la lista','Tiene que tener rol Supervisor o Visor en "Usuarios y contraseñas" de Stock Manager.'],
+    ['Un servicio no aparece en "A quién corresponde"','Agregalo en la pestaña Corresponde.'],
+    ['El PDF de una rendición vieja salió mal','Rendiciones → Regenerar en esa fila.'],
+    ['Llegan dos mails los lunes','En Activadores tiene que haber un solo recordatorioSemanal: borrá el repetido.']
+  ];
+  return q.map(x => `<details><summary>${x[0]}</summary><p>${x[1]}</p></details>`).join('');
+}
+function quiz(){
+  return PREG[R].map((q, i) => `<div style="margin:14px 0"><b>${i + 1}. ${q.p}</b>${q.o.map((o, j) => `<button class="op" onclick="resp(this,${i},${j})">${o}</button>`).join('')}<div id="qr${i}" style="font-weight:700"></div></div>`).join('');
+}
+function resp(b, i, j){
+  const ok = PREG[R][i].c === j;
+  b.parentNode.querySelectorAll('.op').forEach((x, k) => { x.classList.remove('bien', 'mal'); if (k === PREG[R][i].c && ok) x.classList.add('bien'); });
+  b.classList.add(ok ? 'bien' : 'mal');
+  document.getElementById('qr' + i).innerHTML = ok ? '<span style="color:var(--verde)">¡Correcto!</span>' : '<span style="color:var(--rojo)">Probá otra vez.</span>';
+}
+
+rol(location.hash === '#adm' ? 'adm' : 'sup');
+</script>
+</body>
+</html>

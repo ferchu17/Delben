@@ -154,6 +154,7 @@
   <header>
     <img src="https://ferchu17.github.io/Delben/iconos/combustible-192.png" alt="DELBEN">
     <div class="tit"><b>Control de Combustible</b><span id="hdrUser"></span></div>
+    <button onclick="abrirAyuda()">Ayuda</button>
     <button onclick="doLogout()">Salir</button>
   </header>
   <div id="comoBar" class="como-bar hidden">
@@ -532,6 +533,11 @@ function doLogin(){
     .finally(() => { $('lgBtn').disabled = false; });
 }
 function guardarSesion(s){ S = s; try { localStorage.setItem('delben_comb', JSON.stringify(s)); } catch(e){} }
+/* Instructivo interactivo (página de GitHub): supervisor o administrador según quién entró */
+function abrirAyuda(){
+  const url = 'https://ferchu17.github.io/Delben/combustible/ayuda.html#' + (S && S.rol === 'admin' ? 'adm' : 'sup');
+  try { window.top.location.href = url; } catch (e) { window.open(url, '_blank'); }
+}
 function doLogout(){
   if (S) run('logout', S.token).catch(()=>{});
   try { localStorage.removeItem('delben_comb'); } catch(e){}

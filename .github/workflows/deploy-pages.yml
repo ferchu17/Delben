@@ -44,6 +44,8 @@ jobs:
           # (sin el cartel de Google; el link /exec del backend está en combustible-app/web/config.js)
           mkdir -p _site/combustible
           python3 tools/armar_pagina.py combustible-app _site/combustible
+          # Instructivo interactivo (supervisor y administrador): https://ferchu17.github.io/Delben/combustible/ayuda.html
+          cp combustible-app/web/ayuda.html _site/combustible/ayuda.html
           # Iconos de cada app (se ven en la pestaña del navegador)
           cp -R iconos _site/iconos
           # Juego Mansión Sombranegra (https://ferchu17.github.io/Delben/mansion/). Se arma con: python3 juego-mansion/build.py
