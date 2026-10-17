@@ -58,6 +58,34 @@ function getLogoDelben_() {
   }
 }
 
+/**
+ * Puente para la página publicada en GitHub Pages (https://ferchu17.github.io/Delben/combustible/).
+ * La página manda { fn, args } y acá se llama a la misma función que usa la app dentro de Apps Script.
+ * Así la app se abre desde GitHub, sin el cartel de Google arriba, y el link no cambia con las versiones nuevas.
+ * La implementación tiene que estar con "Ejecutar como: Yo" y "Quién tiene acceso: Cualquier persona".
+ */
+function doPost(e) {
+  let out;
+  try {
+    const req = JSON.parse((e && e.postData && e.postData.contents) || '{}');
+    const fn = String(req.fn || ''), args = Array.isArray(req.args) ? req.args : [];
+    const permitidas = {
+      login: login, checkSession: checkSession, logout: logout,
+      getSupervisorData: getSupervisorData, leerTicket: leerTicket, guardarTicket: guardarTicket,
+      eliminarTicket: eliminarTicket, enviarRendicion: enviarRendicion, getFoto: getFoto,
+      getRendicionPdf: getRendicionPdf, pedirFondos: pedirFondos,
+      getAdminData: getAdminData, guardarAsignacion: guardarAsignacion, eliminarAsignacion: eliminarAsignacion,
+      actualizarTicket: actualizarTicket, regenerarRendicion: regenerarRendicion,
+      cambiarEstadoRendicion: cambiarEstadoRendicion, guardarClaveGemini: guardarClaveGemini, responderPedido: responderPedido
+    };
+    if (!permitidas[fn]) throw new Error('Función no permitida: ' + fn);
+    out = { ok: true, result: permitidas[fn].apply(null, args) };
+  } catch (err) {
+    out = { ok: false, error: String((err && err.message) || err) };
+  }
+  return ContentService.createTextOutput(JSON.stringify(out)).setMimeType(ContentService.MimeType.JSON);
+}
+
 /** Ejecutar una vez desde el editor para aceptar todos los permisos. */
 function autorizar() {
   SpreadsheetApp.openById(CFG.REG_ID).getName();
