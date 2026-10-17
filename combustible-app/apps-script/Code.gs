@@ -236,7 +236,13 @@ function nextId_(rows, field) {
 
 /* ======================= SALDOS ======================= */
 
-function calcularSaldos_(asig, tickets) {
+/**
+ * Saldo de cada supervisor = asignado - consumido.
+ * Consumido = tickets cargados en la app (no rechazados)
+ *           + rendiciones cargadas a mano en la pestaña Rendiciones que no tienen tickets en la pestaña Tickets
+ *             (las anteriores a la app, con su PDF): de esas se descuenta la columna Total.
+ */
+function calcularSaldos_(asig, tickets, rendiciones) {
   const m = {};
   const get = n => { const k = norm_(n); if (!m[k]) m[k] = { nombre: String(n).trim(), asignado: 0, consumido: 0, sinRendir: 0, cantSinRendir: 0 }; return m[k]; };
   asig.forEach(a => { if (String(a.Supervisor || '').trim()) get(a.Supervisor).asignado += num_(a.Monto); });
@@ -246,6 +252,13 @@ function calcularSaldos_(asig, tickets) {
     const s = get(t.Supervisor);
     s.consumido += num_(t['Total con IVA']);
     if (!String(t['N° Planilla'] || '').trim()) { s.sinRendir += num_(t['Total con IVA']); s.cantSinRendir++; }
+  });
+  const conTickets = {};
+  tickets.forEach(t => { const n = String(t['N° Planilla'] || '').trim(); if (n) conTickets[n] = true; });
+  (rendiciones || []).forEach(r => {
+    const n = String(r['N° Planilla'] || '').trim();
+    if (!n || conTickets[n] || !String(r.Supervisor || '').trim()) return;
+    get(r.Supervisor).consumido += num_(r.Total);
   });
   Object.keys(m).forEach(k => { m[k].saldo = round2_(m[k].asignado - m[k].consumido); });
   return m;
@@ -257,17 +270,20 @@ function getSupervisorData(token, como) {
   const s = sesRinde_(token, como);
   const asig = readSheet_(regSheet_('Asignaciones')).rows.filter(a => norm_(a.Supervisor) === norm_(s.nombre));
   const tks = readSheet_(regSheet_('Tickets')).rows.filter(t => norm_(t.Supervisor) === norm_(s.nombre));
-  const sal = calcularSaldos_(asig, tks)[norm_(s.nombre)] || { asignado: 0, consumido: 0, saldo: 0, sinRendir: 0, cantSinRendir: 0 };
-  const rend = readSheet_(regSheet_('Rendiciones')).rows
-    .filter(r => norm_(r.Supervisor) === norm_(s.nombre))
-    .map(r => {
-      const nro = String(r['N° Planilla']);
-      const tk = tks.filter(t => String(t['N° Planilla']) === nro && String(t.Estado) !== 'Rechazado');
-      return {
-        nro: r['N° Planilla'], fecha: fmtD_(r.Fecha), estado: String(r.Estado || ''),
-        cant: tk.length, total: round2_(tk.reduce((a, t) => a + num_(t['Total con IVA']), 0))
-      };
-    });
+  const rendRows = readSheet_(regSheet_('Rendiciones')).rows.filter(r => norm_(r.Supervisor) === norm_(s.nombre));
+  const sal = calcularSaldos_(asig, tks, rendRows)[norm_(s.nombre)] || { asignado: 0, consumido: 0, saldo: 0, sinRendir: 0, cantSinRendir: 0 };
+  const rend = rendRows.map(r => {
+    const nro = String(r['N° Planilla']).trim();
+    const todos = tks.filter(t => String(t['N° Planilla']).trim() === nro);
+    const tk = todos.filter(t => String(t.Estado) !== 'Rechazado');
+    // Rendición anterior a la app (sin tickets en la pestaña Tickets): se usan su Total y Cant. Tickets
+    const historica = !todos.length;
+    return {
+      nro: r['N° Planilla'], fecha: fmtD_(r.Fecha), estado: String(r.Estado || ''), pdf: !!driveId_(r['Link PDF']),
+      cant: historica ? num_(r['Cant. Tickets']) : tk.length,
+      total: historica ? round2_(num_(r.Total)) : round2_(tk.reduce((a, t) => a + num_(t['Total con IVA']), 0))
+    };
+  });
   return {
     saldo: sal,
     asignaciones: asig.map(asigOut_).reverse(),
@@ -425,7 +441,14 @@ function getRendicionPdf(token, nro) {
   if (s.rol === 'supervisor' && norm_(r.Supervisor) !== norm_(s.nombre)) throw new Error('Esa rendición no es tuya.');
   const id = driveId_(r['Link PDF']);
   if (!id) throw new Error('La rendición no tiene PDF.');
-  return Utilities.base64Encode(DriveApp.getFileById(id).getBlob().getBytes());
+  // El PDF se muestra con el visor de Drive dentro de la app: queda visible para quien tenga el link
+  try {
+    const f = DriveApp.getFileById(id);
+    if (f.getSharingAccess() !== DriveApp.Access.ANYONE_WITH_LINK && f.getSharingAccess() !== DriveApp.Access.ANYONE) {
+      f.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+    }
+  } catch (e) { console.error('Compartir PDF ' + id + ': ' + e.message); }
+  return { id: id, preview: 'https://drive.google.com/file/d/' + id + '/preview', link: 'https://drive.google.com/file/d/' + id + '/view' };
 }
 
 /** El administrador carga la clave de Gemini desde la app (opcional: mejora la lectura y lee lo escrito a mano). */
@@ -546,7 +569,7 @@ function getAdminData(token) {
   const tks = readSheet_(regSheet_('Tickets')).rows;
   const rend = readSheet_(regSheet_('Rendiciones')).rows;
   const sups = getSupervisores_();
-  const sal = calcularSaldos_(asig, tks);
+  const sal = calcularSaldos_(asig, tks, rend);
   const saldos = sups.map(u => sal[norm_(u.nombre)] || { nombre: u.nombre, asignado: 0, consumido: 0, saldo: 0, sinRendir: 0, cantSinRendir: 0 });
   Object.keys(sal).forEach(k => { if (!saldos.some(x => norm_(x.nombre) === k)) saldos.push(sal[k]); });
   return {
@@ -755,6 +778,7 @@ function generarArchivos_(nro, supervisor, tickets, fecha) {
     const pdf = UrlFetchApp.fetch('https://docs.google.com/spreadsheets/d/' + ss.getId() + '/export?' + q,
       { headers: { Authorization: 'Bearer ' + token } }).getBlob().setName(nombre + '.pdf');
     const pdfFile = folder.createFile(pdf);
+    try { pdfFile.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW); } catch (e) {}
 
     return { xlsxUrl: xlsxFile.getUrl(), pdfUrl: pdfFile.getUrl(), pdfBlob: pdf };
   } finally {
@@ -933,7 +957,11 @@ function isoFromAny_(v) {
 }
 
 function dateVal_(v) { const d = dateFromAny_(v); return d instanceof Date ? d.getTime() : 0; }
-function fmtD_(v) { return v instanceof Date ? Utilities.formatDate(v, CFG.TZ, 'dd/MM/yyyy') : String(v || ''); }
+function fmtD_(v) {
+  if (v instanceof Date) return Utilities.formatDate(v, CFG.TZ, 'dd/MM/yyyy');
+  const iso = isoFromAny_(v); // fechas escritas a mano como texto: 29-09-2026, 22/9/2026
+  return iso ? iso.slice(8, 10) + '/' + iso.slice(5, 7) + '/' + iso.slice(0, 4) : String(v || '');
+}
 function fmtDT_(v) { return v instanceof Date ? Utilities.formatDate(v, CFG.TZ, 'dd/MM/yyyy HH:mm') : String(v || ''); }
 
 /* ======================= PEDIDOS DE FONDOS ======================= */
@@ -982,7 +1010,8 @@ function pedirFondos(token, p, como) {
   }
   const asig = readSheet_(regSheet_('Asignaciones')).rows.filter(a => norm_(a.Supervisor) === norm_(s.nombre));
   const tks = readSheet_(regSheet_('Tickets')).rows.filter(t => norm_(t.Supervisor) === norm_(s.nombre));
-  const sal = calcularSaldos_(asig, tks)[norm_(s.nombre)] || { saldo: 0, sinRendir: 0, cantSinRendir: 0 };
+  const rendP = readSheet_(regSheet_('Rendiciones')).rows.filter(r => norm_(r.Supervisor) === norm_(s.nombre));
+  const sal = calcularSaldos_(asig, tks, rendP)[norm_(s.nombre)] || { saldo: 0, sinRendir: 0, cantSinRendir: 0 };
   const html =
     '<div style="font-family:Arial,sans-serif;font-size:14px;color:#222">' +
     '<p><b>' + esc_(s.nombre) + '</b> pidió fondos para combustible.</p>' +
@@ -1045,7 +1074,7 @@ function recordatorioSemanal() {
 
   const asig = readSheet_(regSheet_('Asignaciones')).rows;
   const tks = readSheet_(regSheet_('Tickets')).rows;
-  const sal = calcularSaldos_(asig, tks);
+  const sal = calcularSaldos_(asig, tks, readSheet_(regSheet_('Rendiciones')).rows);
   destinatarios.forEach(u => {
     const x = sal[norm_(u.nombre)] || { saldo: 0, sinRendir: 0, cantSinRendir: 0 };
     const pend = x.cantSinRendir

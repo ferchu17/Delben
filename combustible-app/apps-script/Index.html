@@ -123,7 +123,7 @@
   @keyframes g{to{transform:rotate(360deg)}}
   .pdfv{position:fixed;inset:0;background:#525659;z-index:120;display:flex;flex-direction:column}
   .pdfbar{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:10px 14px;background:var(--azul);color:#fff}
-  #pdfPags{flex:1;overflow:auto;padding:10px;-webkit-overflow-scrolling:touch}
+  #pdfPags{flex:1;overflow:auto;padding:0;-webkit-overflow-scrolling:touch}
   #pdfPags canvas{display:block;width:100%;max-width:1000px;margin:0 auto 10px;background:#fff;box-shadow:0 2px 8px rgba(0,0,0,.4)}
 
   @media (max-width:640px){
@@ -364,7 +364,7 @@
 </section>
 
 <div id="pdfView" class="pdfv hidden">
-  <div class="pdfbar"><b id="pdfTit">Rendición</b><button class="btn gris sm" onclick="cerrarPdf()">Cerrar</button></div>
+  <div class="pdfbar"><b id="pdfTit">Rendición</b><span class="fila-btn"><a id="pdfAbrir" class="btn gris sm" href="#" target="_blank">Abrir en Drive</a><button class="btn gris sm" onclick="cerrarPdf()">Cerrar</button></span></div>
   <div id="pdfPags"></div>
 </div>
 <div id="loader" class="hidden"><div class="spin"></div></div>
@@ -722,7 +722,7 @@ function isoOf(f){ const m = String(f).match(/(\d{2})\/(\d{2})\/(\d{4})/); retur
 /* Rendiciones e ingresos: movimientos en orden de fecha con el saldo acumulado */
 function renderIngresos(){
   const movs = SD.asignaciones.map(a => ({fecha:a.fecha, orden:0, det:'Ingreso de fondos' + (a.observacion ? ' · ' + a.observacion : ''), ing:a.monto, egr:0}))
-    .concat((SD.rendiciones || []).map(r => ({fecha:r.fecha, orden:1, nro:r.nro, det:`Rendición N° ${r.nro} · ${r.cant} ticket(s)` + (r.estado ? ' · ' + r.estado : ''), ing:0, egr:r.total})));
+    .concat((SD.rendiciones || []).map(r => ({fecha:r.fecha, orden:1, nro:(r.pdf ? r.nro : 0), det:`Rendición N° ${r.nro} · ${r.cant} ticket(s)` + (r.estado ? ' · ' + r.estado : ''), ing:0, egr:r.total})));
   const pend = SD.tickets.filter(t => !t.planilla && t.estado !== 'Rechazado');
   if (pend.length){
     const ult = pend.map(t => t.fecha).sort((a, b) => isoOf(a).localeCompare(isoOf(b))).pop();
@@ -888,42 +888,15 @@ function detectarTicket(img){
   return { x: x0 / k, y: y0 / k, w: Math.min(W0, (x1 - x0 + 1) / k), h: Math.min(H0, (y1 - y0 + 1) / k) };
 }
 
-/* ---- Visor de PDF dentro de la app ---- */
-let pdfjsPromesa = null;
-function cargarPdfJs(){
-  if (pdfjsPromesa) return pdfjsPromesa;
-  pdfjsPromesa = new Promise((ok, ko) => {
-    const sc = document.createElement('script');
-    sc.src = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js';
-    sc.onload = () => { pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js'; ok(); };
-    sc.onerror = () => { pdfjsPromesa = null; ko(new Error('No se pudo cargar el visor de PDF. Revisá la conexión.')); };
-    document.head.appendChild(sc);
-  });
-  return pdfjsPromesa;
-}
+/* ---- Visor de PDF dentro de la app (visor de Google Drive) ---- */
 function verPdf(nro){
   loader(true);
-  Promise.all([cargarPdfJs(), run('getRendicionPdf', S.token, nro)]).then(async res => {
-    const bin = atob(res[1]);
-    const bytes = new Uint8Array(bin.length);
-    for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+  run('getRendicionPdf', S.token, nro).then(r => {
     $('pdfTit').textContent = 'Rendición N° ' + nro;
-    $('pdfPags').innerHTML = '';
+    $('pdfPags').innerHTML = `<iframe src="${esc(r.preview)}" allow="autoplay" style="width:100%;height:100%;border:0;background:#fff"></iframe>`;
+    $('pdfAbrir').href = r.link;
     $('pdfView').classList.remove('hidden');
-    const pdf = await pdfjsLib.getDocument({ data: bytes }).promise;
-    loader(false);
-    const ancho = Math.min(($('pdfPags').clientWidth || 360) - 20, 1000);
-    for (let p = 1; p <= pdf.numPages; p++){
-      const page = await pdf.getPage(p);
-      const escala = ancho / page.getViewport({ scale: 1 }).width * Math.min(2, window.devicePixelRatio || 1);
-      const vp = page.getViewport({ scale: escala });
-      const cv = document.createElement('canvas');
-      cv.width = vp.width; cv.height = vp.height;
-      $('pdfPags').appendChild(cv);
-      await page.render({ canvasContext: cv.getContext('2d'), viewport: vp }).promise;
-    }
-  }).catch(e => { $('pdfView').classList.add('hidden'); modal('err', 'PDF', esc(errMsg(e))); })
-    .finally(() => loader(false));
+  }).catch(e => modal('err', 'PDF', esc(errMsg(e)))).finally(() => loader(false));
 }
 function cerrarPdf(){ $('pdfView').classList.add('hidden'); $('pdfPags').innerHTML = ''; }
 
