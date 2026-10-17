@@ -1024,8 +1024,9 @@ function marcarPedido_(id, estado, respuesta, quien) {
 /* ======================= RECORDATORIO DE LOS LUNES ======================= */
 
 /**
- * Ejecutar UNA VEZ desde el editor (elegir instalarRecordatorio y tocar Ejecutar).
- * Deja programado el mail de todos los lunes a las 8 a cada supervisor.
+ * El mail de los lunes se programa desde el editor: Activadores (ícono del reloj) → Agregar activador →
+ * función recordatorioSemanal → Basado en tiempo → Temporizador semanal → Todos los lunes → 8 a 9 h → Guardar.
+ * (Esta función hace lo mismo, pero necesita agregar el permiso script.scriptapp en appsscript.json.)
  */
 function instalarRecordatorio() {
   ScriptApp.getProjectTriggers()
