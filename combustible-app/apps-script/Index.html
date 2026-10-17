@@ -215,7 +215,7 @@
         <h2>2. Datos del ticket</h2>
         <p class="muted" style="margin:-6px 0 6px">Se completan solos al leer la foto. Revisalos antes de guardar.</p>
         <label>¿A quién corresponde? *</label>
-        <div class="ac"><input id="tkCorr" placeholder="Escribí el servicio o SUPERVISOR"></div>
+        <div class="ac"><input id="tkCorr" placeholder="Escribí el servicio o puesto"></div>
         <div class="grid2">
           <div><label>Fecha del ticket *</label><input id="tkFecha" type="date"></div>
           <div><label>N° comprobante *</label><input id="tkNum" placeholder="00014-00021464"></div>
@@ -279,6 +279,26 @@
         <div class="ac"><input id="comoSup" placeholder="Escribí el nombre"></div>
         <div id="comoInfo" class="muted" style="margin-top:8px"></div>
         <button class="btn verde block" onclick="entrarComo()">Entrar como este supervisor</button>
+      </div>
+    </div>
+
+    <!-- ADMIN: A QUIÉN CORRESPONDE -->
+    <div id="v-corr" class="vista hidden">
+      <div class="card">
+        <h2>A quién corresponde</h2>
+        <p class="muted" style="margin-top:-6px">Lista de servicios y puestos que aparece al cargar un ticket. Se guarda en la pestaña "a_quien_corresponde" de la planilla de registros.</p>
+        <label>Servicio o puesto *</label>
+        <div class="fila-btn">
+          <input id="corrNuevo" placeholder="Ej: Barrio Laguna Grande" style="flex:1;min-width:200px">
+          <button class="btn verde" onclick="agregarCorr()">Agregar</button>
+        </div>
+      </div>
+      <div class="card">
+        <h2>Listado</h2>
+        <div class="tabla-wrap"><table>
+          <thead><tr><th>N°</th><th>Servicio o puesto</th><th></th></tr></thead>
+          <tbody id="tbCorr"></tbody>
+        </table></div>
       </div>
     </div>
 
@@ -549,6 +569,7 @@ function armarNav(){
       if (tabs.length) tabs.push(['|']);
       if (S.rol === 'admin') tabs.push(['como','Cargar ticket']);
       tabs.push(['saldos','Saldos'], ['asignar','Asignaciones'], ['revision','Revisión'], ['rendiciones','Rendiciones']);
+      if (S.rol === 'admin') tabs.push(['corr','Corresponde']);
     }
   }
   $('nav').innerHTML = tabs.map(t => t[0] === '|' ? '<span class="sep"></span>' : `<button data-v="${t[0]}" onclick="go('${t[0]}')">${t[1]}</button>`).join('');
@@ -654,7 +675,7 @@ function go(v){
 }
 
 function initAC(){
-  AC.corr = makeAC($('tkCorr'), () => [SUP_LABEL].concat((SD && SD.objetivos) || (AD && AD.objetivos) || []), null, {estricto:true});
+  AC.corr = makeAC($('tkCorr'), () => (SD && SD.objetivos) || (AD && AD.objetivos) || [], null, {estricto:true});
   AC.como = makeAC($('comoSup'), () => AD ? AD.supervisores.map(s => s.nombre) : [], v => comoInfo(v), {estricto:true});
   AC.asSup = makeAC($('asSup'), () => AD ? AD.supervisores.map(s => s.nombre) : [], v => infoSaldo(v), {estricto:true});
   AC.asFil = makeAC($('asFil'), () => AD ? AD.supervisores.map(s => s.nombre) : [], () => renderAsig(), {estricto:true, onType: () => renderAsig(), onBlur: () => renderAsig()});
@@ -974,7 +995,7 @@ function cargarAdmin(silencioso){
     $('cfgEstado').innerHTML = d.geminiActiva
       ? '<b class="pos">Usando Gemini.</b> Lee los datos impresos y también lo escrito a mano (el servicio).'
       : '<b>Usando la lectura de Google (sin clave).</b> Lee los datos impresos del ticket. Con una clave de Gemini la lectura es más precisa y también lee lo escrito a mano.';
-    renderSaldos(); renderAsig(); renderRevision(); renderRend(); renderPedidosAdm();
+    renderSaldos(); renderAsig(); renderRevision(); renderRend(); renderPedidosAdm(); renderCorr();
   }).catch(e => modal('err', 'Error', esc(errMsg(e)))).finally(() => loader(false));
 }
 
@@ -987,6 +1008,29 @@ function guardarClave(){
     return cargarAdmin(true);
   }).catch(e => modal('err', 'Clave de Gemini', esc(errMsg(e)))).finally(() => loader(false));
 }
+
+/* ---- Administrador: lista "A quién corresponde" ---- */
+function renderCorr(){
+  const rows = (AD && AD.corresponde) || [];
+  $('tbCorr').innerHTML = rows.map(r => `<tr><td>${esc(r.id)}</td><td><b>${esc(r.nombre)}</b></td>
+    <td class="r">${AD.readOnly ? '' : `<button class="btn rojo sm" onclick="borrarCorr('${esc(r.id)}', '${esc(r.nombre).replace(/'/g, '&#39;')}')">Borrar</button>`}</td></tr>`).join('')
+    || '<tr><td colspan="3" class="muted">La lista está vacía. Agregá los servicios y puestos.</td></tr>';
+}
+function agregarCorr(){
+  const n = $('corrNuevo').value.trim();
+  if (!n) return modal('err', 'Falta el nombre', 'Escribí el servicio o puesto.');
+  loader(true);
+  run('agregarCorresponde', S.token, n).then(() => { $('corrNuevo').value = ''; return cargarAdmin(true); })
+    .then(() => toast('Agregado: ' + n)).catch(e => modal('err', 'No se agregó', esc(errMsg(e)))).finally(() => loader(false));
+}
+function borrarCorr(id, nombre){
+  confirmar('Borrar de la lista', `¿Sacar <b>${esc(nombre)}</b> de la lista?<br>Los tickets ya cargados no cambian.`, () => {
+    loader(true);
+    run('eliminarCorresponde', S.token, id).then(() => cargarAdmin(true)).then(() => toast('Borrado'))
+      .catch(e => modal('err', 'Error', esc(errMsg(e)))).finally(() => loader(false));
+  }, 'Borrar', 'rojo');
+}
+$('corrNuevo').addEventListener('keydown', e => { if (e.key === 'Enter') agregarCorr(); });
 
 function renderSaldos(){
   $('tbSaldos').innerHTML = AD.saldos.map(s => `<tr>
@@ -1076,7 +1120,7 @@ function renderRevision(){
     </div></div>`).join('') || '<p class="muted">No hay tickets con esos filtros.</p>';
   if (rows.length > 200) $('rvLista').insertAdjacentHTML('beforeend', '<p class="muted">Se muestran los primeros 200. Usá los filtros.</p>');
   if (!ro) document.querySelectorAll('#rvLista input[data-f="correspondeA"]').forEach(inp =>
-    makeAC(inp, () => [SUP_LABEL].concat(AD.objetivos), null, {estricto:true}));
+    makeAC(inp, () => AD.objetivos, null, {estricto:true}));
 }
 
 function controlLitros(t){

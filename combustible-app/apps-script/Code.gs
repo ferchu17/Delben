@@ -76,7 +76,8 @@ function doPost(e) {
       getRendicionPdf: getRendicionPdf, pedirFondos: pedirFondos,
       getAdminData: getAdminData, guardarAsignacion: guardarAsignacion, eliminarAsignacion: eliminarAsignacion,
       actualizarTicket: actualizarTicket, regenerarRendicion: regenerarRendicion,
-      cambiarEstadoRendicion: cambiarEstadoRendicion, guardarClaveGemini: guardarClaveGemini, responderPedido: responderPedido
+      cambiarEstadoRendicion: cambiarEstadoRendicion, guardarClaveGemini: guardarClaveGemini, responderPedido: responderPedido,
+      agregarCorresponde: agregarCorresponde, eliminarCorresponde: eliminarCorresponde
     };
     if (!permitidas[fn]) throw new Error('Función no permitida: ' + fn);
     out = { ok: true, result: permitidas[fn].apply(null, args) };
@@ -178,6 +179,62 @@ function getSupervisores_() {
     .filter(u => CFG.ROLES_CON_FONDO.indexOf(rolApp_(u.rol)) >= 0 && String(u.nombre || '').trim())
     .map(u => ({ nombre: String(u.nombre).trim(), correo: primerCorreo_(u.correo), rol: String(u.rol) }))
     .sort((a, b) => a.nombre.localeCompare(b.nombre));
+}
+
+/** Lista de "A quién corresponde": pestaña a_quien_corresponde de la planilla de registros (columnas id, funcion_servicio). */
+const HOJA_CORR = 'a_quien_corresponde';
+function hojaCorresponde_() {
+  const ss = SpreadsheetApp.openById(CFG.REG_ID);
+  let sh = ss.getSheetByName(HOJA_CORR);
+  if (!sh) {
+    sh = ss.insertSheet(HOJA_CORR);
+    sh.getRange(1, 1, 1, 2).setValues([['id', 'funcion_servicio']]).setFontWeight('bold');
+    sh.setFrozenRows(1);
+  }
+  return sh;
+}
+function getCorrespondeRows_() {
+  return readSheet_(hojaCorresponde_()).rows
+    .filter(r => String(r.funcion_servicio || '').trim())
+    .map(r => ({ id: r.id, nombre: String(r.funcion_servicio).trim() }));
+}
+function getCorresponde_() {
+  const vistos = {};
+  return getCorrespondeRows_().map(r => r.nombre).filter(n => { const k = norm_(n); if (vistos[k]) return false; vistos[k] = true; return true; });
+}
+
+/** El administrador agrega un servicio o puesto a la lista "A quién corresponde". */
+function agregarCorresponde(token, nombre) {
+  const s = ses_(token);
+  exigirAdmin_(s);
+  nombre = String(nombre || '').trim().replace(/\s+/g, ' ');
+  if (!nombre) throw new Error('Escribí el servicio o puesto.');
+  const lock = LockService.getScriptLock();
+  lock.waitLock(30000);
+  try {
+    const tab = readSheet_(hojaCorresponde_());
+    if (tab.rows.some(r => norm_(r.funcion_servicio) === norm_(nombre))) throw new Error('"' + nombre + '" ya está en la lista.');
+    appendObj_(tab, { id: nextId_(tab.rows, 'id'), funcion_servicio: nombre });
+    return true;
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+function eliminarCorresponde(token, id) {
+  const s = ses_(token);
+  exigirAdmin_(s);
+  const lock = LockService.getScriptLock();
+  lock.waitLock(30000);
+  try {
+    const tab = readSheet_(hojaCorresponde_());
+    const r = tab.rows.find(x => String(x.id) === String(id));
+    if (!r) throw new Error('No se encontró.');
+    tab.sh.deleteRow(r._r);
+    return true;
+  } finally {
+    lock.releaseLock();
+  }
 }
 
 function getObjetivos_() {
@@ -290,7 +347,7 @@ function getSupervisorData(token, como) {
     tickets: tks.map(ticketOut_).reverse(),
     rendiciones: rend.reverse(),
     pedidos: leerPedidos_().filter(p => norm_(p.supervisor) === norm_(s.nombre)).slice(0, 10),
-    objetivos: getObjetivos_()
+    objetivos: getCorresponde_()
   };
 }
 
@@ -301,7 +358,7 @@ function getSupervisorData(token, como) {
  */
 function leerTicket(token, dataUrl) {
   ses_(token);
-  const opciones = [CFG.SUPERVISOR_LABEL].concat(getObjetivos_());
+  const opciones = getCorresponde_();
   const key = PropertiesService.getScriptProperties().getProperty('GEMINI_API_KEY');
   if (key) {
     try { return leerConGemini_(key, dataUrl, opciones); } catch (e) { console.error('Gemini: ' + e.message); }
@@ -321,7 +378,7 @@ function leerConGemini_(key, dataUrl, opciones) {
     'devolvé los números con punto decimal y sin separador de miles (ej 45956.19). Si un dato no se lee, poné null. No inventes datos.\n' +
     '"servicio": el supervisor suele escribir A MANO sobre el ticket a qué servicio corresponde la carga (ej. "Fincas", "San Francisco", "Laguna"). ' +
     'Si hay una anotación así, devolvé la opción de esta lista que corresponda, copiada exactamente igual: ' + JSON.stringify(opciones) +
-    '. Si dice supervisor o propio, devolvé "' + CFG.SUPERVISOR_LABEL + '". Si no hay anotación a mano o no coincide claramente con ninguna, devolvé null.';
+    '. Si no hay anotación a mano o no coincide claramente con ninguna, devolvé null.';
   const body = {
     contents: [{ parts: [{ text: prompt }, { inline_data: { mime_type: mime, data: parts[1] } }] }],
     generationConfig: { temperature: 0, responseMimeType: 'application/json' }
@@ -576,7 +633,8 @@ function getAdminData(token) {
     readOnly: s.rol !== 'admin',
     geminiActiva: !!PropertiesService.getScriptProperties().getProperty('GEMINI_API_KEY'),
     supervisores: sups,
-    objetivos: getObjetivos_(),
+    objetivos: getCorresponde_(),
+    corresponde: getCorrespondeRows_(),
     saldos: saldos,
     asignaciones: asig.map(asigOut_).reverse(),
     tickets: tks.map(ticketOut_).reverse(),
@@ -769,14 +827,8 @@ function generarArchivos_(nro, supervisor, tickets, fecha) {
       { headers: { Authorization: 'Bearer ' + token } }).getBlob().setName(nombre + '.xlsx');
     const xlsxFile = folder.createFile(xlsx);
 
-    // Hoja de comprobantes con las fotos (solo para el PDF)
-    agregarComprobantes_(ss, nro, supervisor, tickets);
-    SpreadsheetApp.flush();
-
-    const q = 'format=pdf&size=A4&portrait=true&fitw=true&gridlines=false&printtitle=false&sheetnames=false' +
-      '&pagenum=UNDEFINED&fzr=false&top_margin=0.4&bottom_margin=0.4&left_margin=0.4&right_margin=0.4&horizontal_alignment=CENTER';
-    const pdf = UrlFetchApp.fetch('https://docs.google.com/spreadsheets/d/' + ss.getId() + '/export?' + q,
-      { headers: { Authorization: 'Bearer ' + token } }).getBlob().setName(nombre + '.pdf');
+    // PDF: hoja 1 = la planilla; después las fotos de los tickets, 2 por hoja
+    const pdf = armarPdf_(nombre, nro, supervisor, tickets, fecha);
     const pdfFile = folder.createFile(pdf);
     try { pdfFile.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW); } catch (e) {}
 
@@ -786,43 +838,111 @@ function generarArchivos_(nro, supervisor, tickets, fecha) {
   }
 }
 
-function agregarComprobantes_(ss, nro, supervisor, tickets) {
-  const sh = ss.insertSheet('COMPROBANTES');
-  const maxC = sh.getMaxColumns();
-  if (maxC > 5) sh.deleteColumns(6, maxC - 5);
-  sh.setColumnWidth(1, 12); sh.setColumnWidth(2, 370); sh.setColumnWidth(3, 16); sh.setColumnWidth(4, 370); sh.setColumnWidth(5, 12);
-  sh.getRange('B1:D1').merge().setValue('COMPROBANTES - PLANILLA N° ' + nro + ' - ' + supervisor)
-    .setFontFamily('Arial').setFontSize(12).setFontWeight('bold').setHorizontalAlignment('center').setVerticalAlignment('middle');
-  sh.setRowHeight(1, 34);
-  const filasNec = 1 + Math.ceil(tickets.length / 2) * 2;
-  if (sh.getMaxRows() < filasNec + 1) sh.insertRowsAfter(sh.getMaxRows(), filasNec + 1 - sh.getMaxRows());
+/**
+ * Arma el PDF de la rendición en HTML (así salen siempre las hojas justas):
+ * hoja 1 = planilla "Formulario de rendición de fondos fijo" con el logo KTL; después 2 tickets por hoja.
+ */
+function armarPdf_(nombre, nro, supervisor, tickets, fecha) {
+  const e = esc_;
+  let logo = '';
+  try { logo = dataUrl_(DriveApp.getFileById(CFG.LOGO_KTL_ID).getBlob()); } catch (err) {}
+  const filas = tickets.map(t => ({
+    fecha: fmtD_(t['Fecha ticket']), numero: String(t['N° Comprobante'] || ''), prov: String(t.Proveedor || ''),
+    corr: String(t['Corresponde a'] || ''), total: num_(t['Total con IVA'])
+  }));
+  const total = filas.reduce((a, f) => a + f.total, 0);
+  const vacias = Math.max(0, CFG.FILAS_PLANILLA - filas.length);
+  let cuerpo = filas.map(f => '<tr><td>Combustible</td><td class="c">' + e(f.fecha) + '</td><td class="c">' + e(f.numero) + '</td><td>' + e(f.prov) +
+    '</td><td>' + e(f.corr) + '</td><td class="r">' + money_(f.total) + '</td></tr>').join('');
+  for (let i = 0; i < vacias; i++) cuerpo += '<tr><td>&nbsp;</td><td></td><td></td><td></td><td></td><td></td></tr>';
 
-  tickets.forEach((t, i) => {
-    const col = (i % 2 === 0) ? 2 : 4;
-    const rCap = 2 + Math.floor(i / 2) * 2;
-    const rImg = rCap + 1;
-    // Una fila de 2 tickets por hoja A4 vertical (la fila de la foto ocupa casi toda la hoja)
-    sh.setRowHeight(rCap, 40);
-    sh.setRowHeight(rImg, 980);
-    const cap = '#' + (i + 1) + ' · ' + fmtD_(t['Fecha ticket']) + ' · N° ' + t['N° Comprobante'] +
-      '\n' + t['Corresponde a'] + ' · ' + money_(num_(t['Total con IVA']));
-    sh.getRange(rCap, col).setValue(cap).setFontFamily('Arial').setFontSize(9).setFontWeight('bold')
-      .setWrap(true).setHorizontalAlignment('center').setVerticalAlignment('middle')
-      .setBorder(true, true, false, true, false, false);
-    sh.getRange(rImg, col).setBorder(false, true, true, true, false, false);
-    sh.getRange(rImg, 5).setValue('.').setFontColor('#ffffff'); // asegura que la fila entre en el PDF
-    const fid = driveId_(t['Link Foto']);
-    if (!fid) return;
-    try {
-      const img = sh.insertImage(DriveApp.getFileById(fid).getBlob(), col, rImg, 5, 5);
-      const w = img.getWidth(), h = img.getHeight();
-      const k = Math.min(360 / w, 968 / h);
-      img.setWidth(Math.round(w * k)).setHeight(Math.round(h * k));
-      img.setAnchorCellXOffset(Math.max(5, Math.round((370 - w * k) / 2)));
-    } catch (e) {
-      sh.getRange(rImg, col).setValue('No se pudo insertar la foto: ' + e.message).setWrap(true);
+  const css =
+    '@page{size:A4 portrait;margin:10mm}' +
+    'body{font-family:Arial,Helvetica,sans-serif;font-size:10pt;color:#000;margin:0}' +
+    '.hoja{border:2px solid #000;padding:8mm 7mm 6mm}' +
+    '.salto{page-break-before:always}' +
+    'table{border-collapse:collapse;width:100%}' +
+    '.cab td{vertical-align:middle}' +
+    '.tit{font-size:12pt;font-weight:bold;text-align:center;color:#1f3864}' +
+    '.campos td{padding:2.2mm 1mm;font-size:10pt}' +
+    '.lbl{font-weight:bold;white-space:nowrap}' +
+    '.box{border:1.5px solid #000;text-align:center;height:6mm}' +
+    '.det{margin-top:6mm}' +
+    '.det th{border:1.5px solid #000;font-size:9pt;padding:2mm 1mm;text-align:center;background:#f2f2f2}' +
+    '.det td{border-left:1.5px solid #000;border-right:1.5px solid #000;border-bottom:1px solid #999;padding:1.6mm 1.5mm;font-size:9pt;height:5mm}' +
+    '.det tr.tot td{border:1.5px solid #000;font-weight:bold;font-size:11pt;padding:2mm 1.5mm}' +
+    '.c{text-align:center}.r{text-align:right;white-space:nowrap}' +
+    '.firma{margin-top:16mm;font-size:9.5pt}' +
+    '.tk td{width:50%;vertical-align:top;text-align:center;padding:0 2mm}' +
+    '.cap{font-size:9pt;font-weight:bold;border:1px solid #000;border-bottom:0;padding:1.5mm;background:#f2f2f2}' +
+    '.foto{border:1px solid #000;padding:2mm}' +
+    '.tt{font-size:11pt;font-weight:bold;text-align:center;margin-bottom:3mm}';
+
+  let html = '<html><head><meta charset="utf-8"><style>' + css + '</style></head><body>' +
+    '<div class="hoja">' +
+    '<table class="cab"><tr><td class="tit">FORMULARIO DE RENDICION DE FONDOS FIJO - REINTEGRO DE GASTOS COMBUSTIBLE</td>' +
+    '<td style="width:34mm;text-align:right">' + (logo ? '<img src="' + logo + '" style="height:17mm">' : '') + '</td></tr></table>' +
+    '<table class="campos" style="margin-top:4mm">' +
+    '<tr><td class="lbl" style="width:52mm">EMPRESA:</td><td class="box" colspan="3"></td></tr>' +
+    '<tr><td class="lbl">FECHA:</td><td class="box" style="width:38mm">' + e(fmtD_(fecha)) + '</td>' +
+    '<td class="lbl" style="text-align:right;padding-right:3mm">PLANILLA N°</td><td class="box" style="width:38mm">' + e(nro) + '</td></tr>' +
+    '<tr><td class="lbl">NOMBRE DEL EMPLEADO</td><td class="box" colspan="3">' + e(supervisor) + '</td></tr>' +
+    '<tr><td class="lbl">ES TITULAR DE FONDO FIJO?</td><td class="box" style="width:38mm">NO</td><td colspan="2"></td></tr>' +
+    '<tr><td class="lbl">TIENE TARJETA PRECARGABLE?</td><td class="box" style="width:38mm">NO</td><td colspan="2"></td></tr>' +
+    '</table>' +
+    '<table class="det"><tr><th style="width:22%">CONCEPTO</th><th style="width:12%">FECHA</th><th style="width:15%">N° COMPROBANTE</th>' +
+    '<th style="width:20%">PROVEEDOR</th><th style="width:16%">USUARIO</th><th style="width:15%">MONTO</th></tr>' + cuerpo +
+    '<tr class="tot"><td colspan="5">TOTAL DE GASTOS CON IVA</td><td class="r">' + money_(total) + '</td></tr></table>' +
+    '<div class="firma">' + e(supervisor) + '<br>.------------------------------------------<br>Firma del Empleado' +
+    '<br><br><br><br>.------------------------------------------<br>Firma de Responsable Administrativo</div>' +
+    '</div>';
+
+  // Hojas de tickets: 2 por hoja, uno al lado del otro
+  const FW = 88, FH = 232; // medida máxima de cada foto en mm
+  for (let i = 0; i < tickets.length; i += 2) {
+    html += '<div class="salto"><div class="tt">COMPROBANTES - PLANILLA N° ' + e(nro) + ' - ' + e(supervisor) + '</div><table class="tk"><tr>';
+    for (let j = i; j < i + 2; j++) {
+      const t = tickets[j];
+      if (!t) { html += '<td></td>'; continue; }
+      let img = '<div style="padding:20mm 0">Sin foto</div>';
+      const fid = driveId_(t['Link Foto']);
+      if (fid) {
+        try {
+          const b = DriveApp.getFileById(fid).getBlob();
+          const d = medidaImagen_(b.getBytes());
+          let w = FW, h = FH;
+          if (d) { const k = Math.min(FW / d.w, FH / d.h); w = d.w * k; h = d.h * k; }
+          img = '<img src="' + dataUrl_(b) + '" style="width:' + w.toFixed(1) + 'mm;height:' + h.toFixed(1) + 'mm">';
+        } catch (err) { img = '<div style="padding:20mm 0">No se pudo cargar la foto</div>'; }
+      }
+      html += '<td><div class="cap">#' + (j + 1) + ' · ' + e(fmtD_(t['Fecha ticket'])) + ' · N° ' + e(t['N° Comprobante']) + '<br>' +
+        e(t['Corresponde a']) + ' · ' + money_(num_(t['Total con IVA'])) + '</div><div class="foto">' + img + '</div></td>';
     }
-  });
+    html += '</tr></table></div>';
+  }
+  html += '</body></html>';
+  return HtmlService.createHtmlOutput(html).getBlob().getAs('application/pdf').setName(nombre + '.pdf');
+}
+
+function dataUrl_(blob) {
+  return 'data:' + (blob.getContentType() || 'image/jpeg') + ';base64,' + Utilities.base64Encode(blob.getBytes());
+}
+
+/** Ancho y alto en píxeles de una foto JPEG o PNG (para que entre entera en la hoja). */
+function medidaImagen_(bytes) {
+  const u = i => bytes[i] & 0xff;
+  if (u(0) === 0x89 && u(1) === 0x50) return { w: (u(16) << 24) | (u(17) << 16) | (u(18) << 8) | u(19), h: (u(20) << 24) | (u(21) << 16) | (u(22) << 8) | u(23) };
+  if (u(0) !== 0xff || u(1) !== 0xd8) return null;
+  let i = 2;
+  while (i < bytes.length - 9) {
+    if (u(i) !== 0xff) { i++; continue; }
+    const m = u(i + 1);
+    if (m >= 0xc0 && m <= 0xcf && m !== 0xc4 && m !== 0xc8 && m !== 0xcc) {
+      return { h: (u(i + 5) << 8) | u(i + 6), w: (u(i + 7) << 8) | u(i + 8) };
+    }
+    i += 2 + ((u(i + 2) << 8) | u(i + 3));
+  }
+  return null;
 }
 
 function enviarMail_(nro, supervisor, correoSup, cant, total, pdfBlob, corregida) {
@@ -867,9 +987,9 @@ function validarTicket_(t) {
   if (!t.fecha) throw new Error('Ingresá la fecha del ticket.');
   if (!String(t.numero || '').trim()) throw new Error('Ingresá el N° de comprobante.');
   if (!(num_(t.total) > 0)) throw new Error('Ingresá el total con IVA.');
-  const objs = getObjetivos_().map(norm_);
+  const objs = getCorresponde_().map(norm_);
   const ca = norm_(t.correspondeA);
-  if (ca !== norm_(CFG.SUPERVISOR_LABEL) && objs.indexOf(ca) < 0) throw new Error('"Corresponde a" tiene que ser un servicio de la lista o SUPERVISOR.');
+  if (objs.indexOf(ca) < 0) throw new Error('"A quién corresponde" tiene que ser uno de la lista (se cargan en Corresponde).');
 }
 
 function chequearDuplicado_(rows, t, exceptId) {
