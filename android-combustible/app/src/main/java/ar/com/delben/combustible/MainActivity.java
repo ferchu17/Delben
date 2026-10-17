@@ -69,6 +69,8 @@ public class MainActivity extends Activity {
         s.setUseWideViewPort(true);
         s.setJavaScriptCanOpenWindowsAutomatically(true);
         s.setSupportMultipleWindows(true);
+        // Siempre la versión más nueva de la página (sin copias viejas guardadas en el celular)
+        s.setCacheMode(WebSettings.LOAD_NO_CACHE);
         if (Build.VERSION.SDK_INT >= 21) {
             s.setMixedContentMode(WebSettings.MIXED_CONTENT_COMPATIBILITY_MODE);
             CookieManager.getInstance().setAcceptThirdPartyCookies(web, true);
@@ -148,11 +150,8 @@ public class MainActivity extends Activity {
             }
         });
 
-        if (savedInstanceState != null) {
-            web.restoreState(savedInstanceState);
-        } else {
-            web.loadUrl(INICIO);
-        }
+        web.clearCache(true);
+        web.loadUrl(INICIO);
     }
 
     private void pedirCamara() {
