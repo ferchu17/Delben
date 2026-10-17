@@ -107,6 +107,11 @@ button{font-family:inherit;color:inherit}
 .campo input,.campo select{min-height:46px;border-radius:12px;border:1px solid var(--borde);background:#121833;color:#fff;padding:0 12px;font:500 15px 'Sora',system-ui,sans-serif;width:100%}
 .campo input:focus,.campo select:focus{outline:2px solid var(--azul);border-color:transparent}
 .ayuda{font-size:12px;color:var(--tenue);line-height:1.5}
+.con-pegar{display:flex;gap:8px}
+.con-pegar input{flex:1;min-width:0}
+.pegar{min-height:46px;min-width:72px;border-radius:12px;border:1px solid var(--borde);background:#1E2747;color:#fff;font:700 13px 'Sora',system-ui,sans-serif;cursor:pointer;padding:0 12px}
+.pegar:active{transform:scale(.96)}
+.btn.todo{background:linear-gradient(120deg,var(--verde),var(--cian));color:#062313;box-shadow:0 0 18px rgba(34,227,122,.4)}
 .fila-switch{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 14px;border-radius:14px;background:#121833;border:1px solid var(--borde)}
 .fila-switch span{font-size:14px;font-weight:700}
 .fila-switch small{display:block;font-size:12px;color:var(--tenue);font-weight:500;margin-top:2px}
@@ -177,19 +182,21 @@ button{font-family:inherit;color:inherit}
   <div class="hoja" role="dialog" aria-modal="true" aria-labelledby="tituloAjustes">
     <h2 id="tituloAjustes">Ajustes</h2>
     <p>Datos de tu proyecto en la plataforma de Tuya (platform.tuya.com → Cloud → tu proyecto). Quedan guardados solo en este teléfono.</p>
+    <button class="btn todo" id="btnPegarTodo">Pegar todo (los 3 datos juntos)</button>
+    <span class="ayuda">Copiá un texto que tenga el Access ID, el Access Secret y el UID, y tocá este botón: se completan solos.</span>
     <div class="campo">
       <label for="fAccess">Access ID</label>
-      <input id="fAccess" autocomplete="off" autocapitalize="off" spellcheck="false">
+      <div class="con-pegar"><input id="fAccess" autocomplete="off" autocapitalize="off" spellcheck="false"><button class="pegar" type="button" data-pegar="fAccess">Pegar</button></div>
       <span class="ayuda">Pestaña <b>Overview</b> del proyecto, «Access ID/Client ID».</span>
     </div>
     <div class="campo">
       <label for="fSecret">Access Secret</label>
-      <input id="fSecret" type="password" autocomplete="off" autocapitalize="off" spellcheck="false">
+      <div class="con-pegar"><input id="fSecret" type="password" autocomplete="off" autocapitalize="off" spellcheck="false"><button class="pegar" type="button" data-pegar="fSecret">Pegar</button></div>
       <span class="ayuda">También en <b>Overview</b> (tocá el ojito para verlo). Si ya está guardado, dejalo vacío.</span>
     </div>
     <div class="campo">
       <label for="fUid">UID de tu cuenta de Smart Life</label>
-      <input id="fUid" autocomplete="off" autocapitalize="off" spellcheck="false">
+      <div class="con-pegar"><input id="fUid" autocomplete="off" autocapitalize="off" spellcheck="false"><button class="pegar" type="button" data-pegar="fUid">Pegar</button></div>
       <span class="ayuda"><b>Devices → Link App Account</b>, columna UID (empieza con «az…»).</span>
     </div>
     <div class="campo">
@@ -431,6 +438,16 @@ function aplicarConfig(){
   if (cfg.version) $('version').textContent = 'DelBen Domótica ' + cfg.version;
 }
 
+/* Borrador: lo escrito en Ajustes se guarda al instante, así no se pierde
+   si Android cierra la app mientras copiás una clave en otra pantalla. */
+const CAMPOS = ['fAccess','fSecret','fUid','fServidor'];
+function leerBorrador(){ try { return JSON.parse(localStorage.getItem('borradorAjustes') || 'null'); } catch(e){ return null; } }
+function guardarBorrador(){
+  const b = {}; CAMPOS.forEach(id => b[id] = $(id).value);
+  try { localStorage.setItem('borradorAjustes', JSON.stringify(b)); } catch(e){}
+}
+function borrarBorrador(){ try { localStorage.removeItem('borradorAjustes'); } catch(e){} }
+
 function abrirAjustes(){
   // Si ya está abierto (por ejemplo, al volver de copiar una clave en otra app), no se borra lo escrito
   if ($('capa').classList.contains('abierta')){ aplicarConfig(); return; }
@@ -439,8 +456,50 @@ function abrirAjustes(){
   $('fSecret').placeholder = cfg.tieneSecret ? '•••••••• (guardado)' : '';
   $('fUid').value = cfg.uid || '';
   $('fServidor').value = cfg.servidor || 'https://openapi.tuyaus.com';
+  const b = leerBorrador();
+  if (b) CAMPOS.forEach(id => { if (b[id]) $(id).value = b[id]; });
   aplicarConfig();
   $('capa').classList.add('abierta');
+}
+
+/* Pegar: toma el texto copiado. «Pegar todo» reconoce cada dato por su forma:
+   UID = empieza con «az»; Access Secret = 32 letras/números (0-9, a-f); Access ID = 20 letras/números. */
+function textoCopiado(){
+  if (nativo && nativo.portapapeles) return Promise.resolve(nativo.portapapeles() || '');
+  if (navigator.clipboard && navigator.clipboard.readText) return navigator.clipboard.readText().catch(() => '');
+  return Promise.resolve('');
+}
+function separarDatos(t){
+  const palabras = (t.match(/[A-Za-z0-9]+/g) || []);
+  const r = {};
+  for (const w of palabras){
+    if (!r.uid && /^az[A-Za-z0-9]{10,}$/.test(w)) { r.uid = w; continue; }
+    if (!r.secret && /^[0-9a-f]{32}$/.test(w)) { r.secret = w; continue; }
+    if (!r.accessId && /^[0-9a-z]{20}$/.test(w) && !/^p\d{10,}/.test(w)) { r.accessId = w; continue; }
+  }
+  return r;
+}
+function pegarTodo(){
+  textoCopiado().then(t => {
+    const d = separarDatos(t);
+    const n = ['accessId','secret','uid'].filter(k => d[k]).length;
+    if (!n){ toast('No encontré los datos en lo que copiaste. Copiá el mensaje con los 3 datos y probá de nuevo.'); return; }
+    if (d.accessId) $('fAccess').value = d.accessId;
+    if (d.secret) $('fSecret').value = d.secret;
+    if (d.uid) $('fUid').value = d.uid;
+    guardarBorrador();
+    toast(n === 3 ? '¡Listo! Se completaron los 3 datos. Tocá Guardar.' : `Se completaron ${n} de 3 datos. Revisá el que falta.`);
+  });
+}
+function pegarEn(id){
+  textoCopiado().then(t => {
+    t = (t || '').trim();
+    if (!t){ toast('No hay nada copiado'); return; }
+    const d = separarDatos(t);
+    const v = id === 'fUid' ? (d.uid || t) : id === 'fSecret' ? (d.secret || t) : (d.accessId || t);
+    $(id).value = v.replace(/\s+/g, '');
+    guardarBorrador();
+  });
 }
 function cerrarAjustes(){ $('capa').classList.remove('abierta'); }
 
@@ -455,6 +514,7 @@ function guardar(){
     toast('Completá Access ID, Access Secret y UID'); return;
   }
   cargando = true; estadoMsg = null; dibujar();
+  borrarBorrador();
   if (nativo) nativo.guardar(JSON.stringify(datos));
   cerrarAjustes();
   toast('Conectando con Tuya…');
@@ -475,6 +535,10 @@ $('btnAjustes').addEventListener('click', abrirAjustes);
 $('btnActualizar').addEventListener('click', () => { refrescar(); if (!nativo) toast('Actualizado'); });
 $('btnCerrar').addEventListener('click', cerrarAjustes);
 $('btnGuardar').addEventListener('click', guardar);
+$('btnPegarTodo').addEventListener('click', pegarTodo);
+document.querySelectorAll('[data-pegar]').forEach(b => b.addEventListener('click', () => pegarEn(b.dataset.pegar)));
+CAMPOS.forEach(id => $(id).addEventListener('input', guardarBorrador));
+CAMPOS.forEach(id => $(id).addEventListener('change', guardarBorrador));
 $('capa').addEventListener('click', ev => { if (ev.target === $('capa')) cerrarAjustes(); });
 $('fEscucha').addEventListener('change', ev => {
   cfg.escucha = ev.target.checked; aplicarConfig();

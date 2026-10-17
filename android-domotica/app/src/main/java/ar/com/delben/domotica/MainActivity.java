@@ -5,6 +5,8 @@ import android.annotation.SuppressLint;
 import android.app.Activity;
 import android.content.ActivityNotFoundException;
 import android.content.BroadcastReceiver;
+import android.content.ClipData;
+import android.content.ClipboardManager;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
@@ -403,6 +405,20 @@ public class MainActivity extends Activity {
                     } catch (Exception ignored) { aviso("Abrí Ajustes → Batería y dejá DelBen sin restricciones"); }
                 }
             });
+        }
+
+        /** Texto copiado en el teléfono (para el botón «Pegar todo» de Ajustes). */
+        @JavascriptInterface
+        public String portapapeles() {
+            try {
+                ClipboardManager cm = (ClipboardManager) getSystemService(Context.CLIPBOARD_SERVICE);
+                ClipData clip = cm == null ? null : cm.getPrimaryClip();
+                if (clip == null || clip.getItemCount() == 0) return "";
+                CharSequence t = clip.getItemAt(0).coerceToText(MainActivity.this);
+                return t == null ? "" : t.toString();
+            } catch (Exception e) {
+                return "";
+            }
         }
 
         @JavascriptInterface
