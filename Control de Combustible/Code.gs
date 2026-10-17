@@ -1008,13 +1008,25 @@ function instalarRecordatorio() {
   Logger.log('Recordatorio instalado: todos los lunes a las 8.');
 }
 
-/** Mail de los lunes: le recuerda a cada supervisor que envíe la rendición, con su disponible y lo que tiene sin rendir. */
+/**
+ * Mail de los lunes: le recuerda que envíe la rendición SOLO a las personas de la pestaña "quienRetira"
+ * de Stock Manager que tienen "SI" en la columna "correo de combustible" (columna E), al correo de esa fila.
+ * Incluye su disponible y lo que tiene sin rendir.
+ */
 function recordatorioSemanal() {
+  const sh = SpreadsheetApp.openById(CFG.STOCK_ID).getSheetByName('quienRetira');
+  if (!sh) throw new Error('No existe la pestaña "quienRetira" en Stock Manager.');
+  const t = readSheet_(sh);
+  const colSi = t.headers.find(h => norm_(h) === 'correo de combustible') || t.headers[4];
+  const destinatarios = t.rows
+    .filter(r => norm_(r[colSi]) === 'si' && String(r.nombre || '').trim() && primerCorreo_(r.correo))
+    .map(r => ({ nombre: String(r.nombre).trim().replace(/\s+/g, ' '), correo: primerCorreo_(r.correo) }));
+  if (!destinatarios.length) return;
+
   const asig = readSheet_(regSheet_('Asignaciones')).rows;
   const tks = readSheet_(regSheet_('Tickets')).rows;
   const sal = calcularSaldos_(asig, tks);
-  getSupervisores_().forEach(u => {
-    if (!u.correo) return;
+  destinatarios.forEach(u => {
     const x = sal[norm_(u.nombre)] || { saldo: 0, sinRendir: 0, cantSinRendir: 0 };
     const pend = x.cantSinRendir
       ? 'Tenés <b>' + x.cantSinRendir + ' ticket(s) sin rendir por ' + money_(x.sinRendir) + '</b>. Entrá a la app, revisá que estén todos y tocá <b>Enviar rendición</b>.'
