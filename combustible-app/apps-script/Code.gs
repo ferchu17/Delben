@@ -782,10 +782,231 @@ function generarArchivos_(nro, supervisor, tickets, fecha) {
 }
 
 /**
+ * PDF de la rendición armado página por página (sin convertir desde HTML), así cada hoja tiene su orientación:
+ * hoja 1 = planilla en A4 HORIZONTAL; hojas de tickets en A4 VERTICAL, 2 tickets por hoja.
+ * Si algo falla, se arma con el método anterior (todo vertical) para que la rendición salga igual.
+ */
+function armarPdf_(nombre, nro, supervisor, tickets, fecha) {
+  try {
+    return armarPdfDirecto_(nombre, nro, supervisor, tickets, fecha);
+  } catch (err) {
+    console.error('PDF directo: ' + err.message + ' — se usa el armado HTML');
+    return armarPdfHtml_(nombre, nro, supervisor, tickets, fecha);
+  }
+}
+
+function armarPdfDirecto_(nombre, nro, supervisor, tickets, fecha) {
+  const doc = { paginas: [], imagenes: [] };
+  const AZUL = '0.122 0.220 0.392', NEGRO = '0 0 0', GRIS_F = '0.949 0.949 0.949', GRIS_L = '0.6 0.6 0.6';
+  const M = 28;
+
+  // ---------- Hoja 1: planilla (A4 horizontal) ----------
+  const p = pdfPagina_(doc, 842, 595);
+  pdfRect_(p, M, M, 842 - 2 * M, 595 - 2 * M, 1.6);
+  let logoW = 0;
+  try {
+    const lb = DriveApp.getFileById(CFG.LOGO_KTL_ID).getBlob().getBytes();
+    const li = pdfImagen_(doc, lb);
+    if (li !== null) {
+      const d = doc.imagenes[li], lh = 46;
+      logoW = lh * d.w / d.h;
+      pdfImg_(p, li, 842 - M - 14 - logoW, M + 10, logoW, lh);
+    }
+  } catch (e) {}
+  const anchoTit = 842 - 2 * M - 28 - logoW;
+  pdfTxtC_(p, M + 14 + anchoTit / 2, M + 38, 13, true, 'FORMULARIO DE RENDICION DE FONDOS FIJO - REINTEGRO DE GASTOS COMBUSTIBLE', AZUL);
+
+  const X0 = M + 14, XB = 232, XR = 842 - M - 14;
+  let y = M + 76;
+  const campo = (lbl, val, w) => {
+    pdfTxt_(p, X0, y + 13, 10, true, lbl);
+    pdfRect_(p, XB, y, w, 19, 1.2);
+    pdfTxtC_(p, XB + w / 2, y + 13.5, 10, false, pdfCortar_(val, 10, false, w - 8));
+  };
+  campo('EMPRESA:', '', XR - XB); y += 25;
+  campo('FECHA:', fmtD_(fecha), 140);
+  pdfTxt_(p, 520, y + 13, 10, true, 'PLANILLA N°');
+  pdfRect_(p, 620, y, XR - 620, 19, 1.2);
+  pdfTxtC_(p, 620 + (XR - 620) / 2, y + 13.5, 10, false, String(nro));
+  y += 25;
+  campo('NOMBRE DEL EMPLEADO', supervisor, XR - XB); y += 25;
+  campo('ES TITULAR DE FONDO FIJO?', 'NO', 140); y += 25;
+  campo('TIENE TARJETA PRECARGABLE?', 'NO', 140); y += 25;
+
+  // Tabla de tickets
+  const cols = [['CONCEPTO', 140], ['FECHA', 80], ['N° COMPROBANTE', 120], ['PROVEEDOR', 190], ['USUARIO', 136], ['MONTO', XR - X0 - 666]];
+  const ty = y + 12, th = 24;
+  const n = Math.max(CFG.FILAS_PLANILLA, tickets.length);
+  const libre = (595 - M - 14) - 74 - 24 - (ty + th);
+  const rh = Math.min(19, libre / n);
+  const fs = Math.min(9, rh * 0.55);
+  let x = X0;
+  pdfRellenar_(p, X0, ty, XR - X0, th, GRIS_F);
+  cols.forEach(c => { pdfRect_(p, x, ty, c[1], th, 1.2); pdfTxtC_(p, x + c[1] / 2, ty + 15.5, 8.5, true, c[0]); x += c[1]; });
+  const filas = tickets.map(t => ['Combustible', fmtD_(t['Fecha ticket']), String(t['N° Comprobante'] || ''), String(t.Proveedor || ''),
+    String(t['Corresponde a'] || ''), money_(num_(t['Total con IVA']))]);
+  let total = 0;
+  tickets.forEach(t => { total += num_(t['Total con IVA']); });
+  const yT = ty + th, hT = rh * n;
+  x = X0;
+  cols.forEach(c => { pdfLinea_(p, x, yT, x, yT + hT, 1.2); x += c[1]; });
+  pdfLinea_(p, XR, yT, XR, yT + hT, 1.2);
+  for (let i = 0; i < n; i++) {
+    const yy = yT + i * rh;
+    if (i > 0) pdfLinea_(p, X0, yy, XR, yy, 0.5, GRIS_L);
+    const f = filas[i];
+    if (!f) continue;
+    x = X0;
+    f.forEach((v, j) => {
+      const w = cols[j][1], base = yy + rh / 2 + fs * 0.35;
+      const tx = pdfCortar_(v, fs, false, w - 8);
+      if (j === 5) pdfTxtR_(p, x + w - 4, base, fs, false, tx);
+      else if (j === 1 || j === 2) pdfTxtC_(p, x + w / 2, base, fs, false, tx);
+      else pdfTxt_(p, x + 4, base, fs, false, tx);
+      x += w;
+    });
+  }
+  const yTot = yT + hT;
+  pdfRect_(p, X0, yTot, XR - X0, 24, 1.4);
+  pdfLinea_(p, XR - cols[5][1], yTot, XR - cols[5][1], yTot + 24, 1.4);
+  pdfTxt_(p, X0 + 6, yTot + 16, 11, true, 'TOTAL DE GASTOS CON IVA');
+  pdfTxtR_(p, XR - 4, yTot + 16, 11, true, money_(total));
+
+  const yF = yTot + 50;
+  pdfTxt_(p, X0, yF, 9.5, false, supervisor);
+  pdfTxt_(p, X0, yF + 12, 9.5, false, '.------------------------------------------');
+  pdfTxt_(p, X0, yF + 24, 9.5, false, 'Firma del Empleado');
+  pdfTxt_(p, 470, yF + 12, 9.5, false, '.------------------------------------------');
+  pdfTxt_(p, 470, yF + 24, 9.5, false, 'Firma de Responsable Administrativo');
+
+  // ---------- Hojas de tickets (A4 vertical, 2 por hoja) ----------
+  const PW = 595, PH = 842, colW = (PW - 2 * M - 12) / 2;
+  for (let i = 0; i < tickets.length; i += 2) {
+    const q = pdfPagina_(doc, PW, PH);
+    pdfTxtC_(q, PW / 2, M + 10, 11, true, pdfCortar_('COMPROBANTES - PLANILLA N° ' + nro + ' - ' + supervisor, 11, true, PW - 2 * M));
+    for (let j = i; j < i + 2 && j < tickets.length; j++) {
+      const t = tickets[j], cx = M + (j - i) * (colW + 12), cy = M + 22;
+      pdfRellenar_(q, cx, cy, colW, 30, GRIS_F);
+      pdfRect_(q, cx, cy, colW, 30, 0.8);
+      pdfTxtC_(q, cx + colW / 2, cy + 12, 8.5, true, pdfCortar_('#' + (j + 1) + ' · ' + fmtD_(t['Fecha ticket']) + ' · N° ' + (t['N° Comprobante'] || ''), 8.5, true, colW - 8));
+      pdfTxtC_(q, cx + colW / 2, cy + 24, 8.5, true, pdfCortar_((t['Corresponde a'] || '') + ' · ' + money_(num_(t['Total con IVA'])), 8.5, true, colW - 8));
+      const iy = cy + 30, maxH = PH - M - iy;
+      let dibujada = false;
+      const fid = driveId_(t['Link Foto']);
+      if (fid) {
+        try {
+          const ii = pdfImagen_(doc, DriveApp.getFileById(fid).getBlob().getBytes());
+          if (ii !== null) {
+            const d = doc.imagenes[ii], k = Math.min((colW - 8) / d.w, (maxH - 8) / d.h);
+            const w = d.w * k, h = d.h * k;
+            pdfRect_(q, cx, iy, colW, h + 8, 0.8);
+            pdfImg_(q, ii, cx + (colW - w) / 2, iy + 4, w, h);
+            dibujada = true;
+          }
+        } catch (e) {}
+      }
+      if (!dibujada) { pdfRect_(q, cx, iy, colW, 60, 0.8); pdfTxtC_(q, cx + colW / 2, iy + 34, 9, false, 'Sin foto'); }
+    }
+  }
+  return pdfArmar_(doc, nombre + '.pdf');
+}
+
+/* ---------- Escritor de PDF mínimo (texto Helvetica, líneas, rectángulos y fotos JPEG) ---------- */
+const HELV_W_ = [278, 278, 355, 556, 556, 889, 667, 191, 333, 333, 389, 584, 278, 333, 278, 278, 556, 556, 556, 556, 556, 556, 556, 556, 556, 556, 278, 278, 584, 584, 584, 556, 1015, 667, 667, 722, 722, 667, 611, 778, 722, 278, 500, 667, 556, 833, 722, 778, 667, 778, 722, 667, 611, 722, 667, 944, 667, 667, 611, 278, 278, 278, 469, 556, 333, 556, 556, 500, 556, 556, 278, 556, 556, 222, 222, 500, 222, 833, 556, 556, 556, 556, 333, 500, 278, 556, 500, 722, 500, 500, 500, 334, 260, 334, 584, 761, 556, 0, 222, 556, 333, 1000, 556, 556, 333, 1000, 667, 333, 1000, 0, 611, 0, 0, 222, 222, 333, 333, 350, 556, 1000, 333, 1000, 500, 333, 944, 0, 500, 667, 278, 333, 556, 556, 556, 556, 260, 556, 333, 737, 370, 556, 584, 333, 737, 333, 400, 584, 333, 333, 333, 556, 537, 278, 333, 333, 365, 556, 834, 834, 834, 611, 667, 667, 667, 667, 667, 667, 1000, 722, 667, 667, 667, 667, 278, 278, 278, 278, 722, 722, 778, 778, 778, 778, 778, 584, 778, 722, 722, 722, 722, 667, 667, 611, 556, 556, 556, 556, 556, 556, 889, 500, 556, 556, 556, 556, 278, 278, 278, 278, 556, 556, 556, 556, 556, 556, 556, 584, 611, 556, 556, 556, 556, 500, 556, 500];
+const HELV_B_W_ = [278, 333, 474, 556, 556, 889, 722, 238, 333, 333, 389, 584, 278, 333, 278, 278, 556, 556, 556, 556, 556, 556, 556, 556, 556, 556, 333, 333, 584, 584, 584, 611, 975, 722, 722, 722, 722, 667, 611, 778, 722, 278, 556, 722, 611, 833, 722, 778, 667, 778, 722, 667, 611, 722, 667, 944, 667, 667, 611, 333, 278, 333, 584, 556, 333, 556, 611, 556, 611, 556, 333, 611, 611, 278, 278, 556, 278, 889, 611, 611, 611, 611, 389, 556, 333, 611, 556, 778, 556, 556, 500, 389, 280, 389, 584, 761, 556, 0, 278, 556, 500, 1000, 556, 556, 333, 1000, 667, 333, 1000, 0, 611, 0, 0, 278, 278, 500, 500, 350, 556, 1000, 333, 1000, 556, 333, 944, 0, 500, 667, 278, 333, 556, 556, 556, 556, 280, 556, 333, 737, 370, 556, 584, 333, 737, 333, 400, 584, 333, 333, 333, 611, 556, 278, 333, 333, 365, 556, 834, 834, 834, 611, 722, 722, 722, 722, 722, 722, 1000, 722, 667, 667, 667, 667, 278, 278, 278, 278, 722, 722, 778, 778, 778, 778, 778, 584, 778, 722, 722, 722, 722, 667, 667, 611, 556, 556, 556, 556, 556, 556, 889, 556, 556, 556, 556, 556, 278, 278, 278, 278, 611, 611, 611, 611, 611, 611, 611, 584, 611, 611, 611, 611, 611, 556, 611, 556];const WINANSI_EXTRA_ = { '€': 0x80, '‚': 0x82, '„': 0x84, '…': 0x85, '•': 0x95, '–': 0x96, '—': 0x97, '‘': 0x91, '’': 0x92, '“': 0x93, '”': 0x94, '™': 0x99 };
+
+function pdfBytesTexto_(s) {
+  const out = [];
+  for (const ch of String(s == null ? '' : s)) {
+    const c = ch.charCodeAt(0);
+    if ((c >= 32 && c < 127) || (c >= 160 && c <= 255)) out.push(c);
+    else if (WINANSI_EXTRA_[ch]) out.push(WINANSI_EXTRA_[ch]);
+    else out.push(63);
+  }
+  return out;
+}
+function pdfAncho_(s, size, bold) {
+  const W = bold ? HELV_B_W_ : HELV_W_;
+  return pdfBytesTexto_(s).reduce((a, c) => a + (W[c - 32] || 556), 0) * size / 1000;
+}
+function pdfCortar_(s, size, bold, max) {
+  s = String(s == null ? '' : s);
+  if (pdfAncho_(s, size, bold) <= max) return s;
+  while (s.length && pdfAncho_(s + '...', size, bold) > max) s = s.slice(0, -1);
+  return s + '...';
+}
+function pdfPagina_(doc, w, h) { const p = { w: w, h: h, ops: [], imgs: {} }; doc.paginas.push(p); return p; }
+function pdfN_(v) { return (Math.round(v * 100) / 100).toString(); }
+function pdfTxt_(p, x, y, size, bold, s, color) {
+  const esc = pdfBytesTexto_(s).map(c => (c === 40 || c === 41 || c === 92) ? '\\' + String.fromCharCode(c) : String.fromCharCode(c)).join('');
+  p.ops.push((color || '0 0 0') + ' rg BT /' + (bold ? 'F2' : 'F1') + ' ' + pdfN_(size) + ' Tf ' + pdfN_(x) + ' ' + pdfN_(p.h - y) + ' Td (' + esc + ') Tj ET');
+}
+function pdfTxtC_(p, cx, y, size, bold, s, color) { pdfTxt_(p, cx - pdfAncho_(s, size, bold) / 2, y, size, bold, s, color); }
+function pdfTxtR_(p, rx, y, size, bold, s, color) { pdfTxt_(p, rx - pdfAncho_(s, size, bold), y, size, bold, s, color); }
+function pdfRect_(p, x, y, w, h, lw, color) {
+  p.ops.push((color || '0 0 0') + ' RG ' + pdfN_(lw) + ' w ' + pdfN_(x) + ' ' + pdfN_(p.h - y - h) + ' ' + pdfN_(w) + ' ' + pdfN_(h) + ' re S');
+}
+function pdfRellenar_(p, x, y, w, h, color) {
+  p.ops.push(color + ' rg ' + pdfN_(x) + ' ' + pdfN_(p.h - y - h) + ' ' + pdfN_(w) + ' ' + pdfN_(h) + ' re f');
+}
+function pdfLinea_(p, x1, y1, x2, y2, lw, color) {
+  p.ops.push((color || '0 0 0') + ' RG ' + pdfN_(lw) + ' w ' + pdfN_(x1) + ' ' + pdfN_(p.h - y1) + ' m ' + pdfN_(x2) + ' ' + pdfN_(p.h - y2) + ' l S');
+}
+/** Agrega una foto JPEG al documento; devuelve su número o null si no es JPEG. */
+function pdfImagen_(doc, bytes) {
+  const d = medidaImagen_(bytes);
+  if (!d || d.png || !d.w || !d.h) return null;
+  doc.imagenes.push({ bytes: bytes, w: d.w, h: d.h, c: d.c || 3 });
+  return doc.imagenes.length - 1;
+}
+function pdfImg_(p, idx, x, y, w, h) {
+  p.imgs[idx] = true;
+  p.ops.push('q ' + pdfN_(w) + ' 0 0 ' + pdfN_(h) + ' ' + pdfN_(x) + ' ' + pdfN_(p.h - y - h) + ' cm /Im' + idx + ' Do Q');
+}
+function pdfArmar_(doc, nombreArchivo) {
+  const out = [], ofs = [];
+  const put = s => { for (let i = 0; i < s.length; i++) out.push(s.charCodeAt(i) & 0xff); };
+  const putB = b => { for (let i = 0; i < b.length; i++) out.push(b[i] & 0xff); };
+  const objs = [];
+  const nImg = doc.imagenes.length, nPag = doc.paginas.length;
+  // 1 catálogo, 2 páginas, 3-4 fuentes, 5.. imágenes, después página + contenido de cada hoja
+  const idImg = i => 5 + i, idPag = i => 5 + nImg + i * 2, idCont = i => 6 + nImg + i * 2;
+  objs[1] = { s: '<< /Type /Catalog /Pages 2 0 R >>' };
+  objs[2] = { s: '<< /Type /Pages /Kids [' + doc.paginas.map((_, i) => idPag(i) + ' 0 R').join(' ') + '] /Count ' + nPag + ' >>' };
+  objs[3] = { s: '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>' };
+  objs[4] = { s: '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold /Encoding /WinAnsiEncoding >>' };
+  doc.imagenes.forEach((im, i) => {
+    const cs = im.c === 1 ? '/DeviceGray' : im.c === 4 ? '/DeviceCMYK /Decode [1 0 1 0 1 0 1 0]' : '/DeviceRGB';
+    objs[idImg(i)] = { s: '<< /Type /XObject /Subtype /Image /Width ' + im.w + ' /Height ' + im.h + ' /ColorSpace ' + cs +
+      ' /BitsPerComponent 8 /Filter /DCTDecode /Length ' + im.bytes.length + ' >>', stream: im.bytes };
+  });
+  doc.paginas.forEach((pg, i) => {
+    const xo = Object.keys(pg.imgs).map(k => '/Im' + k + ' ' + idImg(+k) + ' 0 R').join(' ');
+    objs[idPag(i)] = { s: '<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ' + pg.w + ' ' + pg.h + '] /Resources << /Font << /F1 3 0 R /F2 4 0 R >>' +
+      (xo ? ' /XObject << ' + xo + ' >>' : '') + ' >> /Contents ' + idCont(i) + ' 0 R >>' };
+    const cont = pg.ops.join('\n');
+    const cb = []; for (let k = 0; k < cont.length; k++) cb.push(cont.charCodeAt(k) & 0xff);
+    objs[idCont(i)] = { s: '<< /Length ' + cb.length + ' >>', stream: cb };
+  });
+  put('%PDF-1.4\n%âãÏÓ\n');
+  for (let i = 1; i < objs.length; i++) {
+    ofs[i] = out.length;
+    put(i + ' 0 obj\n' + objs[i].s + '\n');
+    if (objs[i].stream) { put('stream\n'); putB(objs[i].stream); put('\nendstream\n'); }
+    put('endobj\n');
+  }
+  const xref = out.length;
+  let x = 'xref\n0 ' + objs.length + '\n0000000000 65535 f \n';
+  for (let i = 1; i < objs.length; i++) x += ('0000000000' + ofs[i]).slice(-10) + ' 00000 n \n';
+  put(x + 'trailer\n<< /Size ' + objs.length + ' /Root 1 0 R >>\nstartxref\n' + xref + '\n%%EOF');
+  return Utilities.newBlob(out.map(b => b > 127 ? b - 256 : b), 'application/pdf', nombreArchivo);
+}
+
+/**
  * Arma el PDF de la rendición en HTML (así salen siempre las hojas justas):
  * hoja 1 = planilla "Formulario de rendición de fondos fijo" con el logo KTL; después 2 tickets por hoja.
  */
-function armarPdf_(nombre, nro, supervisor, tickets, fecha) {
+function armarPdfHtml_(nombre, nro, supervisor, tickets, fecha) {
   const e = esc_;
   // Logo KTL con su proporción real (alto 17 mm, ancho según la foto), para que no salga deformado
   let logo = '', logoW = 29.5;
@@ -880,14 +1101,14 @@ function dataUrl_(blob) {
 /** Ancho y alto en píxeles de una foto JPEG o PNG (para que entre entera en la hoja). */
 function medidaImagen_(bytes) {
   const u = i => bytes[i] & 0xff;
-  if (u(0) === 0x89 && u(1) === 0x50) return { w: (u(16) << 24) | (u(17) << 16) | (u(18) << 8) | u(19), h: (u(20) << 24) | (u(21) << 16) | (u(22) << 8) | u(23) };
+  if (u(0) === 0x89 && u(1) === 0x50) return { png: true, w: (u(16) << 24) | (u(17) << 16) | (u(18) << 8) | u(19), h: (u(20) << 24) | (u(21) << 16) | (u(22) << 8) | u(23) };
   if (u(0) !== 0xff || u(1) !== 0xd8) return null;
   let i = 2;
   while (i < bytes.length - 9) {
     if (u(i) !== 0xff) { i++; continue; }
     const m = u(i + 1);
     if (m >= 0xc0 && m <= 0xcf && m !== 0xc4 && m !== 0xc8 && m !== 0xcc) {
-      return { h: (u(i + 5) << 8) | u(i + 6), w: (u(i + 7) << 8) | u(i + 8) };
+      return { h: (u(i + 5) << 8) | u(i + 6), w: (u(i + 7) << 8) | u(i + 8), c: u(i + 9) };
     }
     i += 2 + ((u(i + 2) << 8) | u(i + 3));
   }
