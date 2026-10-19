@@ -453,13 +453,13 @@ const AC = {};         // autocompletables
 /* ================== UTILES ================== */
 function run(fn, ...args){
   // Si la conexión con Google falla un momento ("Failed to fetch"), se reintenta sola hasta 2 veces
-  const red = m => /failed to fetch|networkerror|load failed|network request failed|respuesta no v[aá]lida/i.test(m);
+  const red = m => /failed to fetch|networkerror|load failed|network request failed|respuesta no v[aá]lida|iniciar sesi[oó]n en google/i.test(m);
   const intento = n => new Promise((ok, ko) => {
     google.script.run.withSuccessHandler(ok).withFailureHandler(e => {
       const m = String(e && e.message || e);
       if (m.indexOf('SESION_VENCIDA') >= 0){ sesionVencida(); return; }
       if (n < 2 && red(m)) { setTimeout(() => intento(n + 1).then(ok, ko), 1500 * (n + 1)); return; }
-      if (red(m)) { ko(new Error('No se pudo conectar con el servidor. Revisá la conexión y probá de nuevo.')); return; }
+      if (red(m)) { ko(new Error('Google no respondió (puede estar ocupado un momento). Esperá unos segundos y probá de nuevo; lo que no se guardó no se perdió de la pantalla.')); return; }
       ko(e);
     })[fn](...args);
   });
