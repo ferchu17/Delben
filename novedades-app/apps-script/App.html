@@ -509,7 +509,7 @@ async function entrar(u, c) {
 }
 
 function salir(silencioso) {
-  S.token = null; S.u = null; S.base = null; S.pl = null; S.sucio = false;
+  S.token = null; S.u = null; S.base = null; S.pl = null; S.sucio = false; S.tabsPend = {}; S.cargadaSem = {};
   guardarToken(null);
   cerrarModal();
   vLogin();
@@ -519,10 +519,11 @@ async function ir(vista, params) {
   if (S.vista === 'diagrama' && vista !== 'diagrama' && PLANS.ed && planCambios().length) {
     if (!(await planConfirmarSalida())) return;
   }
-  if (S.sucio && S.vista === 'planilla') {
-    const ok = await confirmar('Cambios sin guardar', 'Hay cambios en la planilla que no guardaste.', 'Salir sin guardar');
+  if (hayCambiosPl() && S.vista === 'planilla') {
+    const n = tabsPendientes().length + (S.sucio ? 1 : 0);
+    const ok = await confirmar('Cambios sin guardar', n > 1 ? 'Hay cambios en <b>' + n + ' pestañas</b> que no guardaste (' + esc(tabsPendientes().map(p => p.nombre).concat(S.sucio && S.pl ? [S.pl.serv.Servicio] : []).join(', ')) + ').' : 'Hay cambios en la planilla que no guardaste.', 'Salir sin guardar');
     if (!ok) return;
-    S.sucio = false;
+    S.sucio = false; S.tabsPend = {};
   }
   acCerrar();
   try { window.focus(); } catch (e) { }
@@ -827,6 +828,16 @@ function sinDiferencia(serv) {
   const t = norm(String(serv.Servicio || '') + ' ' + String(serv.Cliente || ''));
   return /\bRAZ\b/.test(t) && /BARRACAS|TRELLES|MONTENEGRO/.test(t);
 }
+// v1.25.0: servicios que carga Administración (el supervisor los ve solo para consultar y no los tiene que completar).
+// En Servicios: "Lo carga" Administración / Supervisor; vacío = por el nombre (RAIZEN Dock Sud Supervisores y los 3 RAZ).
+function cargaAdmin(serv) {
+  if (!serv) return false;
+  const v = String(serv.CargaAdmin || '').toUpperCase();
+  if (v === 'SI') return true;
+  if (v === 'NO') return false;
+  const t = norm(String(serv.Servicio || '') + ' ' + String(serv.Cliente || ''));
+  return (/\bRAIZEN\b/.test(t) && /SUPERVISOR/.test(t)) || (/\bRAZ\b/.test(t) && /BARRACAS|TRELLES|MONTENEGRO/.test(t));
+}
 function contratadoDia(serv, d) {
   const ov = serv && S.base.contrDia && S.base.contrDia[serv.Id + '|' + d.getUTCFullYear() + '-' + pad(d.getUTCMonth() + 1) + '-' + pad(d.getUTCDate())];
   if (ov) return { d: ov.d, n: ov.n };   // v1.22.9: cargado a mano en la Planificación de servicios
@@ -917,10 +928,18 @@ async function vPlanilla(params) {
     S.pl.filas = pend.filas.map(f => prepararFila(Object.assign({}, f, { Dias: f.Dias.slice() })));
     S.pl.plus = (pend.plus || []).slice();
   }
+  // v1.25.0: cambios de esta pestaña que quedaron pendientes al pasar a otra (se guardan todos juntos)
+  const tp = (S.tabsPend || {})[per + '|' + servicioId];
+  if (tp && !pend) {
+    S.pl.filas = tp.filas; S.pl.plus = tp.plus;
+    prepararProyectado(r.proyectado || []);
+    delete S.tabsPend[per + '|' + servicioId];
+    S.sucio = true;
+  }
   renderPlanilla();
   if (pend) toast('Esta planilla tiene cambios guardados sin internet (' + pend.cuando + ') que todavía no se mandaron.');
   // Si vino de memoria, se actualiza en segundo plano
-  if (enMemoria) traerPlanilla(per, servicioId).then(r2 => {
+  if (enMemoria && !tp) traerPlanilla(per, servicioId).then(r2 => {
     if (S.vista === 'planilla' && S.pl && S.pl.servicioId === servicioId && S.pl.periodo === per && !S.sucio && JSON.stringify(r2) !== JSON.stringify(enMemoria)) {
       armarPlanilla(r2, servicioId, params); renderPlanilla(true);
     }
@@ -970,6 +989,7 @@ function armarPlanilla(r, servicioId, params) {
     })),
     plus: r.plus.map(p => ({ Legajo: p.Legajo, Nombre: p.Nombre, Funcion: p.Funcion, Dias: p.Dias, Observaciones: p.Observaciones, Dia: p.Dia || '' })),
     semanas: r.semanas,
+    sinNov: r.sinNov || [],
     // v1.22.5: la ventana (Proyección o Novedades semanales) no depende del período
     programacion: S.modo !== 'nov',
     modoNov: S.modo === 'nov',
@@ -978,15 +998,18 @@ function armarPlanilla(r, servicioId, params) {
     diagrama: params.diagrama || null,
     // Perfil que solo puede ver: la planilla queda de consulta.
     soloVer: params.diagrama ? !puede('diagrama', true) : !puede(S.periodo > periodoTrabajo() ? 'programacion' : 'planillas', true),
-    // v1.22.9: el supervisor que ya envió la proyección no la puede cambiar: los cambios van por Novedades semanales
-    proyCerrada: !params.diagrama && S.modo !== 'nov' && !esAdmin() && !!r.programacion,
+    // v1.22.9: el supervisor que ya envió la proyección no la puede cambiar: los cambios van por Novedades semanales.
+    // v1.25.0: tampoco si ya está cargada y el período empezó (los cambios van por Novedades semanales, desde la semana que informa)
+    proyCerrada: !params.diagrama && S.modo !== 'nov' && !esAdmin() && (!!r.programacion || (S.periodo <= periodoTrabajo() && (r.proyectado || []).length > 0)),
+    // v1.25.0: servicio que carga Administración: el supervisor solo lo consulta
+    cargaAdminSup: !esAdmin() && cargaAdmin(r.servicio),
     // Lo cargado en los otros servicios en el mismo período, para avisar si alguien queda en dos lugares a la vez.
     ocup: (r.ocupacion || []).map(o => ({
       Legajo: o.Legajo, Nombre: o.Nombre, Servicio: o.Servicio,
       Dias: Array.from({ length: 31 }, (_, i) => o['D' + pad(i + 1)] || '')
     }))
   };
-  if (S.pl.proyCerrada) S.pl.soloVer = true;
+  if (S.pl.proyCerrada || S.pl.cargaAdminSup) S.pl.soloVer = true;
   prepararProyectado(r.proyectado || []);
   // v1.22.8: Ctrl+Z / Ctrl+Y
   S.undoPl = []; S.redoPl = []; S.fotoPl = fotoPl(); SEL.extra = [];
@@ -1073,7 +1096,10 @@ function renderPlanilla(conservarScroll) {
 
   $('#main').innerHTML =
     (pl.diagrama ? htmlDiagramaTabs(pl) : '') +
-    (pl.proyCerrada ? '<div class="solo-ver">La proyección ya se envió' + (pl.progEnviada && pl.progEnviada.FechaEnvio ? ' (' + esc(pl.progEnviada.FechaEnvio) + ')' : '') + ': no se puede modificar. Los cambios se cargan en <b>Novedades semanales</b>, en las semanas que todavía no vencieron.</div>'
+    (pl.cargaAdminSup ? '<div class="solo-ver solo-adm">Este servicio lo carga <b>Administración</b>: no hace falta que lo completes. Lo podés ver, pero no modificar.</div>'
+      : pl.proyCerrada ? (pl.progEnviada ? '<div class="solo-ver">La proyección ya se envió' + (pl.progEnviada.FechaEnvio ? ' (' + esc(pl.progEnviada.FechaEnvio) + ')' : '') + ': no se puede modificar.'
+        : '<div class="solo-ver">La proyección de este período ya está cargada y el período empezó: no se puede modificar.') +
+        ' Los cambios se cargan en <b>Novedades semanales</b>, desde la semana que estás informando en adelante.</div>'
       : pl.soloVer ? '<div class="solo-ver">Solo consulta: tu perfil puede ver esta planilla pero no modificarla.</div>' : '') +
     (pl.diagrama ? '' : pl.modoNov ? '<div class="prog-cinta">NOVEDADES SEMANALES · ' + esc(nombrePeriodo(pl.periodo)).toUpperCase() + '</div>'
       : '<div class="prog-cinta prog-cinta-pro">PROYECCIÓN · ' + esc(nombrePeriodo(pl.periodo)).toUpperCase() + '</div>') +
@@ -1098,6 +1124,7 @@ function renderPlanilla(conservarScroll) {
       (puede('stdsector') ? '<button class="btn btn-std" id="btnSTDSec" title="El STD de tu sector">STD</button>' : '') +
       (puede('otrossup') ? '<button class="btn" id="btnOtrosSup" title="Ver los servicios de los otros supervisores">Otros supervisores</button>' : '') +
       (puede('vacaciones') ? '<button class="btn" id="btnVac" title="Vacaciones diagramadas e informadas por zona">Vacaciones</button>' : '') +
+      (esAdmin() && pl.modoNov ? '<button class="btn" id="btnCopiarTodo" title="Selecciona todo el listado de personal y lo copia (con los colores) para pegarlo en cualquier hoja de Excel">⧉ Copiar todo el listado</button>' : '') +
       '<button class="btn btn-excel" id="btnExcel">Excel</button>' +
       '<button class="btn btn-correo" id="btnCorreo">✉ Enviar</button>' +
       '<button class="btn prim" id="btnGuardar">Guardar</button>' +
@@ -1111,7 +1138,10 @@ function renderPlanilla(conservarScroll) {
       '<span class="esp"></span>' + (!pl.modoNov
         ? (pl.progEnviada ? '<span class="sem-chip env" title="Enviada por ' + esc(pl.progEnviada.EnviadoPor) + '">Enviada el ' + esc(pl.progEnviada.FechaEnvio) + '</span>' : '') +
           '<button class="btn prim" id="btnEnviarProg">' + (pl.progEnviada ? 'Volver a enviar la proyección' : 'Enviar proyección') + '</button>'
-        : (pl.limiteNov > 0 && pl.limiteNov < 99 ? '<span class="sem-chip" title="Los días anteriores no se modifican">Se modifica desde el ' + ddmm(fechaDia(pl.periodo, pl.limiteNov)) + '</span>' : pl.limiteNov >= 99 ? '<span class="sem-chip">Período cerrado: solo consulta</span>' : '') + semBtns) +
+        : (pl.soloVer ? '' : (() => { const e = tabSemana(pl.servicioId, pl.periodo); return e === 'sinnov'
+            ? '<button class="btn chico sin-nov on" id="btnSinNov" data-m="0" title="Quitar la marca">✓ Sin novedades esta semana</button>'
+            : e ? '' : '<button class="btn chico sin-nov" id="btnSinNov" data-m="1" title="Si en este servicio no cambió nada esta semana, marcalo: la pestaña queda pintada como cargada">Sin novedades esta semana</button>'; })()) +
+          (pl.limiteNov > 0 && pl.limiteNov < 99 ? '<span class="sem-chip" title="Los días anteriores no se modifican">Se modifica desde el ' + ddmm(fechaDia(pl.periodo, pl.limiteNov)) + '</span>' : pl.limiteNov >= 99 ? '<span class="sem-chip">Período cerrado: solo consulta</span>' : '') + semBtns) +
     '</div>' +
     '<datalist id="dlTurnos">' + TURNOS.map(t => '<option value="' + t + '">').join('') + '</datalist>' +
     (pl.diagrama ? '' : '<div id="proyResumen">' + htmlProyectado() + '</div>') +
@@ -1127,6 +1157,8 @@ function renderPlanilla(conservarScroll) {
 
   if (pl.soloVer) ['#btnGuardar', '#pinceles', '#btnEnviarProg', '#btnNuevaPl', '#btnNuevaPl2'].forEach(q => { const el = $(q); if (el) el.hidden = true; });
   if ($('#btnEnviarProg')) $('#btnEnviarProg').onclick = () => enviarProgramacion();
+  if ($('#btnSinNov')) $('#btnSinNov').onclick = e => marcarSinNovedades(e.currentTarget.dataset.m === '1');
+  if ($('#btnCopiarTodo')) $('#btnCopiarTodo').onclick = () => copiarTodoListado();
   if ($('#btnNotasXls')) $('#btnNotasXls').onclick = () => comentariosDeExcel();
   $('#btnExcel').onclick = () => ventanaExcel();
   $('#btnCorreo').onclick = () => ventanaEnviar();
@@ -1163,7 +1195,7 @@ function renderPlanilla(conservarScroll) {
   $('#selPer').onchange = e => cambiarPlanilla(pl.servicioId, e.target.value);
   // v1.22.3: Cubrir vacaciones: trae los servicios del supervisor elegido como pestañas
   if ($('#selCubre')) $('#selCubre').onchange = async e => {
-    if (S.sucio && !(await guardarPlanilla(true))) { e.target.value = (S.base.cubre || [])[0] || ''; return; }
+    if (hayCambiosPl() && !(await guardarPlanilla(true))) { e.target.value = (S.base.cubre || [])[0] || ''; return; }
     const tit = e.target.value;
     try {
       const r = await api('cubrirVacaciones', { titular: tit });
@@ -1187,6 +1219,154 @@ function renderPlanilla(conservarScroll) {
   if (scroll) { const w = $('.grilla-wrap'); w.scrollLeft = scroll[0]; w.scrollTop = scroll[1]; }
 }
 
+/* ---------- v1.25.0 Novedades semanales: pestañas de la semana y guardado de todas juntas ----------
+   Los lunes todas las pestañas arrancan sin pintar. Se pintan cuando el servicio se carga o se modifica esa semana
+   (o cuando se marca "Sin novedades"). Al cambiar de pestaña los cambios quedan pendientes y se guardan todos juntos con Guardar. */
+function lunesSemana() {
+  const h = new Date(), d = new Date(h.getFullYear(), h.getMonth(), h.getDate());
+  d.setDate(d.getDate() - ((d.getDay() + 6) % 7));
+  return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate());
+}
+function tabsPendientes() { return Object.values(S.tabsPend || {}); }
+function hayCambiosPl() { return !!S.sucio || tabsPendientes().length > 0; }
+// '' sin pintar · 'pend' con cambios sin guardar · 'ok' cargada esta semana · 'sinnov' marcada sin novedades
+function tabSemana(id, periodo) {
+  const key = periodo + '|' + id;
+  if ((S.tabsPend || {})[key] || (S.pl && S.pl.servicioId === id && S.pl.periodo === periodo && S.sucio)) return 'pend';
+  const lun = lunesSemana(), me = String((S.u && S.u.usuario) || '').toLowerCase(), adm = esAdmin();
+  if ((S.cargadaSem || {})[key] === lun) return 'ok';
+  const sn = S.pl && S.pl.servicioId === id && S.pl.periodo === periodo ? S.pl.sinNov : null;
+  const c = S.cachePl && S.cachePl[key];
+  if ((sn || (c && c.sinNov) || []).some(x => x.Lunes === lun)) return 'sinnov';
+  if (c && (c.filas || []).some(f => String(f.Actualizado || '') >= lun && (adm || String(f.ActualizadoPor || '').toLowerCase() === me))) return 'ok';
+  return '';
+}
+function claseTab(s, pl) {
+  if (!esAdmin() && cargaAdmin(s)) return ' tab-adm';
+  if (pl && pl.modoNov) { const e = tabSemana(s.Id, pl.periodo); return e === 'pend' ? ' tab-llena tab-pend' : e ? ' tab-llena' : ''; }
+  return tabLlena(s.Id, pl.periodo) ? ' tab-llena' : '';
+}
+function tituloTab(s, pl) {
+  if (!esAdmin() && cargaAdmin(s)) return ' title="Lo carga Administración: no hace falta que lo completes"';
+  if (!pl || !pl.modoNov) return '';
+  const e = tabSemana(s.Id, pl.periodo);
+  return ' title="' + (e === 'pend' ? 'Con cambios sin guardar' : e === 'ok' ? 'Cargada esta semana' : e === 'sinnov' ? 'Marcada sin novedades esta semana' : 'Todavía no se cargó esta semana') + '"';
+}
+// Deja los cambios de la pestaña abierta como pendientes (se guardan todos juntos con Guardar)
+function guardarEnPendientes() {
+  const pl = S.pl; if (!pl || !S.sucio) return;
+  S.tabsPend = S.tabsPend || {};
+  S.tabsPend[pl.periodo + '|' + pl.servicioId] = {
+    key: pl.periodo + '|' + pl.servicioId, periodo: pl.periodo, servicioId: pl.servicioId, nombre: (pl.serv && pl.serv.Servicio) || pl.servicioId,
+    filas: pl.filas.map(f => Object.assign({}, f, { Dias: f.Dias.slice(), Col: (f.Col || []).slice() })),
+    plus: pl.plus.map(x => Object.assign({}, x))
+  };
+  S.sucio = false;
+}
+function datosParaGuardar(periodo, servicioId, filas, plus, forzar) {
+  return { forzar: !!forzar, periodo, servicioId,
+    filas: filas.map(f => ({ Seccion: f.Seccion, Legajo: f.Legajo, Nombre: String(f.Nombre || '').trim().toUpperCase(), Empresa: f.Empresa, Puesto: f.Puesto, Turno: f.Turno, Dias: f.Dias })),
+    plus: plus.filter(p => p.Nombre) };
+}
+// Guarda las pestañas pendientes. Si alguna tiene un problema (falta el turno, choques), la abre para corregirla.
+// v1.25.0: lo guardado queda también en la memoria de la app: al pasar de Proyección a Novedades semanales
+// (o al revés) se ve enseguida lo último guardado, sin esperar a que se vuelva a traer del servidor.
+function actualizarCachePl(pl, filas) {
+  const c = S.cachePl && S.cachePl[pl.periodo + '|' + pl.servicioId]; if (!c) return;
+  const h = new Date(), ahora = h.getFullYear() + '-' + pad(h.getMonth() + 1) + '-' + pad(h.getDate()) + ' ' + pad(h.getHours()) + ':' + pad(h.getMinutes());
+  c.filas = filas.map((f, i) => {
+    const o = { Periodo: pl.periodo, ServicioId: pl.servicioId, Seccion: f.Seccion, Orden: String(i + 1), Legajo: f.Legajo || '', Nombre: String(f.Nombre || '').trim().toUpperCase(),
+      Empresa: f.Empresa || '', Puesto: f.Puesto || '', Turno: f.Turno || '', ActualizadoPor: S.u.usuario, Actualizado: ahora };
+    f.Dias.forEach((v, j) => { o['D' + pad(j + 1)] = v || ''; });
+    return o;
+  });
+  c.plus = pl.plus.filter(p => p.Nombre).map(p => Object.assign({}, p));
+}
+function faltaTurnoPuesto(filas) {
+  return filas.some(f => (f.Seccion === 'RETEN' || f.Seccion === 'COBERTURA') && (String(f.Nombre || '').trim() || f.Dias.some(Boolean)) && !String(f.Puesto || '').trim());
+}
+async function guardarPestanasPend(forzar) {
+  let n = 0;
+  const conProblema = [];
+  for (const p of tabsPendientes()) {
+    const filas = p.filas.filter(f => String(f.Nombre || '').trim() || f.Dias.some(Boolean));
+    if (faltaTurnoPuesto(filas)) { conProblema.push(p); continue; }
+    const datos = datosParaGuardar(p.periodo, p.servicioId, filas, p.plus, forzar);
+    if (navigator.onLine === false) { guardarSinConexion(datos, filas); delete S.tabsPend[p.key]; n++; continue; }
+    let res;
+    try { res = await api('guardarPlanilla', datos); }
+    catch (e) {
+      if (esErrorDeRed(e)) { guardarSinConexion(datos, filas); delete S.tabsPend[p.key]; n++; continue; }
+      toast('No se guardó ' + p.nombre + ': ' + e.message, true); return false;
+    }
+    if (res && res.conflictos && res.conflictos.length) {
+      await cambiarPlanilla(p.servicioId, p.periodo);
+      mostrarConflictos(res.conflictos, { alGuardar: esAdmin() ? () => guardarPlanilla(false, true) : null });
+      return false;
+    }
+    delete S.tabsPend[p.key];
+    if (S.cachePl) delete S.cachePl[p.key];
+    S.cargadaSem = S.cargadaSem || {}; S.cargadaSem[p.key] = lunesSemana();
+    n++;
+  }
+  // Las que tienen algo sin completar quedan pendientes: se abre la primera para corregirla
+  if (conProblema.length) {
+    const p = conProblema[0];
+    toast((n ? (n === 1 ? 'Se guardó 1 pestaña. ' : 'Se guardaron ' + n + ' pestañas. ') : '') + 'En ' + p.nombre + ' falta completar el turno o el puesto: completalo y volvé a tocar Guardar.', true);
+    await cambiarPlanilla(p.servicioId, p.periodo);
+    setTimeout(() => { if (validarTurnos()) validarPuestosReten(); }, 300);
+    return false;
+  }
+  return n;
+}
+// Pestaña "Sin novedades": queda pintada esta semana aunque no se haya cambiado nada
+async function marcarSinNovedades(marcar) {
+  const pl = S.pl; if (!pl) return;
+  try {
+    const r = await api('sinNovedades', { periodo: pl.periodo, servicioId: pl.servicioId, marcar: !!marcar, lunes: lunesSemana() });
+    pl.sinNov = (r && r.sinNov) || [];
+    const c = S.cachePl && S.cachePl[pl.periodo + '|' + pl.servicioId]; if (c) c.sinNov = pl.sinNov;
+    toast(marcar ? pl.serv.Servicio + ': marcada sin novedades esta semana.' : 'Se quitó la marca de sin novedades.');
+    renderPlanilla(true);
+  } catch (e) { toast(e.message, true); }
+}
+// Administración: copia todo el listado (con los colores) para pegarlo en cualquier hoja de Excel
+async function copiarTodoListado() {
+  const pl = S.pl, n = pl.info.n, cs = el => el ? getComputedStyle(el).backgroundColor : '';
+  const encab = ['N°', 'Empresa', 'LP', 'APELLIDO Y NOMBRE', 'Turno'].concat(Array.from({ length: n }, (_, i) => String(fechaDia(pl.periodo, i).getUTCDate()))).concat(['Total']);
+  const tsv = [encab.join('\t')];
+  let html = '<table border="1" style="border-collapse:collapse;font-family:Calibri,Arial;font-size:11pt"><tr>' + encab.map(t => '<th style="background:#d9d9d9">' + esc(t) + '</th>').join('') + '</tr>';
+  const filasTr = $$('table.g tr.x-dato');
+  let seccion = '';
+  filasTr.forEach(tr => {
+    const r = +tr.dataset.fila, f = pl.filas[r];
+    if (!f || !(String(f.Nombre || '').trim() || f.Dias.some(Boolean))) return;
+    if (f.Seccion !== seccion && seccion) { tsv.push(''); html += '<tr><td colspan="' + encab.length + '" style="background:#fff2cc"><b>' + (f.Seccion === 'RETEN' ? 'Instrucción o retén' : 'Eventuales') + '</b></td></tr>'; }
+    seccion = f.Seccion;
+    const nro = (tr.querySelector('.x-nro') || {}).textContent || '';
+    const tot = ($('#tot-' + r) || {}).textContent || '';
+    const celdas = [nro, f.Empresa || '', f.Legajo || '', f.Nombre || '', f.Puesto || ''];
+    const dias = []; for (let i = 0; i < n; i++) dias.push(soloNumero(f.Dias[i] || ''));
+    tsv.push(celdas.concat(dias).concat([tot]).join('\t'));
+    html += '<tr>' + celdas.map(v => '<td>' + esc(v) + '</td>').join('') +
+      dias.map((v, i) => { const td = $('#c-' + r + '-' + i); const bg = cs(td && td.parentElement); return '<td style="text-align:center' + (bg && bg !== 'rgba(0, 0, 0, 0)' ? ';background:' + bg : '') + '">' + esc(v) + '</td>'; }).join('') +
+      '<td style="text-align:center"><b>' + esc(tot) + '</b></td></tr>';
+  });
+  html += '</table>';
+  // Se marca todo como seleccionado para que se vea qué se copió
+  const orden = ordenFilas().filter(r => pl.filas[r] && (String(pl.filas[r].Nombre || '').trim() || pl.filas[r].Dias.some(Boolean)));
+  if (orden.length) { SEL.extra = []; SEL.a = { r: orden[0], i: 0 }; SEL.b = { r: orden[orden.length - 1], i: n - 1 }; marcarSeleccion(); }
+  try {
+    if (window.ClipboardItem && navigator.clipboard && navigator.clipboard.write) {
+      await navigator.clipboard.write([new ClipboardItem({ 'text/html': new Blob([html], { type: 'text/html' }), 'text/plain': new Blob([tsv.join('\n')], { type: 'text/plain' }) })]);
+    } else await navigator.clipboard.writeText(tsv.join('\n'));
+    toast('Se copió todo el listado (' + (tsv.length - 1) + ' filas). Pegalo con Ctrl+V en cualquier hoja de Excel.');
+  } catch (e) {
+    try { await navigator.clipboard.writeText(tsv.join('\n')); toast('Se copió todo el listado. Pegalo con Ctrl+V en Excel.'); }
+    catch (e2) { toast('El navegador no dejó copiar. Probá de nuevo con la página en primer plano.', true); }
+  }
+}
+
 // Administración: los servicios también como pestañas (como en el Excel), agrupados por zona (supervisor).
 function htmlTabsAdmin(pl) {
   const act = S.base.servicios.filter(s => s.Activo !== 'NO');
@@ -1200,7 +1380,7 @@ function htmlTabsAdmin(pl) {
   const borrando = esAdmin() && S.borrarServ;
   return '<div class="adm-tabs"><label class="campo">Zona<select id="selZonaTab">' + opciones(zonas.map(z => ({ v: z, t: nomZ(z) })), S.zonaTab) + '</select></label>' +
     (esAdmin() ? '<button class="btn chico' + (borrando ? ' prim' : '') + '" id="btnBorrarServ" title="Quitar un servicio que no va en el listado">' + (borrando ? 'Listo' : '🗑 Borrar servicio') + '</button>' : '') +
-    '<div class="dia-tabs sup-tabs' + (borrando ? ' tabs-borrar' : '') + '">' + servs.map(s => '<button class="dia-tab' + (s.Id === pl.servicioId ? ' on' : '') + (tabLlena(s.Id, pl.periodo) ? ' tab-llena' : '') + '" data-stab="' + s.Id + '">' +
+    '<div class="dia-tabs sup-tabs' + (borrando ? ' tabs-borrar' : '') + '">' + servs.map(s => '<button class="dia-tab' + (s.Id === pl.servicioId ? ' on' : '') + claseTab(s, pl) + '"' + tituloTab(s, pl) + ' data-stab="' + s.Id + '">' +
       (borrando ? '<span class="tab-x" data-quitarserv="' + s.Id + '" title="Borrar este servicio">×</span>' : '') + esc(nombreTab(s)) + '</button>').join('') + '</div></div>';
 }
 // El supervisor (no administración) ve sus servicios como pestañas.
@@ -1215,20 +1395,39 @@ function tabLlena(id, periodo) {
 }
 function pintarTabsLlenas() {
   if (!S.pl) return;
-  $$('[data-stab]').forEach(b => b.classList.toggle('tab-llena', tabLlena(b.dataset.stab, S.pl.periodo)));
+  pintarTabsSemana();
   const faltan = $$('[data-stab]').map(b => b.dataset.stab).filter(id => !(S.cachePl && S.cachePl[S.pl.periodo + '|' + id]) && id !== S.pl.servicioId);
   if (faltan.length && !pintarTabsLlenas.trayendo) {
     pintarTabsLlenas.trayendo = true;
-    lotePlanillas(S.pl.periodo, faltan.slice(0, 60)).then(() => { pintarTabsLlenas.trayendo = false; $$('[data-stab]').forEach(b => b.classList.toggle('tab-llena', tabLlena(b.dataset.stab, S.pl.periodo))); })
+    lotePlanillas(S.pl.periodo, faltan.slice(0, 60)).then(() => { pintarTabsLlenas.trayendo = false; pintarTabsSemana(); })
       .catch(() => { pintarTabsLlenas.trayendo = false; });
   }
+}
+// v1.25.0: pinta las pestañas (sin volver a pedir nada al servidor) y cuenta cuántas faltan esta semana
+function pintarTabsSemana() {
+  const pl = S.pl; if (!pl) return;
+  let total = 0, listas = 0;
+  $$('[data-stab]').forEach(b => {
+    const s = (S.base.servicios || []).find(x => x.Id === b.dataset.stab) || { Id: b.dataset.stab };
+    ['tab-llena', 'tab-pend', 'tab-adm'].forEach(c => b.classList.remove(c));
+    claseTab(s, pl).split(' ').filter(Boolean).forEach(c => b.classList.add(c));
+    const t = tituloTab(s, pl).match(/title="([^"]*)"/); if (t) b.title = t[1]; else b.removeAttribute('title');
+    if (pl.modoNov && !(!esAdmin() && cargaAdmin(s)) && !b.closest('.cubre-tabs')) { total++; if (tabSemana(s.Id, pl.periodo)) listas++; }
+  });
+  const bs = $('#btnSinNov');
+  if (bs) { const e = tabSemana(pl.servicioId, pl.periodo); bs.hidden = e === 'pend' || e === 'ok'; }
+  const el = $('#tabsSem');
+  if (el) el.innerHTML = total ? 'Semana del ' + ddmm(new Date(lunesSemana() + 'T12:00:00Z')) + ': <b>' + listas + ' de ' + total + '</b> pestañas cargadas' +
+    (listas < total ? ' · faltan ' + (total - listas) + ' (las que no están pintadas)' : ' ✓') +
+    (tabsPendientes().length || S.sucio ? ' · <span class="tabs-sem-pend">hay cambios sin guardar: al terminar tocá Guardar</span>' : '') : '';
 }
 function htmlTabsSupervisor(pl) {
   const me = String(S.u.usuario).toLowerCase(), cubre = S.base.cubre || [];
   const act = S.base.servicios.filter(s => s.Activo !== 'NO').sort((a, b) => a.Servicio.localeCompare(b.Servicio));
-  const tab = s => '<button class="dia-tab' + (s.Id === pl.servicioId ? ' on' : '') + (tabLlena(s.Id, pl.periodo) ? ' tab-llena' : '') + '" data-stab="' + s.Id + '">' + esc(nombreTab(s)) + '</button>';
+  const tab = s => '<button class="dia-tab' + (s.Id === pl.servicioId ? ' on' : '') + claseTab(s, pl) + '"' + tituloTab(s, pl) + ' data-stab="' + s.Id + '">' + esc(nombreTab(s)) + '</button>';
   const mios = act.filter(s => String(s.Supervisor || '').toLowerCase() === me || !cubre.length);
-  let h = '<div class="dia-tabs sup-tabs">' + mios.map(tab).join('') + '<button class="dia-tab nueva-pl" id="btnNuevaPl">+ Nueva planilla</button></div>';
+  let h = '<div class="dia-tabs sup-tabs">' + mios.map(tab).join('') + '<button class="dia-tab nueva-pl" id="btnNuevaPl">+ Nueva planilla</button></div>' +
+    (pl.modoNov ? '<div class="tabs-sem" id="tabsSem"></div>' : '');
   // Zona que se está cubriendo (vacaciones de otro supervisor)
   cubre.forEach(z => {
     const otros = act.filter(s => String(s.Supervisor || '').toLowerCase() === z);
@@ -1287,12 +1486,14 @@ function formNuevaPlanilla() {
 }
 
 async function cambiarPlanilla(servicioId, periodo) {
+  // v1.25.0: en Novedades semanales no se guarda pestaña por pestaña: los cambios quedan pendientes y se guardan todos juntos
+  if (S.sucio && S.pl && S.pl.modoNov && !S.pl.soloVer) guardarEnPendientes();
   if (S.sucio) {
     const ok = await confirmar('Cambios sin guardar', 'Hay cambios en esta planilla que no guardaste.', 'Seguir sin guardar');
     if (!ok) { renderPlanilla(true); return; }
     S.sucio = false;
   }
-  vPlanilla({ servicioId, periodo, diagrama: S.pl && S.pl.diagrama });
+  return vPlanilla({ servicioId, periodo, diagrama: S.pl && S.pl.diagrama });
 }
 
 // Turnos de la columna Turno (lista con autocompletado). Mixto: ni gris ni blanco.
@@ -1704,10 +1905,14 @@ function marcarSucio(v) {
     setTimeout(() => { if (S.pl) S.fotoPl = fotoPl(); S._undoPend = false; }, 0);
   }
   const el = $('#estGuardado');
+  // v1.25.0: cuenta también las otras pestañas con cambios pendientes
+  const nPend = tabsPendientes().length + (v ? 1 : 0);
   if (el) {
-    el.textContent = v ? 'Cambios sin guardar' : 'Todo guardado';
-    el.className = 'estado-guardado' + (v ? ' sucio' : '');
+    el.textContent = nPend > 1 ? 'Cambios sin guardar en ' + nPend + ' pestañas' : nPend ? 'Cambios sin guardar' : 'Todo guardado';
+    el.className = 'estado-guardado' + (nPend ? ' sucio' : '');
   }
+  const bg = $('#btnGuardar'); if (bg && !bg.disabled) bg.textContent = nPend > 1 ? 'Guardar todo (' + nPend + ')' : 'Guardar';
+  if (S.pl && S.pl.modoNov && S.vista === 'planilla') pintarTabsSemana();
 }
 
 function agregarFila(seccion, sinRender) {
@@ -1908,16 +2113,12 @@ function avisoGuardando(on) {
     document.body.appendChild(el);
   }
 }
-async function guardarPlanilla(silencioso, forzar) {
+// Instrucción o Retén sin elegir: no se guarda (avisa y lleva a la fila)
+function validarPuestosReten() {
   const pl = S.pl;
-  const btn = $('#btnGuardar');
-  if (btn) btn.disabled = true;
-  avisoGuardando(true);
-  try {
-    if (!validarTurnos()) return false;
-    const filas = pl.filas.filter(f => f.Nombre.trim() || f.Dias.some(Boolean));
-    const sinPuesto = filas.filter(f => f.Seccion === 'RETEN' && !String(f.Puesto || '').trim());
-    if (sinPuesto.length) {
+  const filas = pl.filas.filter(f => f.Nombre.trim() || f.Dias.some(Boolean));
+  const sinPuesto = filas.filter(f => f.Seccion === 'RETEN' && !String(f.Puesto || '').trim());
+  if (sinPuesto.length) {
       const m = modal('<div class="aviso-doble"><div class="aviso-icono">!</div>' +
         '<h3>Falta el puesto en Instrucción o Retén</h3>' +
         '<p>Elegí si cada persona está en Instrucción o en Retén antes de guardar.</p></div>' +
@@ -1931,8 +2132,39 @@ async function guardarPlanilla(silencioso, forzar) {
         const sel = $('select.pue-sel[data-r="' + r + '"]');
         if (sel) { sel.scrollIntoView({ block: 'center' }); sel.focus(); sel.parentElement.classList.add('resaltar'); setTimeout(() => sel.parentElement.classList.remove('resaltar'), 2600); }
       };
-      return false;
+    return false;
+  }
+  return true;
+}
+async function guardarPlanilla(silencioso, forzar) {
+  const pl = S.pl;
+  const btn = $('#btnGuardar');
+  // v1.25.0: primero las otras pestañas con cambios pendientes (Novedades semanales: se guarda todo junto al final)
+  let nOtras = 0;
+  if (tabsPendientes().length) {
+    // La pestaña abierta, si está completa, se guarda junto con las otras
+    const actual = S.sucio && pl && !pl.soloVer && !faltaTurnoPuesto(pl.filas) ? pl.periodo + '|' + pl.servicioId : '';
+    if (actual) guardarEnPendientes();
+    if (btn) btn.disabled = true;
+    avisoGuardando(true);
+    try { nOtras = await guardarPestanasPend(forzar); }
+    finally { avisoGuardando(false); if (btn) btn.disabled = false; }
+    if (actual && S.pl === pl && (S.tabsPend || {})[actual]) {   // no se llegó a guardar: vuelve a quedar como cambios de la pestaña abierta
+      delete S.tabsPend[actual]; S.sucio = true;
     }
+    if (nOtras === false) { marcarSucio(S.sucio); return false; }
+    if (!S.sucio) {
+      if (!silencioso) toast(nOtras === 1 ? 'Se guardó 1 pestaña.' : 'Se guardaron ' + nOtras + ' pestañas.');
+      marcarSucio(false); pintarTabsLlenas();
+      return true;
+    }
+  }
+  if (btn) btn.disabled = true;
+  avisoGuardando(true);
+  try {
+    if (!validarTurnos()) return false;
+    const filas = pl.filas.filter(f => f.Nombre.trim() || f.Dias.some(Boolean));
+    if (!validarPuestosReten()) return false;
     const datosGuardar = {
       forzar: !!forzar,
       periodo: pl.periodo, servicioId: pl.servicioId,
@@ -1954,8 +2186,10 @@ async function guardarPlanilla(silencioso, forzar) {
       return false;
     }
     pl.filas = filas;
+    actualizarCachePl(pl, filas);
     marcarSucio(false);
-    if (!silencioso) toast('Planilla guardada.');
+    if (pl.modoNov) { S.cargadaSem = S.cargadaSem || {}; S.cargadaSem[pl.periodo + '|' + pl.servicioId] = lunesSemana(); }
+    if (!silencioso) toast(nOtras ? 'Se guardaron ' + (nOtras + 1) + ' pestañas.' : 'Planilla guardada.');
     renderPlanilla(true);
     return true;
   } catch (e) {
@@ -2003,7 +2237,7 @@ async function enviarSemana(n) {
 
 async function mandarNovedades(n, forzar, correo) {
   const pl = S.pl;
-  if (S.sucio && !(await guardarPlanilla(true))) return;
+  if (hayCambiosPl() && !(await guardarPlanilla(true))) return;
   try {
     const r = await api('enviarSemana', { periodo: pl.periodo, servicioId: pl.servicioId, semana: n, forzar: !!forzar, correo });
     if (r.faltan && r.faltan.length) { mostrarFaltantes(r.faltan, n, () => mandarNovedades(n, true, correo)); return; }
@@ -2040,7 +2274,7 @@ function ventanaExcel() {
     const [alcance, modo] = b.dataset.xls.split('|');
     const para = modo === 'mail' ? $(alcance === 'zona' ? '#xlParaZona' : '#xlParaServ').value.trim() : '';
     if (modo === 'mail' && !para) { toast('Escribí el correo.', true); return; }
-    if (S.sucio && !(await guardarPlanilla(true))) return;
+    if (hayCambiosPl() && !(await guardarPlanilla(true))) return;
     $$('[data-xls]', m).forEach(x => { x.disabled = true; });
     $('#xlEstado').textContent = 'Armando el Excel…';
     try {
@@ -2122,7 +2356,7 @@ function ventanaEnviar() {
     const t = b.dataset.env;
     const items = $$('[data-sem]:checked', m).map(c => ({ periodo: pl.periodo, semana: +c.dataset.sem }));
     if (t === 'semanas' && !items.length) { toast('Elegí al menos una semana.', true); return; }
-    if (S.sucio) { cerrarModal(); if (!(await guardarPlanilla(true))) return; }
+    if (hayCambiosPl()) { cerrarModal(); if (!(await guardarPlanilla(true))) return; }
     const per = nombrePeriodo(pl.periodo), quien = (esAdmin() ? 'Administración ' : 'Supervisor ') + S.u.nombre;
     if (t === 'semanas') {
       return ventanaCorreo({ que: 'semanas', periodo: pl.periodo, items, adjunto: 'Detalle de ' + items.length + ' semana' + (items.length === 1 ? '' : 's') + ' en el cuerpo del correo',
@@ -2191,7 +2425,7 @@ async function enviarProgramacion(forzar, correo) {
       cuerpo: 'Buenos días:\n\nLes envío las novedades semanales de ' + per + ' de ' + (zona.length === 1 ? pl.serv.Servicio : 'mi zona') + '.' + firmaUsuario(),
       alEnviar: c => enviarProgramacion(false, c) });
   }
-  if (S.sucio && !(await guardarPlanilla(true))) return;
+  if (hayCambiosPl() && !(await guardarPlanilla(true))) return;
   try {
     const r = await api('enviarProgramacion', { periodo: pl.periodo, servicioId: pl.servicioId, forzar: !!forzar, correo });
     if (r.faltan && r.faltan.length) { mostrarFaltantes(r.faltan, null, () => enviarProgramacion(true, correo)); return; }
@@ -2349,7 +2583,7 @@ function mostrarFaltantes(lista, n, alForzar) {
 async function irACelda(x) {
   const pl = S.pl;
   if (pl.servicioId !== x.servicioId) {
-    if (S.sucio && !(await guardarPlanilla(true))) return;
+    if (hayCambiosPl() && !(await guardarPlanilla(true))) return;
     await vPlanilla({ servicioId: x.servicioId, periodo: pl.periodo });
   }
   const clave = clavePersona({ Legajo: x.legajo, Nombre: x.nombre });
@@ -2366,7 +2600,7 @@ async function irACelda(x) {
 async function reabrirSemana(n) {
   const ok = await confirmar('Reabrir semana ' + n, 'El supervisor va a poder modificar esos días y tendrá que volver a enviarla.', 'Reabrir');
   if (!ok) return;
-  if (S.sucio && !(await guardarPlanilla(true))) return;
+  if (hayCambiosPl() && !(await guardarPlanilla(true))) return;
   await api('reabrirSemana', { periodo: S.pl.periodo, servicioId: S.pl.servicioId, semana: n });
   S.pl.semanas = S.pl.semanas.filter(s => Number(s.Semana) !== n);
   renderPlanilla(true);
@@ -3229,7 +3463,7 @@ function enlazarEventos() {
     const a = document.activeElement;
     if (a && a.tagName === 'IFRAME' && a.classList.contains('vista-archivo')) { try { a.blur(); window.focus(); } catch (e) { } }
   }, 250));
-  window.addEventListener('beforeunload', e => { if (S.sucio || (S.vista === 'diagrama' && PLANS.ed && planCambios().length)) { e.preventDefault(); e.returnValue = ''; } });
+  window.addEventListener('beforeunload', e => { if (hayCambiosPl() || (S.vista === 'diagrama' && PLANS.ed && planCambios().length)) { e.preventDefault(); e.returnValue = ''; } });
 }
 
 /* ============================================================
@@ -3823,6 +4057,9 @@ function formServicio(s) {
     '<label class="campo" title="Ej.: RAZ Barracas, Trelles y Montenegro: se factura lo que se cubre">Horas contratadas<select name="SinDiferencia">' +
       opciones([{ v: '', t: 'Según el contrato' + (sinDiferencia(Object.assign({}, s, { SinDiferencia: '' })) ? ' (por nombre: igual a las realizadas)' : '') },
         { v: 'SI', t: 'Iguales a las realizadas (sin diferencias)' }, { v: 'NO', t: 'Según el contrato (siempre)' }], s.SinDiferencia || '') + '</select></label>' +
+    '<label class="campo" title="Ej.: RAIZEN Dock Sud Supervisores y los RAZ: los carga Administración y el supervisor no los tiene que completar">Lo carga<select name="CargaAdmin">' +
+      opciones([{ v: '', t: 'Según el nombre' + (cargaAdmin(Object.assign({}, s, { CargaAdmin: '' })) ? ' (Administración)' : ' (el supervisor)') },
+        { v: 'SI', t: 'Administración (el supervisor solo consulta)' }, { v: 'NO', t: 'El supervisor' }], s.CargaAdmin || '') + '</select></label>' +
     '<label class="campo">Estado<select name="Activo" id="selEstadoServ">' + opciones([{ v: 'SI', t: 'Activo' }, { v: 'NO', t: 'Baja' }], s.Activo || 'SI') + '</select></label>' +
     '<label class="campo" id="campoFechaBaja"' + (s.Activo === 'NO' ? '' : ' hidden') + '>Fecha de baja<input type="date" name="FechaBaja" value="' + esc(s.FechaBaja || '') + '"></label>' +
     '<div class="ancho"><div class="campo">Horas contratadas por día</div><div style="overflow-x:auto"><table class="contrato"><tr><th></th>' +
@@ -7810,7 +8047,7 @@ const INSTR = [
       { m: '.pincel', t: '<b>Pinceles</b>: Blanco, Celeste o Gris pintan las celdas elegidas (día, noche, sin servicio).' },
       { m: '#btnNota', t: '<b>Comentario</b>: deja una nota en la celda. Si escribís un horario (ej. "05.30 a 14") las horas se ajustan solas (8.5).' },
       { m: '#btnGuardar', t: '<b>Guardar</b>: guarda sin enviar. Podés seguir otro día.' },
-      { m: '#btnEnviarProg', t: '<b>Enviar proyección</b>: le llega a administración. Una vez enviada, el supervisor ya no la puede cambiar; lo que cambie después se informa en Novedades semanales.' },
+      { m: '#btnEnviarProg', t: '<b>Enviar proyección</b>: le llega a administración. Una vez enviada (o cuando el período ya empezó y la proyección está cargada), el supervisor ya no la puede cambiar: lo que cambie después se carga en Novedades semanales, desde la semana que está informando en adelante.' },
       { m: '#btnExcel', t: '<b>Excel</b>: baja la planilla con el formato de la empresa.' },
       { m: '#btnVac', t: '<b>Vacaciones</b>: quién sale de vacaciones en el período y quién lo cubre.' },
       { m: '#btnOtrosSup', t: '<b>Otros supervisores</b>: ver (sin modificar) las planillas de otras zonas.' },
@@ -7819,7 +8056,9 @@ const INSTR = [
     tips: [
       { t: 'El 25 de abril (Día del Vigilador) el que trabaja lleva "!" en la columna DV de los informes.' },
       { t: 'Una persona nueva en la empresa que está en instrucción figura como YNG (nuevo ingreso). Si ya trabajaba en otro servicio, no.' },
-      { t: 'Administración puede modificar todo, aun después del envío.', solo: 'NOSUP' }
+      { t: 'Administración puede modificar todo, aun después del envío. Lo que cambia en la Proyección se ve también en Novedades semanales, aunque la semana esté abierta (desbloqueada).', solo: 'NOSUP' },
+      { t: 'Cuando la proyección ya está cargada y el período empezó, la Proyección queda solo para consultar: los cambios van por Novedades semanales.', solo: 'SUP' },
+      { t: 'Los servicios en gris (por ejemplo RAIZEN Dock Sud Supervisores y los RAZ) los carga Administración: no hace falta que los completes.', solo: 'SUP' }
     ] },
 
   { k: 'novedades', perm: 'programacion', ir: ['planilla', { modo: 'nov', periodo: '__prog' }], t: 'Novedades semanales', ic: 'novedades', c: '#0a8f8f', img: { def: 'novedades', SUPERVISOR: 'novedades_sup' },
@@ -7829,11 +8068,19 @@ const INSTR = [
       { m: '#c-0-0', t: 'Corregí los días que cambiaron. Las celdas distintas a lo proyectado quedan con <b>borde naranja</b>.' },
       { m: 'text=Comparado con lo proyectado', t: '<b>Comparado con lo proyectado</b>: resumen de lo que cambió en cobertura, retén e instrucción.' },
       { m: 'text=Enviar semana', t: '<b>Enviar semana</b>: informa la semana a administración. Las semanas ya cerradas quedan con borde azul.' },
-      { m: 'text=Reabrir', t: '<b>Reabrir</b>: vuelve a abrir una semana ya informada para corregirla.', solo: 'ADMIN' }
+      { m: 'text=Reabrir', t: '<b>Reabrir</b>: vuelve a abrir una semana ya informada para corregirla.', solo: 'ADMIN' },
+      { m: '#tabsSem||.dia-tab', t: 'Los <b>lunes</b> todas las pestañas arrancan sin pintar. Cada pestaña se pinta de rojo cuando la cargás o la modificás esa semana; arriba dice cuántas te faltan.', solo: 'SUP' },
+      { m: '.dia-tab', t: 'Los <b>lunes</b> todas las pestañas arrancan sin pintar y se pintan de rojo a medida que se cargan o modifican esa semana: así se ve qué servicios ya informó cada supervisor.', solo: 'NOSUP' },
+      { m: '#btnSinNov', t: '<b>Sin novedades esta semana</b>: si en un servicio no cambió nada, tocalo y la pestaña queda pintada igual.' },
+      { m: '#btnGuardar', t: '<b>Guardar</b>: no hace falta guardar pestaña por pestaña. Pasá por todas las que tengas que cambiar (las que tienen cambios sin guardar muestran un punto blanco) y al terminar tocá <b>Guardar todo</b>: se guardan todas juntas.' },
+      { m: '#btnCopiarTodo', t: '<b>Copiar todo el listado</b>: selecciona todo el personal del servicio de una vez y lo copia con los colores, para pegarlo con Ctrl+V en cualquier hoja de Excel.', solo: 'ADMIN' }
     ],
     tips: [
-      { t: 'El supervisor puede cambiar las novedades de la semana en curso y de las que no vencieron. Una semana vencida ya no se modifica: pedíselo a administración.', solo: 'SUP' },
-      { t: 'Si mandaste la proyección y cambió algo, no se toca la proyección: se informa acá.', solo: 'SUP' }
+      { t: 'Solo se modifican los días desde la semana que estás informando en adelante. Las semanas anteriores quedan cerradas: si hay que corregir algo, pedíselo a administración.', solo: 'SUP' },
+      { t: 'La Proyección no se toca: una vez cargada, todo lo que cambie se informa acá.', solo: 'SUP' },
+      { t: 'Si salís de la pantalla con pestañas sin guardar, la app te avisa antes.', solo: 'SUP' },
+      { t: 'Los servicios en gris (por ejemplo RAIZEN Dock Sud Supervisores y los RAZ) los carga Administración: no hace falta completarlos y no frenan el envío de la semana.', solo: 'SUP' },
+      { t: 'Administración puede modificar acá o en la Proyección. Lo que se cambia en la Proyección se ve también acá, aunque la semana esté abierta.', solo: 'NOSUP' }
     ] },
 
   { k: 'bandeja', perm: 'bandeja', ir: ['bandeja'], t: 'Semanas informadas', ic: 'bandeja', c: '#e08a00', img: 'bandeja', soloRol: 'NOSUP',
@@ -7964,7 +8211,8 @@ const INSTR = [
     pasos: [
       { m: '#btnNuevo', t: '<b>Nuevo servicio</b>.', solo: 'ADMIN' },
       { m: 'text=Editar', t: '<b>Editar</b> (o clic en el objetivo): nombre, supervisor, ciclo, contratadas, líneas de teléfono.' },
-      { m: '.af-btn', t: 'Filtrá y ordená con las flechitas <b>▾</b>.' }
+      { m: '.af-btn', t: 'Filtrá y ordená con las flechitas <b>▾</b>.' },
+      { m: 'text=Editar', t: '<b>Lo carga</b> (en Editar): Administración o el supervisor. Los que carga Administración (ej.: RAIZEN Dock Sud Supervisores y los RAZ) el supervisor los ve en gris, solo para consultar, y no los tiene que completar.', solo: 'ADMIN' }
     ] },
 
   { k: 'personal', perm: 'personal', ir: ['personal'], t: 'Personal', ic: 'personal', c: '#0b63c9', img: 'personal',
@@ -8046,7 +8294,7 @@ const INSTR = [
 
 // Perfil para el instructivo: ADMIN, SUPERVISOR o CONSULTA
 function rolInstr() { return esAdmin() ? 'ADMIN' : (S.u && S.u.rol === 'CONSULTA' ? 'CONSULTA' : 'SUPERVISOR'); }
-const NOMBRE_ROL_INSTR = { ADMIN: 'Administración', SUPERVISOR: 'Supervisor', CONSULTA: 'Consulta' };
+const NOMBRE_ROL_INSTR = { ADMIN: 'Administrador', SUPERVISOR: 'Supervisor', CONSULTA: 'Consulta' };
 function instrVale(solo, rol) {
   if (!solo) return true;
   if (solo === 'ADMIN') return rol === 'ADMIN';
@@ -8127,7 +8375,7 @@ async function vInstructivo() {
   $('#main').innerHTML =
     '<div class="barra"><div><h1>Instructivo</h1><p class="sub" style="margin:0">Para qué sirve cada pantalla y cómo se usa. Perfil: <b>' + esc(nomPerfil) + '</b>. ' +
     'Los números de cada imagen corresponden a los pasos de abajo.</p></div><div class="esp"></div>' +
-    (esAdmin() ? '<label class="campo">Ver como el perfil<select id="insRol"><option value="">El mío (Administración)</option>' + opciones((INSTRV.perfiles.perfiles || []).filter(p => norm(p) !== 'ADMINISTRADOR').map(p => ({ v: p, t: p })), INSTRV.perfil) + '</select></label>' : '') +
+    (esAdmin() ? '<label class="campo" title="Elegí para quién es: el instructivo y el PDF muestran solo lo que tiene asignado ese perfil">Instructivo para<select id="insRol"><option value="">Administrador</option>' + opciones((INSTRV.perfiles.perfiles || []).filter(p => norm(p) !== 'ADMINISTRADOR').map(p => ({ v: p, t: p })), INSTRV.perfil) + '</select></label>' : '') +
     '<button class="btn btn-pdf" id="insPdf">Descargar PDF</button></div>' +
     '<div class="ins-wrap"><nav class="ins-idx">' + secs.map(s => '<a href="#ins-' + s.k + '" data-k="' + s.k + '" style="--c:' + s.c + '"><i>' + icono(s.ic) + '</i>' + esc(s.t) + '</a>').join('') + '</nav>' +
     '<div class="ins-cont">' + secs.map(seccion).join('') + '</div></div>';

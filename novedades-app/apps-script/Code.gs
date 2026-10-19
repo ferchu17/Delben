@@ -76,7 +76,7 @@ var HOJAS = {
     'JefeOperaciones', 'Ciclo',
     'D_LUN', 'D_MAR', 'D_MIE', 'D_JUE', 'D_VIE', 'D_SAB', 'D_DOM',
     'N_LUN', 'N_MAR', 'N_MIE', 'N_JUE', 'N_VIE', 'N_SAB', 'N_DOM',
-    'Activo', 'FechaBaja', 'CorreoServicio', 'D_FER', 'N_FER', 'Direccion', 'Jurisdiccion', 'Pestana', 'ObjetivoId', 'Localidad', 'SinDiferencia', 'Lineas'],
+    'Activo', 'FechaBaja', 'CorreoServicio', 'D_FER', 'N_FER', 'Direccion', 'Jurisdiccion', 'Pestana', 'ObjetivoId', 'Localidad', 'SinDiferencia', 'Lineas', 'CargaAdmin'],
   Planilla: ['Periodo', 'ServicioId', 'Seccion', 'Orden', 'Legajo', 'Nombre',
     'Empresa', 'Puesto', 'Turno'].concat(DIAS_COL).concat(['ActualizadoPor', 'Actualizado']),
   Semanas: ['Periodo', 'ServicioId', 'Semana', 'Desde', 'Hasta', 'EnviadoPor',
@@ -84,6 +84,8 @@ var HOJAS = {
   Plus: ['Periodo', 'ServicioId', 'Legajo', 'Nombre', 'Funcion', 'Dias',
     'Observaciones', 'CargadoPor', 'Fecha', 'Dia'],
   Programaciones: ['Periodo', 'Supervisor', 'EnviadoPor', 'FechaEnvio', 'Servicios'],
+  // v1.25.0: pestañas marcadas "Sin novedades" en Novedades semanales (Lunes = la semana en que se marcó)
+  SinNovedades: ['Periodo', 'ServicioId', 'Lunes', 'Usuario', 'Fecha'],
   Feriados: ['Fecha', 'Descripcion'],
   // Lo proyectado de cada planilla (para marcar los días que se modificaron después).
   Proyectado: null,
@@ -316,7 +318,7 @@ function hoja_(nombre) {
 // y, además, en la caché de Apps Script por unos minutos: así abrir una planilla o cambiar de pestaña
 // no vuelve a leer toda la hoja cada vez. Cada vez que la app escribe una hoja, su caché se invalida.
 var MEMO_HOJAS_ = {};
-var HOJAS_EN_CACHE_ = { ContratadoDia: 1, AjustesInforme: 1, Planilla: 1, Proyectado: 1, Plus: 1, Semanas: 1, SemanasDef: 1, Programaciones: 1, Servicios: 1, Codigos: 1, Feriados: 1, Config: 1, Contactos: 1, Facturar: 1, ConfAjustes: 1 };
+var HOJAS_EN_CACHE_ = { SinNovedades: 1, ContratadoDia: 1, AjustesInforme: 1, Planilla: 1, Proyectado: 1, Plus: 1, Semanas: 1, SemanasDef: 1, Programaciones: 1, Servicios: 1, Codigos: 1, Feriados: 1, Config: 1, Contactos: 1, Facturar: 1, ConfAjustes: 1 };
 var CACHE_HOJA_SEG_ = 600;
 function versionHoja_(nombre, nueva) {
   var c = CacheService.getScriptCache(), k = 'ver_' + nombre;
@@ -810,7 +812,7 @@ var ACCIONES_ = {
     var servs = serviciosZona_(serv.Supervisor, serv.Id);
     var todo = { numero: 0, desdeIdx: 0, hastaIdx: info.n - 1 };
     if (!(d.forzar && esAdmin_(u))) {
-      var faltan = faltantesZona_(servs, d.periodo, todo, periodoAnterior_(d.periodo));
+      var faltan = faltantesZona_(servs.filter(function (s) { return !cargaAdmin_(s); }), d.periodo, todo, periodoAnterior_(d.periodo));
       if (faltan.length) return { faltan: faltan };
     }
     var reg = { Periodo: d.periodo, Supervisor: serv.Supervisor, EnviadoPor: u.usuario, FechaEnvio: ahora_(), Servicios: servs.map(function (s) { return s.Servicio; }).join(', ') };
@@ -1148,6 +1150,7 @@ var ACCIONES_ = {
       }).sort(function (a, b) { return Number(a.Orden) - Number(b.Orden); }),
       proyectado: leer_('Proyectado').filter(function (f) { return f.Periodo === d.periodo && f.ServicioId === d.servicioId; })
         .sort(function (a, b) { return Number(a.Orden) - Number(b.Orden); }),
+      sinNov: leer_('SinNovedades').filter(function (f) { return f.Periodo === d.periodo && f.ServicioId === d.servicioId; }),
       plus: leer_('Plus').filter(function (f) {
         return f.Periodo === d.periodo && f.ServicioId === d.servicioId;
       }),
@@ -1168,7 +1171,7 @@ var ACCIONES_ = {
       return permitidos.some(function (s) { return s.Id === id; });
     }).slice(0, 200);
     traerPeriodoDrive_(d.periodo);
-    var pl = planillaPeriodo_(d.periodo), proy = leer_('Proyectado'), plus = leer_('Plus'), sem = leer_('Semanas'), prog = leer_('Programaciones');
+    var pl = planillaPeriodo_(d.periodo), proy = leer_('Proyectado'), plus = leer_('Plus'), sem = leer_('Semanas'), prog = leer_('Programaciones'), sinNov = leer_('SinNovedades');
     var nombres = {};
     leer_('Servicios').forEach(function (s) { nombres[s.Id] = s.Servicio; });
     var out = {};
@@ -1181,7 +1184,8 @@ var ACCIONES_ = {
         filas: pl.filter(function (f) { return f.ServicioId === id; }).sort(function (a, b) { return Number(a.Orden) - Number(b.Orden); }),
         proyectado: proy.filter(function (f) { return f.Periodo === d.periodo && f.ServicioId === id; }).sort(function (a, b) { return Number(a.Orden) - Number(b.Orden); }),
         plus: plus.filter(function (f) { return f.Periodo === d.periodo && f.ServicioId === id; }),
-        semanas: sem.filter(function (f) { return f.Periodo === d.periodo && f.ServicioId === id; })
+        semanas: sem.filter(function (f) { return f.Periodo === d.periodo && f.ServicioId === id; }),
+        sinNov: sinNov.filter(function (f) { return f.Periodo === d.periodo && f.ServicioId === id; })
       };
     });
     var ocup = pl.filter(function (f) { return f.Legajo || f.Nombre; }).map(function (f) {
@@ -1201,7 +1205,9 @@ var ACCIONES_ = {
   },
 
   guardarPlanilla: function (u, d) {
-    servicioPermitido_(u, d.servicioId);
+    var servG = servicioPermitido_(u, d.servicioId);
+    // v1.25.0: los servicios que carga Administración (ej.: RAIZEN Dock Sud Supervisores y los RAZ) el supervisor solo los consulta
+    if (!esAdmin_(u) && cargaAdmin_(servG)) throw new Error('El servicio ' + servG.Servicio + ' lo carga Administración: no hace falta que lo completes.');
     exigir_(u, d.periodo > periodoActualServidor_() ? 'programacion' : 'planillas', true);
     var lock = LockService.getScriptLock();
     lock.waitLock(20000);
@@ -1290,7 +1296,7 @@ var ACCIONES_ = {
       if (!pendientes.length) throw new Error('Esa semana ya estaba enviada.');
 
       if (!(d.forzar && esAdmin_(u))) {
-        var faltan = faltantesZona_(servs, d.periodo, semana);
+        var faltan = faltantesZona_(servs.filter(function (s) { return !cargaAdmin_(s) || s.Id === serv.Id && esAdmin_(u); }), d.periodo, semana);
         if (faltan.length) return { faltan: faltan };
       }
 
@@ -1319,6 +1325,23 @@ var ACCIONES_ = {
       aviso = 'Las novedades quedaron enviadas, pero el mail no salió: ' + e.message;
     }
     return { semanas: regs, servicios: pendientes.map(function (s) { return s.Servicio; }), aviso: aviso };
+  },
+
+  // v1.25.0: Novedades semanales: marcar (o desmarcar) una pestaña como "Sin novedades" esta semana.
+  // Así queda pintada como las que se cargaron. Los lunes se despintan todas (la marca es de la semana).
+  sinNovedades: function (u, d) {
+    servicioPermitido_(u, d.servicioId);
+    exigir_(u, 'planillas', true);
+    var lunes = /^\d{4}-\d{2}-\d{2}$/.test(String(d.lunes || '')) ? String(d.lunes) : lunesActual_();
+    var lock = LockService.getScriptLock(); lock.waitLock(20000);
+    try {
+      var resto = leer_('SinNovedades').filter(function (f) {
+        return !(f.Periodo === d.periodo && f.ServicioId === d.servicioId && f.Lunes === lunes);
+      });
+      if (d.marcar) resto.push({ Periodo: d.periodo, ServicioId: d.servicioId, Lunes: lunes, Usuario: u.usuario, Fecha: ahora_() });
+      reescribir_('SinNovedades', resto);
+      return { sinNov: resto.filter(function (f) { return f.Periodo === d.periodo && f.ServicioId === d.servicioId; }) };
+    } finally { lock.releaseLock(); }
   },
 
   reabrirSemana: function (u, d) {
@@ -2233,4 +2256,20 @@ function jefeOperacionesPorDefecto_() {
   lista.forEach(function (s) { if (!String(s.JefeOperaciones || '').trim()) { s.JefeOperaciones = jo; n++; } });
   if (n) reescribir_('Servicios', lista);
   return n;
+}
+
+// v1.25.0: servicios que carga Administración. Columna CargaAdmin de Servicios: SI / NO; vacía = por el nombre
+// (RAIZEN Dock Sud Supervisores y los RAZ de Barracas, Trelles y Montenegro).
+function cargaAdmin_(serv) {
+  if (!serv) return false;
+  var v = String(serv.CargaAdmin || '').trim().toUpperCase();
+  if (v === 'SI') return true;
+  if (v === 'NO') return false;
+  var t = String((serv.Servicio || '') + ' ' + (serv.Cliente || '')).normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase();
+  return (/\bRAIZEN\b/.test(t) && /SUPERVISOR/.test(t)) || (/\bRAZ\b/.test(t) && /BARRACAS|TRELLES|MONTENEGRO/.test(t));
+}
+// Lunes de la semana en curso (yyyy-MM-dd), en la hora de Argentina.
+function lunesActual_() {
+  var d = new Date(), dow = Number(Utilities.formatDate(d, APP.TZ, 'u'));
+  return Utilities.formatDate(new Date(d.getTime() - (dow - 1) * 864e5), APP.TZ, 'yyyy-MM-dd');
 }

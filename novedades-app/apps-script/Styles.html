@@ -887,6 +887,17 @@ main table td br + small, .fs-std table td br + small { white-space: nowrap; }
 /* v1.22.4 · pestañas de servicios con datos: rojo (204), letras blancas en negrita */
 .dia-tab.tab-llena { background: #cc0000 !important; color: #fff !important; font-weight: 800 !important; border-color: #a30000 !important; }
 .dia-tab.tab-llena.on { box-shadow: 0 0 0 3px rgba(204, 0, 0, .35), inset 0 -3px 0 #ffffff; }
+/* v1.25.0 Novedades semanales: pestaña con cambios sin guardar (punto blanco), servicios que carga Administración (gris) */
+.dia-tab.tab-pend { position: relative; padding-right: 22px !important; }
+.dia-tab.tab-pend::after { content: ''; position: absolute; right: 8px; top: 50%; width: 7px; height: 7px; margin-top: -3.5px; border-radius: 50%; background: #fff; box-shadow: 0 0 0 2px rgba(255, 255, 255, .35); }
+.dia-tab.tab-adm { background: #eceff3 !important; color: #8a94a3 !important; border-style: dashed !important; font-style: italic; }
+.dia-tab.tab-adm.on { color: #475569 !important; box-shadow: 0 0 0 2px #cbd5e1; }
+.tabs-sem { margin: -2px 0 8px; font-size: 12.5px; color: #475569; }
+.tabs-sem b { color: #cc0000; }
+.tabs-sem-pend { color: #b45309; font-weight: 700; }
+.btn.sin-nov { border-color: #cc0000; color: #cc0000; }
+.btn.sin-nov.on { background: #cc0000; color: #fff; }
+.solo-ver.solo-adm { background: #eef2f7; color: #334155; }
 input.t-fijo { background: #eef2f7 !important; color: #0f172a; font-weight: 700; cursor: not-allowed; }
 </style>
 
