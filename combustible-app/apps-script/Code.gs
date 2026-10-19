@@ -390,7 +390,8 @@ function leerConGemini_(key, dataUrl, opciones) {
     '{"fecha":"DD/MM/AAAA","numero":"punto de venta y número tal cual figura, ej 00014-00021464","proveedor":"razón social del EMISOR (la estación)",' +
     '"cuit":"CUIT del EMISOR con guiones, NO el del cliente","producto":"ej NAFTA SUPER, INFINIA, DIESEL","litros":numero,"precio_litro":numero,' +
     '"total":numero,"servicio":"opción de la lista o null"}\n' +
-    'Reglas: "total" es el TOTAL final pagado con IVA e impuestos incluidos. En los tickets argentinos la coma es decimal y el punto separa miles: ' +
+    'Reglas: "total" es el TOTAL final pagado con IVA e impuestos incluidos (el importe más grande del renglón TOTAL); ' +
+    'NUNCA el subtotal, el neto gravado ni el importe sin IVA. '+ 'En los tickets argentinos la coma es decimal y el punto separa miles: ' +
     'devolvé los números con punto decimal y sin separador de miles (ej 45956.19). Si un dato no se lee, poné null. No inventes datos.\n' +
     '"servicio": el supervisor suele escribir A MANO sobre el ticket a qué servicio corresponde la carga (ej. "Fincas", "San Francisco", "Laguna"). ' +
     'Si hay una anotación así, devolvé la opción de esta lista que corresponda, copiada exactamente igual: ' + JSON.stringify(opciones) +
@@ -481,19 +482,23 @@ function parsearTicket_(texto, opciones) {
     if (m) r.litros = num_(m[1]);
   }
 
+  // Total CON IVA: nunca el subtotal ni el neto gravado. El total final siempre es el mayor importe del ticket
+  // (subtotal, neto, IVA e impuestos son partes de él), salvo lo que se pagó en efectivo o el vuelto.
+  const RX_IMP = /\$?\s*(\d{1,3}(?:\.\d{3})+,\d{2}|\d+,\d{2}|\d{1,3}(?:,\d{3})+\.\d{2}|\d+\.\d{2})(?!\d)/g;
+  const importes = l => { const out = []; let x; RX_IMP.lastIndex = 0; while ((x = RX_IMP.exec(l))) out.push(num_(x[1])); return out.filter(n => n >= 100 && n < 20000000); };
+  const pago = /EFECTIVO|RECIB|SU PAGO|PAGO CON|PAGA CON|VUELTO|CAMBIO|ENTREG/i;
   let total = 0;
-  for (let i = 0; i < lineas.length && !total; i++) {
-    const l = lineas[i];
-    if (/^TOTAL\b/i.test(l) && !/OTROS|TRIBUT|SUB/i.test(l)) {
-      let mm = l.match(/(\d[\d.]*[.,]\d{2})\s*$/);
-      if (!mm && lineas[i + 1]) mm = lineas[i + 1].match(/^\$?\s*(\d[\d.]*[.,]\d{2})\s*$/);
-      if (mm) total = num_(mm[1]);
+  // 1) Renglones "TOTAL ..." con importe en el mismo renglón (no subtotal / neto / gravado / IVA)
+  lineas.forEach(l => {
+    if (/\bTOTAL\b/i.test(l) && !/SUB|NETO|GRAVAD|IVA|OTROS|TRIBUT|PERCEP|IMPUEST|LITRO|PAGO|EFECT|VUELTO/i.test(l)) {
+      importes(l).forEach(n => { if (n > total) total = n; });
     }
-  }
-  if (!total) {
-    const nums = (t.match(/\b\d{1,3}(?:\.\d{3})+,\d{2}\b|\b\d+,\d{2}\b/g) || []).map(num_).filter(n => n >= 500 && n < 20000000);
-    if (nums.length) total = Math.max.apply(null, nums);
-  }
+  });
+  // 2) El mayor importe del ticket (sin pagos/vuelto). Si es mayor que el encontrado, es el total real
+  //    (pasa cuando el OCR separa las etiquetas de los valores).
+  let mayor = 0;
+  lineas.forEach(l => { if (!pago.test(l)) importes(l).forEach(n => { if (n > mayor) mayor = n; }); });
+  if (mayor > total) total = mayor;
   if (total) r.total = round2_(total);
   if (r.litros && r.total && !r.precio) r.precio = round2_(r.total / r.litros);
 
