@@ -5709,7 +5709,7 @@ async function vCierre(params) {
   if (S.vista !== 'cierre') return;
   if (r.demo) { $('#ciRes').innerHTML = '<div class="vacio-msg">' + esc(r.demo) + '</div>'; return; }
   const BLOQUES = [
-    ['dobleCarga', 'Informados el mismo día en dos o más servicios', 'Lo que cargaron los supervisores: la misma persona el mismo día en más de un servicio (los francos no cuentan). Con ⚠: suma más de 24 hs o tiene horas y una licencia a la vez.', 'bad'],
+    ['dobleCarga', 'Informados el mismo día en dos o más servicios', 'La misma persona con horas el mismo día en más de un servicio (las horas se suman). Los estados y abreviaturas no cuentan (F, VAC, OS, AO, P4…: P4 quiere decir que fue a cubrir el servicio 4 y sus horas están en ese servicio). Con ⚠: suma más de 24 hs.', 'bad'],
     ['noEnListado', 'No están en el listado de personal', 'Revisar el legajo o el nombre: así no se pueden liquidar.', 'bad'],
     ['bajaConHoras', 'De baja en el listado y con horas', 'Confirmar la fecha de baja.', 'bad'],
     ['empresaDistinta', 'Empresa distinta a la del listado', 'Corregir la empresa en la planilla o en el listado.', 'warn'],
@@ -8414,11 +8414,11 @@ const INSTR = [
       { m: '#ciPer', t: 'Elegí el <b>período</b>.' },
       { m: '.af-btn', t: 'Filtrá por tipo de aviso.' },
       { m: '#ciBajar', t: '<b>Descargar (Excel)</b>: también lleva el resumen de vacaciones, horas extras y licencias.' },
-      { m: 'text=Informados el mismo día', t: '<b>Informados el mismo día en dos o más servicios</b>: la misma persona cargada el mismo día en más de un servicio, con qué cargó cada supervisor (un día por renglón). Con ⚠ los más graves: más de 24 hs o horas y licencia a la vez.' },
+      { m: 'text=Informados el mismo día', t: '<b>Informados el mismo día en dos o más servicios</b>: la misma persona con horas el mismo día en más de un servicio, con las horas que cargó cada supervisor y el total (un día por renglón). Los estados y abreviaturas (F, VAC, OS, AO, P4…) no cuentan. Con ⚠: más de 24 hs.' },
       { m: 'text=Resumen del período', t: '<b>Resumen del período</b>: total de días de vacaciones, total de horas extras y cada licencia o ausencia con sus días y personas. Cada persona cuenta una sola vez por día aunque esté cargada en dos servicios. <b>Tocá un total o un estado</b> (por ejemplo VAC) y se abre la lista de personas con sus días y su servicio, ordenada por supervisor y por empresa, con subtotales; se puede copiar o bajar a Excel.' }
     ],
     tips: [
-      { t: 'Los francos no cuentan como "dos servicios el mismo día". Las horas extras salen con las mismas fórmulas del Consolidado.' }
+      { t: 'Solo las horas cuentan como "dos servicios el mismo día": un franco, un estado o una abreviatura del servicio que fue a cubrir (ej.: P4 = SUCRE 4225, AO = Arauco Oasis) no. Las horas extras salen con las mismas fórmulas del Consolidado.' }
     ] },
 
   { k: 'datos', perm: 'datos', ir: ['datos'], t: 'Datos', ic: 'config', c: '#475569', img: 'datos',

@@ -1311,18 +1311,19 @@ function controlCierre_(periodo) {
     var vacios = [];
     for (var i = 0; i < n; i++) if (!g.dias[i] || !g.dias[i].length) vacios.push(ddmm(i));
     if (vacios.length) out.diasSinDato.push(Object.assign({ Detalle: vacios.length + ' día' + (vacios.length === 1 ? '' : 's') + ' sin dato: ' + vacios.slice(0, 12).join(', ') + (vacios.length > 12 ? '…' : '') }, base));
-    // v1.25.2: informado el mismo día en dos o más servicios (horas en los dos, u horas en uno y un estado en otro).
-    // Los francos no cuentan. Si suma más de 24 hs o tiene horas y licencia a la vez, va marcado con ⚠.
+    // v1.25.4: informado el mismo día con HORAS en dos o más servicios (las horas se suman).
+    // Los estados y abreviaturas (F, VAC, OS, AO, P4...) no cuentan: P4 = va a cubrir al servicio 4, sus horas están en ese servicio.
+    // Si suma más de 24 hs va marcado con ⚠.
     var dobles = [], graves = 0;
     for (var j = 0; j < n; j++) {
-      var cargas = (g.dias[j] || []).filter(function (x) { return x.c.tipo === 'horas' || (x.c.tipo === 'codigo' && !FRANCOS_CIERRE_[x.c.cod]); });
+      var cargas = (g.dias[j] || []).filter(function (x) { return x.c.tipo === 'horas'; });
       var servD = cargas.map(function (x) { return x.serv; }).filter(function (x, i, a) { return a.indexOf(x) === i; });
       if (cargas.length < 2 || servD.length < 2) continue;
-      var h = cargas.filter(function (x) { return x.c.tipo === 'horas'; });
+      var h = cargas;
       var tot = h.reduce(function (a, x) { return a + x.c.h; }, 0);
-      var grave = tot > 24 || (h.length && h.length < cargas.length);
+      var grave = tot > 24;
       if (grave) graves++;
-      dobles.push((grave ? '⚠ ' : '') + ddmm(j) + ': ' + cargas.map(function (x) { return (x.c.tipo === 'horas' ? x.c.h + ' hs' : x.c.cod) + ' en ' + x.serv; }).join(' + '));
+      dobles.push((grave ? '⚠ ' : '') + ddmm(j) + ': ' + cargas.map(function (x) { return x.c.h + ' hs en ' + x.serv; }).join(' + ') + ' = ' + tot + ' hs');
     }
     if (dobles.length) out.dobleCarga.push(Object.assign({ Detalle: dobles.join(' · '), Dias: dobles.length, Graves: graves }, base));
   });
