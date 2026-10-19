@@ -1311,13 +1311,20 @@ function controlCierre_(periodo) {
     var vacios = [];
     for (var i = 0; i < n; i++) if (!g.dias[i] || !g.dias[i].length) vacios.push(ddmm(i));
     if (vacios.length) out.diasSinDato.push(Object.assign({ Detalle: vacios.length + ' día' + (vacios.length === 1 ? '' : 's') + ' sin dato: ' + vacios.slice(0, 12).join(', ') + (vacios.length > 12 ? '…' : '') }, base));
-    var dobles = [];
+    // v1.25.2: informado el mismo día en dos o más servicios (horas en los dos, u horas en uno y un estado en otro).
+    // Los francos no cuentan. Si suma más de 24 hs o tiene horas y licencia a la vez, va marcado con ⚠.
+    var dobles = [], graves = 0;
     for (var j = 0; j < n; j++) {
-      var h = (g.dias[j] || []).filter(function (x) { return x.c.tipo === 'horas'; });
+      var cargas = (g.dias[j] || []).filter(function (x) { return x.c.tipo === 'horas' || (x.c.tipo === 'codigo' && !FRANCOS_CIERRE_[x.c.cod]); });
+      var servD = cargas.map(function (x) { return x.serv; }).filter(function (x, i, a) { return a.indexOf(x) === i; });
+      if (cargas.length < 2 || servD.length < 2) continue;
+      var h = cargas.filter(function (x) { return x.c.tipo === 'horas'; });
       var tot = h.reduce(function (a, x) { return a + x.c.h; }, 0);
-      if (h.length > 1 && tot > 24) dobles.push(ddmm(j) + ' (' + tot + ' hs: ' + h.map(function (x) { return x.serv; }).join(' + ') + ')');
+      var grave = tot > 24 || (h.length && h.length < cargas.length);
+      if (grave) graves++;
+      dobles.push((grave ? '⚠ ' : '') + ddmm(j) + ': ' + cargas.map(function (x) { return (x.c.tipo === 'horas' ? x.c.h + ' hs' : x.c.cod) + ' en ' + x.serv; }).join(' + '));
     }
-    if (dobles.length) out.dobleCarga.push(Object.assign({ Detalle: dobles.slice(0, 6).join(' · ') + (dobles.length > 6 ? '…' : '') }, base));
+    if (dobles.length) out.dobleCarga.push(Object.assign({ Detalle: dobles.join(' · '), Dias: dobles.length, Graves: graves }, base));
   });
   var informados = [];
   Object.keys(gente).forEach(function (k) { if (gente[k].p) informados.push(gente[k].p); });
@@ -1369,4 +1376,40 @@ function accionSimExcel_(u, d) {
   try { sh.setName(nomServ.replace(/[\[\]\*\?\/\\:]/g, ' ').slice(0, 90) || 'Proyección'); } catch (e) { }
   soloPestanas_(ss, [sh.getName()]);
   return salida_(exportarXlsx_(ss, nombre));
+}
+
+// v1.25.2: estados que no son una carga (no cuentan como "informado en dos servicios el mismo día")
+var FRANCOS_CIERRE_ = { F: 1, FCO: 1, FR: 1, FRANCO: 1, X: 1, '-': 1 };
+// v1.25.2: resumen del período para el Control de cierre: vacaciones, horas extras y licencias, con sus totales
+function resumenCierre_(periodo) {
+  var lic = datosLicencias_(periodo), out = { vacaciones: [], extras: [], licencias: [], porCodigo: {} };
+  var vac = {};
+  lic.forEach(function (x) {
+    var pc = out.porCodigo[x.Codigo] = out.porCodigo[x.Codigo] || { dias: 0, personas: {} };
+    pc.dias += Number(x.Dias) || 0; pc.personas[(x.Legajo || '') + '|' + x.Nombre] = 1;
+    if (x.Codigo === 'VAC') {
+      var k = (x.Legajo || '') + '|' + x.Nombre;
+      var v = vac[k] = vac[k] || { Legajo: x.Legajo, Nombre: x.Nombre, Empresa: x.Empresa, Servicios: [], Dias: 0, Fechas: [] };
+      if (v.Servicios.indexOf(x.Servicio) < 0) v.Servicios.push(x.Servicio);
+      v.Dias += Number(x.Dias) || 0; v.Fechas.push(x.Fechas);
+    } else out.licencias.push({ Codigo: x.Codigo, Legajo: x.Legajo, Nombre: x.Nombre, Empresa: x.Empresa, Servicios: x.Servicio, Dias: Number(x.Dias) || 0, Fechas: x.Fechas });
+  });
+  Object.keys(out.porCodigo).forEach(function (c) { out.porCodigo[c].personas = Object.keys(out.porCodigo[c].personas).length; });
+  out.vacaciones = Object.keys(vac).map(function (k) { var v = vac[k]; return { Legajo: v.Legajo, Nombre: v.Nombre, Empresa: v.Empresa, Servicios: v.Servicios.join(', '), Dias: v.Dias, Fechas: v.Fechas.join(', ') }; })
+    .sort(function (a, b) { return b.Dias - a.Dias || String(a.Nombre).localeCompare(String(b.Nombre)); });
+  try {
+    var ex = vistaTabla_('extras', periodo);
+    out.extras = (ex.filas || []).filter(function (f) { return Number(f.Ext) > 0; }).map(function (f) {
+      return { Legajo: f.Legajo, Nombre: f.Nombre, Empresa: f.Empresa, Servicios: f.Servicio, Total: f.Liq, Normales: f.Norm, Extras: f.Ext, Ausentismo: f.Aus };
+    });
+    out.notaExtras = ex.nota || '';
+  } catch (e) { out.errorExtras = e.message; }
+  var r2 = function (x) { return Math.round(x * 100) / 100; };
+  out.totales = {
+    vacDias: out.vacaciones.reduce(function (a, x) { return a + x.Dias; }, 0), vacPersonas: out.vacaciones.length,
+    extras: r2(out.extras.reduce(function (a, x) { return a + (Number(x.Extras) || 0); }, 0)), extrasPersonas: out.extras.length,
+    licDias: out.licencias.reduce(function (a, x) { return a + x.Dias; }, 0),
+    licPersonas: out.licencias.map(function (x) { return (x.Legajo || '') + '|' + x.Nombre; }).filter(function (x, i, a) { return a.indexOf(x) === i; }).length
+  };
+  return out;
 }

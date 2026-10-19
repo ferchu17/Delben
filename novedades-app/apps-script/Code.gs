@@ -1443,7 +1443,10 @@ var ACCIONES_ = {
   // Control de cierre del período (ver Plantilla.gs).
   cierre: function (u, d) {
     exigir_(u, 'cierre', false);
-    return controlCierre_(d.periodo);
+    var r = controlCierre_(d.periodo);
+    // v1.25.2: resumen de vacaciones, horas extras y licencias del período
+    try { r.resumen = resumenCierre_(d.periodo); } catch (e) { r.resumen = { error: e.message }; }
+    return r;
   },
 
   datosPeriodos: function (u, d) {

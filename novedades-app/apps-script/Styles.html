@@ -1077,4 +1077,13 @@ table.sim-grid td:nth-child(2).fijo, table.sim-grid th:nth-child(2).fijo { min-w
 /* v1.24.2: Planificación de servicios en modificación: sin el recuadro azul en cada celda (los bordes quedan como en el Excel) */
 .pe-on td.pe { box-shadow: none; }
 .pe-on td.pe:hover { box-shadow: inset 0 0 0 1px rgba(11, 63, 214, .55); }
+
+/* v1.25.2 Control de cierre: resumen del período */
+.ci-res .ci-card.ci-vac b { color: #1565c0; }
+.ci-res .ci-card.ci-ext b { color: #2e7d32; }
+.ci-res .ci-card.ci-lic b { color: #c2410c; }
+.ci-det { margin-top: 10px; border: 1px solid #e2e8f0; border-radius: 8px; padding: 8px 12px; }
+.ci-det summary { cursor: pointer; font-weight: 700; color: #1f4e79; }
+.ci-det[open] summary { margin-bottom: 8px; }
+.ci-tot td { background: #f1f5f9; }
 </style>

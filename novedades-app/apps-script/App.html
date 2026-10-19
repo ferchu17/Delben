@@ -5709,32 +5709,66 @@ async function vCierre(params) {
   if (S.vista !== 'cierre') return;
   if (r.demo) { $('#ciRes').innerHTML = '<div class="vacio-msg">' + esc(r.demo) + '</div>'; return; }
   const BLOQUES = [
+    ['dobleCarga', 'Informados el mismo día en dos o más servicios', 'Lo que cargaron los supervisores: la misma persona el mismo día en más de un servicio (los francos no cuentan). Con ⚠: suma más de 24 hs o tiene horas y una licencia a la vez.', 'bad'],
     ['noEnListado', 'No están en el listado de personal', 'Revisar el legajo o el nombre: así no se pueden liquidar.', 'bad'],
     ['bajaConHoras', 'De baja en el listado y con horas', 'Confirmar la fecha de baja.', 'bad'],
-    ['dobleCarga', 'Más de 24 horas el mismo día (dos servicios)', 'Revisar en qué servicio estuvo.', 'bad'],
     ['empresaDistinta', 'Empresa distinta a la del listado', 'Corregir la empresa en la planilla o en el listado.', 'warn'],
     ['diasSinDato', 'Días sin dato', 'Cada día tiene que tener horas, franco o un estado.', 'warn'],
     ['sinInformar', 'Activos en el listado que no figuran en ninguna planilla', 'Confirmar si están de licencia, de baja o si falta cargarlos.', 'warn']
   ];
-  const tabla = l => '<div class="tabla-wrap"><table class="t"><thead><tr><th>Legajo</th><th>Apellido y nombre</th><th>Empresa</th><th>Servicios</th><th>Detalle</th></tr></thead><tbody>' +
-    l.map(x => '<tr><td>' + esc(x.Legajo || '') + '</td><td><b>' + esc(x.Nombre) + '</b></td><td>' + esc(x.Empresa || '') + '</td><td><small>' + esc(x.Servicios || '') + '</small></td><td>' + esc(x.Detalle) + '</td></tr>').join('') + '</tbody></table></div>';
+  // v1.25.2: en "informados el mismo día en dos servicios" va un día por renglón
+  const tabla = (l, renglones) => '<div class="tabla-wrap"><table class="t"><thead><tr><th>Legajo</th><th>Apellido y nombre</th><th>Empresa</th><th>Servicios</th><th>Detalle</th></tr></thead><tbody>' +
+    l.map(x => '<tr><td>' + esc(x.Legajo || '') + '</td><td><b>' + esc(x.Nombre) + '</b></td><td>' + esc(x.Empresa || '') + '</td><td><small>' + esc(x.Servicios || '') + '</small></td><td>' +
+      (renglones ? String(x.Detalle).split(' · ').map(d => /^⚠/.test(d) ? '<b style="color:#b91c1c">' + esc(d) + '</b>' : esc(d)).join('<br>') : esc(x.Detalle)) + '</td></tr>').join('') + '</tbody></table></div>';
   const totalProb = BLOQUES.reduce((a, b) => a + r[b[0]].length, 0);
   $('#ciRes').innerHTML =
     (!r.conDatos ? '<div class="panel vacio-msg">El período ' + esc(r.nombrePeriodo) + ' no tiene planillas cargadas.</div>' : '') +
     '<div class="ci-cards"><div class="ci-card"><b>' + r.informados + '</b><span>personas informadas<br>(STD · Consolidado · 30/31 días)</span></div>' +
       '<div class="ci-card"><b>' + r.activosListado + '</b><span>activos en el listado de personal</span></div>' +
       '<div class="ci-card ' + (totalProb ? 'mal' : 'bien') + '"><b>' + totalProb + '</b><span>' + (totalProb ? 'cosas para revisar' : 'todo en orden') + '</span></div></div>' +
+    htmlResumenCierre(r.resumen) +
     BLOQUES.map(b => '<div class="panel ci-blq ' + b[3] + '"><div class="barra" style="margin:0"><div><h2 style="margin:0">' + esc(b[1]) + ' <span class="pill ' + (r[b[0]].length ? (b[3] === 'bad' ? 'bad' : 'warn') : 'ok') + '">' + r[b[0]].length + '</span></h2>' +
-      '<p class="sub" style="margin:0">' + esc(b[2]) + '</p></div></div>' + (r[b[0]].length ? tabla(r[b[0]]) : '<p class="sub" style="margin:6px 0 0">Sin observaciones.</p>') + '</div>').join('');
+      '<p class="sub" style="margin:0">' + esc(b[2]) + '</p></div></div>' + (r[b[0]].length ? tabla(r[b[0]], b[0] === 'dobleCarga') : '<p class="sub" style="margin:6px 0 0">Sin observaciones.</p>') + '</div>').join('');
   $('#ciBajar').disabled = false;
   $('#ciBajar').onclick = () => {
     const filas = [['Control', 'Legajo', 'Apellido y nombre', 'Empresa', 'Servicios', 'Detalle']];
     BLOQUES.forEach(b => r[b[0]].forEach(x => filas.push([b[1], x.Legajo || '', x.Nombre, x.Empresa || '', x.Servicios || '', x.Detalle])));
+    // v1.25.2: el resumen de vacaciones, horas extras y licencias también va en el archivo
+    const rs = r.resumen || {};
+    (rs.vacaciones || []).forEach(x => filas.push(['Vacaciones', x.Legajo || '', x.Nombre, x.Empresa || '', x.Servicios || '', x.Dias + ' días: ' + x.Fechas]));
+    (rs.extras || []).forEach(x => filas.push(['Horas extras', x.Legajo || '', x.Nombre, x.Empresa || '', x.Servicios || '', x.Extras + ' hs extras (total ' + x.Total + ' hs, normales ' + x.Normales + ')']));
+    (rs.licencias || []).forEach(x => filas.push(['Licencia ' + x.Codigo + (S.codigos[x.Codigo] ? ' (' + S.codigos[x.Codigo].Descripcion + ')' : ''), x.Legajo || '', x.Nombre, x.Empresa || '', x.Servicios || '', x.Dias + ' días: ' + x.Fechas]));
     const tsv = '﻿' + filas.map(f => f.map(c => '"' + String(c).replace(/"/g, '""') + '"').join(';')).join('\r\n');
     const url = URL.createObjectURL(new Blob([tsv], { type: 'text/csv;charset=utf-8' }));
     const a = document.createElement('a'); a.href = url; a.download = 'Control de cierre - ' + r.nombrePeriodo + '.csv'; document.body.appendChild(a); a.click(); a.remove();
     setTimeout(() => URL.revokeObjectURL(url), 4000);
   };
+}
+
+// v1.25.2: resumen del período en el Control de cierre: vacaciones, horas extras y licencias, con sus totales y el detalle por persona
+function htmlResumenCierre(rs) {
+  if (!rs) return '';
+  if (rs.error) return '<div class="panel"><b>Resumen del período</b><p class="sub">No se pudo armar: ' + esc(rs.error) + '</p></div>';
+  const t = rs.totales || {}, nf = v => (Math.round((Number(v) || 0) * 100) / 100).toLocaleString('es-AR');
+  const desc = c => (S.codigos[c] && S.codigos[c].Descripcion) || c;
+  const cods = Object.keys(rs.porCodigo || {}).sort((a, b) => (rs.porCodigo[b].dias - rs.porCodigo[a].dias) || a.localeCompare(b));
+  const tabla = (cab, filas) => '<div class="tabla-wrap"><table class="t"><thead><tr>' + cab.map(c => '<th>' + c + '</th>').join('') + '</tr></thead><tbody>' + filas.join('') + '</tbody></table></div>';
+  const det = (tit, n, html) => '<details class="ci-det"><summary>' + tit + ' <span class="pill neu">' + n + '</span></summary>' + (n ? html : '<p class="sub">Sin datos en el período.</p>') + '</details>';
+  return '<div class="panel ci-res"><h2 style="margin:0 0 4px">Resumen del período</h2><p class="sub" style="margin:0 0 10px">Lo que cargaron los supervisores en todas las planillas. Tocá cada título para ver el detalle por persona.</p>' +
+    '<div class="ci-cards">' +
+      '<div class="ci-card ci-vac"><b>' + nf(t.vacDias || 0) + '</b><span>días de vacaciones<br>' + (t.vacPersonas || 0) + ' persona' + (t.vacPersonas === 1 ? '' : 's') + '</span></div>' +
+      '<div class="ci-card ci-ext"><b>' + nf(t.extras || 0) + '</b><span>horas extras en total<br>' + (t.extrasPersonas || 0) + ' persona' + (t.extrasPersonas === 1 ? '' : 's') + '</span></div>' +
+      '<div class="ci-card ci-lic"><b>' + nf(t.licDias || 0) + '</b><span>días de licencias y ausencias<br>(sin vacaciones) · ' + (t.licPersonas || 0) + ' persona' + (t.licPersonas === 1 ? '' : 's') + '</span></div>' +
+    '</div>' +
+    (cods.length ? tabla(['Código', 'Descripción', 'Personas', 'Días'], cods.map(c => '<tr><td><span class="' + claseCodigoXl(c) + ' k-' + ((S.codigos[c] || {}).Tipo || '') + '" style="padding:1px 8px;border-radius:4px;font-weight:700">' + esc(c) + '</span></td><td>' + esc(desc(c)) + '</td><td style="text-align:right">' + rs.porCodigo[c].personas + '</td><td style="text-align:right"><b>' + rs.porCodigo[c].dias + '</b></td></tr>')
+      .concat(['<tr class="ci-tot"><td colspan="2"><b>Total</b></td><td></td><td style="text-align:right"><b>' + cods.reduce((a, c) => a + rs.porCodigo[c].dias, 0) + '</b></td></tr>'])) : '') +
+    det('Vacaciones por persona', (rs.vacaciones || []).length, tabla(['Legajo', 'Apellido y nombre', 'Empresa', 'Servicios', 'Días', 'Fechas'],
+      rs.vacaciones.map(x => '<tr><td>' + esc(x.Legajo || '') + '</td><td><b>' + esc(x.Nombre) + '</b></td><td>' + esc(x.Empresa || '') + '</td><td><small>' + esc(x.Servicios || '') + '</small></td><td style="text-align:right"><b>' + x.Dias + '</b></td><td><small>' + esc(x.Fechas) + '</small></td></tr>'))) +
+    det('Horas extras por persona', (rs.extras || []).length, (rs.notaExtras ? '<p class="sub">' + esc(rs.notaExtras) + '</p>' : '') + tabla(['Legajo', 'Apellido y nombre', 'Empresa', 'Servicios', 'Total a liquidar', 'Hs. normales', 'Días de ausentismo', 'Horas extras'],
+      (rs.extras || []).map(x => '<tr><td>' + esc(x.Legajo || '') + '</td><td><b>' + esc(x.Nombre) + '</b></td><td>' + esc(x.Empresa || '') + '</td><td><small>' + esc(x.Servicios || '') + '</small></td><td style="text-align:right">' + nf(x.Total) + '</td><td style="text-align:right">' + nf(x.Normales) + '</td><td style="text-align:right">' + (x.Ausentismo || 0) + '</td><td style="text-align:right"><b>' + nf(x.Extras) + '</b></td></tr>'))) +
+    det('Licencias y ausencias por persona', (rs.licencias || []).length, tabla(['Código', 'Legajo', 'Apellido y nombre', 'Empresa', 'Servicio', 'Días', 'Fechas'],
+      (rs.licencias || []).map(x => '<tr><td><b>' + esc(x.Codigo) + '</b> <small>' + esc(desc(x.Codigo)) + '</small></td><td>' + esc(x.Legajo || '') + '</td><td><b>' + esc(x.Nombre) + '</b></td><td>' + esc(x.Empresa || '') + '</td><td><small>' + esc(x.Servicios || '') + '</small></td><td style="text-align:right"><b>' + x.Dias + '</b></td><td><small>' + esc(x.Fechas) + '</small></td></tr>'))) +
+    '</div>';
 }
 
 // v1.21 · SGI: se abre en otra pestaña con un pase de un solo uso (no pide la clave otra vez).
@@ -8322,11 +8356,16 @@ const INSTR = [
     tips: [{ t: 'Abajo de la ficha están los totales del período: estados (franco, ART, enfermedad…), horas D/N, extras y productividad. Las fechas van como DD/MM/AAAA.' }] },
 
   { k: 'cierre', perm: 'cierre', ir: ['cierre'], t: 'Control de cierre', ic: 'cierre', c: '#c2410c', img: 'cierre',
-    para: 'Antes de pasar a RRHH: el personal informado contra el listado. Muestra quién falta, quién está en dos lados, bajas con horas y empresa distinta.',
+    para: 'Antes de pasar a RRHH: el personal informado contra el listado. Muestra quién está informado en dos servicios el mismo día, quién falta, bajas con horas y empresa distinta, y el resumen del período (vacaciones, horas extras y licencias).',
     pasos: [
       { m: '#ciPer', t: 'Elegí el <b>período</b>.' },
       { m: '.af-btn', t: 'Filtrá por tipo de aviso.' },
-      { m: '#ciBajar', t: '<b>Descargar (Excel)</b>.' }
+      { m: '#ciBajar', t: '<b>Descargar (Excel)</b>: también lleva el resumen de vacaciones, horas extras y licencias.' },
+      { m: 'text=Informados el mismo día', t: '<b>Informados el mismo día en dos o más servicios</b>: la misma persona cargada el mismo día en más de un servicio, con qué cargó cada supervisor (un día por renglón). Con ⚠ los más graves: más de 24 hs o horas y licencia a la vez.' },
+      { m: 'text=Resumen del período', t: '<b>Resumen del período</b>: total de días de vacaciones, total de horas extras y cada licencia o ausencia con sus días y personas. Tocá cada título para ver el detalle por persona.' }
+    ],
+    tips: [
+      { t: 'Los francos no cuentan como "dos servicios el mismo día". Las horas extras salen con las mismas fórmulas del Consolidado.' }
     ] },
 
   { k: 'datos', perm: 'datos', ir: ['datos'], t: 'Datos', ic: 'config', c: '#475569', img: 'datos',
