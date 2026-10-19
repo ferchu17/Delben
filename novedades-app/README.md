@@ -1,6 +1,6 @@
 # Novedades del Personal — App (Apps Script + GitHub Pages)
 
-Carpeta nueva y separada del resto del repositorio. Contiene la app **Novedades del Personal** completa (versión 1.25.0) y la página que la publica en GitHub sin el cartel de Google.
+Carpeta nueva y separada del resto del repositorio. Contiene la app **Novedades del Personal** completa (versión 1.25.1) y la página que la publica en GitHub sin el cartel de Google.
 
 - **Link para compartir (no cambia nunca):** https://ferchu17.github.io/Delben/novedades/
 - **Fuente de verdad:** la carpeta `apps-script/` tiene los mismos archivos que el proyecto de Apps Script, sin cambios.

@@ -871,7 +871,8 @@ function bordeSemanaInformada(i, pos) {
 function bloqueado(i) {
   if (S.pl && S.pl.soloVer) return true;
   // v1.22.5: en Novedades semanales, los días anteriores a la semana que se está informando no se modifican (nadie)
-  if (S.pl && S.pl.modoNov && i < S.pl.limiteNov) return true;
+  // v1.25.1: administración tiene todas las planillas desbloqueadas
+  if (S.pl && S.pl.modoNov && i < S.pl.limiteNov && !esAdmin()) return true;
   const w = semanaDeDia(i);
   return !esAdmin() && !!(w && semanaEnviada(w.numero));
 }
@@ -1141,7 +1142,7 @@ function renderPlanilla(conservarScroll) {
         : (pl.soloVer ? '' : (() => { const e = tabSemana(pl.servicioId, pl.periodo); return e === 'sinnov'
             ? '<button class="btn chico sin-nov on" id="btnSinNov" data-m="0" title="Quitar la marca">✓ Sin novedades esta semana</button>'
             : e ? '' : '<button class="btn chico sin-nov" id="btnSinNov" data-m="1" title="Si en este servicio no cambió nada esta semana, marcalo: la pestaña queda pintada como cargada">Sin novedades esta semana</button>'; })()) +
-          (pl.limiteNov > 0 && pl.limiteNov < 99 ? '<span class="sem-chip" title="Los días anteriores no se modifican">Se modifica desde el ' + ddmm(fechaDia(pl.periodo, pl.limiteNov)) + '</span>' : pl.limiteNov >= 99 ? '<span class="sem-chip">Período cerrado: solo consulta</span>' : '') + semBtns) +
+          (esAdmin() ? '' : pl.limiteNov > 0 && pl.limiteNov < 99 ? '<span class="sem-chip" title="Los días anteriores no se modifican">Se modifica desde el ' + ddmm(fechaDia(pl.periodo, pl.limiteNov)) + '</span>' : pl.limiteNov >= 99 ? '<span class="sem-chip">Período cerrado: solo consulta</span>' : '') + semBtns) +
     '</div>' +
     '<datalist id="dlTurnos">' + TURNOS.map(t => '<option value="' + t + '">').join('') + '</datalist>' +
     (pl.diagrama ? '' : '<div id="proyResumen">' + htmlProyectado() + '</div>') +
@@ -1238,8 +1239,23 @@ function tabSemana(id, periodo) {
   const sn = S.pl && S.pl.servicioId === id && S.pl.periodo === periodo ? S.pl.sinNov : null;
   const c = S.cachePl && S.cachePl[key];
   if ((sn || (c && c.sinNov) || []).some(x => x.Lunes === lun)) return 'sinnov';
-  if (c && (c.filas || []).some(f => String(f.Actualizado || '') >= lun && (adm || String(f.ActualizadoPor || '').toLowerCase() === me))) return 'ok';
+  if (c && (c.filas || []).some(f => fechaIsoDe(f.Actualizado) >= lun && guardadoPorUsuario(f.ActualizadoPor, adm, me))) return 'ok';
   return '';
+}
+// v1.25.1: solo cuenta lo guardado por una persona (no lo que se trae del histórico o del Excel de Drive)
+function guardadoPorUsuario(quien, adm, me) {
+  const q = String(quien || '').trim().toLowerCase();
+  if (!q) return false;
+  if (!adm) return q === me;
+  return q === me || (S.base.supervisores || []).some(x => String(x.usuario || '').toLowerCase() === q);
+}
+// "2026-10-19 09:15" o "19/10/2026 09:15" -> "2026-10-19"
+function fechaIsoDe(v) {
+  const t = String(v || '').trim();
+  let m = t.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
+  if (m) return m[1] + '-' + pad(+m[2]) + '-' + pad(+m[3]);
+  m = t.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+  return m ? m[3] + '-' + pad(+m[2]) + '-' + pad(+m[1]) : '';
 }
 function claseTab(s, pl) {
   if (!esAdmin() && cargaAdmin(s)) return ' tab-adm';
@@ -1332,6 +1348,40 @@ async function marcarSinNovedades(marcar) {
 }
 // Administración: copia todo el listado (con los colores) para pegarlo en cualquier hoja de Excel
 async function copiarTodoListado() {
+  const d = datosListado();
+  // Se marca todo como seleccionado para que se vea qué se copió
+  const pl = S.pl, n = pl.info.n;
+  const orden = ordenFilas().filter(r => pl.filas[r] && (String(pl.filas[r].Nombre || '').trim() || pl.filas[r].Dias.some(Boolean)));
+  if (orden.length) { SEL.extra = []; SEL.a = { r: orden[0], i: 0 }; SEL.b = { r: orden[orden.length - 1], i: n - 1 }; marcarSeleccion(); }
+  if (copiarConColores(d)) { toast('Se copió todo el listado (' + d.filas + ' filas). Pegalo con Ctrl+V en cualquier hoja de Excel.'); return; }
+  try {
+    if (window.ClipboardItem && navigator.clipboard && navigator.clipboard.write) {
+      await navigator.clipboard.write([new ClipboardItem({ 'text/html': new Blob([d.html], { type: 'text/html' }), 'text/plain': new Blob([d.tsv], { type: 'text/plain' }) })]);
+    } else await navigator.clipboard.writeText(d.tsv);
+    toast('Se copió todo el listado (' + d.filas + ' filas). Pegalo con Ctrl+V en cualquier hoja de Excel.');
+  } catch (e) { toast('El navegador no dejó copiar. Elegí todo con Ctrl+A en la planilla y copiá con Ctrl+C.', true); }
+}
+// v1.25.1: copia con el método clásico del navegador (funciona también dentro de Apps Script, donde el portapapeles moderno está bloqueado)
+function copiarConColores(d) {
+  PORTA.forzado = d;
+  const ta = document.createElement('textarea');
+  ta.value = d.tsv; ta.setAttribute('readonly', ''); ta.style.cssText = 'position:fixed;left:-9999px;top:0;opacity:0';
+  const antes = document.activeElement;
+  document.body.appendChild(ta); ta.select();
+  let ok = false;
+  try { ok = document.execCommand('copy'); } catch (e) { ok = false; }
+  ta.remove(); PORTA.forzado = null;
+  try { if (antes && antes.focus) antes.focus({ preventScroll: true }); } catch (e) { }
+  return ok;
+}
+document.addEventListener('copy', e => {
+  if (!PORTA.forzado) return;
+  e.preventDefault(); e.stopImmediatePropagation();
+  e.clipboardData.setData('text/plain', PORTA.forzado.tsv);
+  e.clipboardData.setData('text/html', PORTA.forzado.html);
+}, true);
+// Todo el listado de la planilla abierta: N°, empresa, LP, nombre, turno, los días (con sus colores) y el total
+function datosListado() {
   const pl = S.pl, n = pl.info.n, cs = el => el ? getComputedStyle(el).backgroundColor : '';
   const encab = ['N°', 'Empresa', 'LP', 'APELLIDO Y NOMBRE', 'Turno'].concat(Array.from({ length: n }, (_, i) => String(fechaDia(pl.periodo, i).getUTCDate()))).concat(['Total']);
   const tsv = [encab.join('\t')];
@@ -1353,18 +1403,7 @@ async function copiarTodoListado() {
       '<td style="text-align:center"><b>' + esc(tot) + '</b></td></tr>';
   });
   html += '</table>';
-  // Se marca todo como seleccionado para que se vea qué se copió
-  const orden = ordenFilas().filter(r => pl.filas[r] && (String(pl.filas[r].Nombre || '').trim() || pl.filas[r].Dias.some(Boolean)));
-  if (orden.length) { SEL.extra = []; SEL.a = { r: orden[0], i: 0 }; SEL.b = { r: orden[orden.length - 1], i: n - 1 }; marcarSeleccion(); }
-  try {
-    if (window.ClipboardItem && navigator.clipboard && navigator.clipboard.write) {
-      await navigator.clipboard.write([new ClipboardItem({ 'text/html': new Blob([html], { type: 'text/html' }), 'text/plain': new Blob([tsv.join('\n')], { type: 'text/plain' }) })]);
-    } else await navigator.clipboard.writeText(tsv.join('\n'));
-    toast('Se copió todo el listado (' + (tsv.length - 1) + ' filas). Pegalo con Ctrl+V en cualquier hoja de Excel.');
-  } catch (e) {
-    try { await navigator.clipboard.writeText(tsv.join('\n')); toast('Se copió todo el listado. Pegalo con Ctrl+V en Excel.'); }
-    catch (e2) { toast('El navegador no dejó copiar. Probá de nuevo con la página en primer plano.', true); }
-  }
+  return { html, tsv: tsv.join('\n'), filas: tsv.filter(x => x).length - 1 };
 }
 
 // Administración: los servicios también como pestañas (como en el Excel), agrupados por zona (supervisor).
@@ -2886,7 +2925,7 @@ function marcarSeleccion() {
 }
 
 /* ---------- Funciones tipo Excel: copiar, cortar, pegar, borrar y rellenar ---------- */
-const PORTA = { tsv: '', bloque: null };
+const PORTA = { tsv: '', bloque: null, forzado: null };
 
 function rectSeleccion() {
   if (!SEL.a || !SEL.b || !S.pl) return null;
@@ -2910,6 +2949,11 @@ function ponerValor(r, i, v) {
   return true;
 }
 
+function seleccionTodo(R) {
+  if (!R || R.i0 !== 0 || R.i1 !== S.pl.info.n - 1) return false;
+  const ord = R.orden.filter(r => S.pl.filas[r] && (String(S.pl.filas[r].Nombre || '').trim() || S.pl.filas[r].Dias.some(Boolean)));
+  return ord.length > 1 && R.orden.indexOf(ord[0]) >= R.p0 && R.orden.indexOf(ord[ord.length - 1]) <= R.p1;
+}
 function copiarSeleccion(cortar) {
   const R = rectSeleccion();
   if (!R) return '';
@@ -3281,6 +3325,8 @@ function enlazarEventos() {
     const R = rectSeleccion();
     if (!R || (R.p0 === R.p1 && R.i0 === R.i1 && e.target.selectionStart !== 0)) return;
     e.preventDefault();
+    // v1.25.1: si está elegido todo (Ctrl+A), se copia el listado completo con nombres, turnos y colores
+    if (seleccionTodo(R)) { const d = datosListado(); e.clipboardData.setData('text/plain', d.tsv); e.clipboardData.setData('text/html', d.html); toast('Se copió todo el listado (' + d.filas + ' filas). Pegalo con Ctrl+V en cualquier hoja de Excel.'); return; }
     e.clipboardData.setData('text/plain', copiarSeleccion(false));
   });
   main.addEventListener('cut', e => {
@@ -3297,6 +3343,11 @@ function enlazarEventos() {
       if (e.key === 'ArrowUp') { e.preventDefault(); acMarcar(AC.idx - 1); return; }
       if (e.key === 'Enter' || e.key === 'Tab') { if (AC.items.length) { e.preventDefault(); acElegir(AC.idx); } return; }
       if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); acCerrar(); return; }
+    }
+    // v1.25.1: Ctrl+A elige todo el listado (después Ctrl+C lo copia completo para Excel)
+    if (t.classList.contains('cel') && (e.ctrlKey || e.metaKey) && !e.shiftKey && (e.key === 'a' || e.key === 'A')) {
+      const ord = ordenFilas().filter(r => S.pl.filas[r] && (String(S.pl.filas[r].Nombre || '').trim() || S.pl.filas[r].Dias.some(Boolean)));
+      if (ord.length) { e.preventDefault(); SEL.extra = []; SEL.a = { r: ord[0], i: 0 }; SEL.b = { r: ord[ord.length - 1], i: S.pl.info.n - 1 }; marcarSeleccion(); t.select(); toast('Listado completo elegido: Ctrl+C para copiarlo.'); return; }
     }
     if (t.classList.contains('cel') && (e.key === 'Delete' || e.key === 'Backspace')) {
       const R = rectSeleccion();
@@ -6303,6 +6354,16 @@ function turnoAutoFila(f, r) {
     // v1.22.4: Supervisor (categoría SP) o el estado de todo el mes (Enfermedad, ART, Vacaciones...): lo pone el sistema, no se elige
     const elT = $('input.tx-in[data-r="' + r + '"][data-campo="Puesto"]');
     const fijo = turnoFijo(f);
+    // v1.25.1: administración puede cambiar el turno que pone el sistema (ej.: RAIZEN Dock Sud Supervisores)
+    if (fijo && esAdmin()) {
+      const act = String(f.Puesto || '').trim();
+      if (f._tAuto === undefined) f._tAuto = (!act || act === fijo) ? fijo : null;
+      if (elT) { elT.readOnly = false; elT.classList.remove('t-fijo'); }
+      if (f._tAuto === null) return;        // cambiado a mano: no se toca
+      f.Puesto = fijo; f._tAuto = fijo;
+      if (elT) { if (document.activeElement !== elT) elT.value = fijo; elT.classList.add('t-auto'); elT.title = 'Lo pone el sistema (administración lo puede cambiar)'; }
+      return;
+    }
     if (fijo) {
       f.Puesto = fijo; f._fijo = fijo; f._tAuto = fijo;
       if (elT) { if (document.activeElement !== elT) elT.value = fijo; elT.readOnly = true; elT.classList.add('t-auto', 't-fijo'); elT.title = 'Lo pone el sistema'; }
