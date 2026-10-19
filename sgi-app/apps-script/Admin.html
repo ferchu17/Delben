@@ -331,6 +331,13 @@ var _pVM={
    Al abrir Perfiles se agregan las que falten, copiando los permisos de la fila "como".
    Quedan sin guardar hasta que se toque Guardar. Para sumar otra pestaña nueva, agregala a esta lista. */
 var _pNUEVOS=[
+  {vent:'Flota Automotriz',pest:'Status de Flota',como:'Listado de Flota',despues:'Pólizas'},
+  {vent:'Flota Automotriz',pest:'Movileros',como:'control de Móviles',despues:'Status de Flota'},
+  {vent:'Flota Automotriz',pest:'Cambiar Contraseña',comoV:'Gestión de Personal',como:'Cambiar Contraseña',despues:'Movileros'},
+  {vent:['Datos Vario','Datos Varios'],pest:'Apariencia',como:'Autorizaciones',despues:'Autorizaciones'},
+  {vent:'Indumentaria',pest:'Saltan Leer',como:'Registros de Indumentaria',despues:'Registros de Indumentaria'},
+  {vent:'Indumentaria',pest:'Próxima Entrega',como:'Registros de Indumentaria',despues:'Saltan Leer'},
+  {vent:'Indumentaria',pest:'Curvas',como:'Registros de Indumentaria',despues:'Próxima Entrega'},
   {vent:'Gestión de Personal',pest:'Cargos Firmados',como:'Cargos del Personal',despues:'Cargos del Personal'},
   {vent:'Gestión de Personal',pest:'Devoluciones',como:'Cargos del Personal',despues:'Cargos Firmados'}
 ];
@@ -339,9 +346,12 @@ function _pSyncNuevos(){
   var h=_pD.headers;if(h.length<4)return [];
   var kV=h[1],kP=h[2],agregadas=[];
   function idxDe(vent,pest){var ix=-1;_pD.rows.forEach(function(r,i){if(_pN(r[kV])===_pN(vent)&&_pN(r[kP])===_pN(pest))ix=i;});return ix;}
-  _pNUEVOS.forEach(function(n){
+  _pNUEVOS.forEach(function(n0){
+    var n={vent:n0.vent,pest:n0.pest,como:n0.como,comoV:n0.comoV,despues:n0.despues};
+    // la ventana puede figurar con distintos nombres en la hoja (ej.: "Datos Vario" o "Datos Varios"): se usa la que exista
+    if(Array.isArray(n.vent)){var vs=n.vent;n.vent=vs.filter(function(v){return _pD.rows.some(function(r){return _pN(r[kV])===_pN(v);});})[0]||vs[0];}
     if(idxDe(n.vent,n.pest)>=0)return;
-    var ib=idxDe(n.vent,n.como),base=ib>=0?_pD.rows[ib]:null;
+    var ib=idxDe(n.comoV||n.vent,n.como),base=ib>=0?_pD.rows[ib]:null;
     var mx=0;_pD.rows.forEach(function(r){var id=parseInt(r[h[0]])||0;if(id>mx)mx=id;});
     var nr={};nr[h[0]]=String(mx+1);nr[kV]=n.vent;nr[kP]=n.pest;
     h.slice(3).forEach(function(c){

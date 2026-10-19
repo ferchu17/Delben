@@ -810,6 +810,8 @@ var _PMAP = {
   "Flota Automotriz::Pólizas":                    {tab:"tab-flo-polizas",     screen:"screen-flota",      group:"tabs-flota"},
   "Flota Automotriz::Status de Flota":            {tab:"tab-flo-status",      screen:"screen-flota",      group:"tabs-flota"},
   "Flota Automotriz::Cambiar Contraseña":          {tab:"tab-flo-pwd",         screen:"screen-flota",      group:"tabs-flota"},
+  "Flota Automotriz::Movileros":                   {tab:"tab-flo-movileros",   screen:"screen-flota",      group:"tabs-flota"},
+  "Datos Varios::Apariencia":                      {tab:"tab-apariencia",      screen:"screen-datos",      group:"tabs-datos"},
   "Datos Varios::Quien Retira":                    {tab:"tab-quien",           screen:"screen-datos",      group:"tabs-datos"},
   "Datos Varios::Objetivo/Cliente":                {tab:"tab-objetivo",        screen:"screen-datos",      group:"tabs-datos"},
   "Datos Varios::Empresas":                        {tab:"tab-empresas",        screen:"screen-datos",      group:"tabs-datos"},
@@ -839,6 +841,24 @@ var _PMAP = {
   "Control de Móviles::Carro Eléctrico":           {tab:"tab-carroelectrico",  screen:"screen-moviles",    group:"tabs-moviles"},
   "Control de Móviles::Bicicletas":                {tab:"tab-bicicleta",       screen:"screen-moviles",    group:"tabs-moviles"}
 };
+
+// Pestañas que en la hoja "autorizaciones" figuran con otro nombre (la fila de la hoja manda si existe con el nombre de la pestaña)
+var _PALIAS = {
+  "Inventarios::Inventarios Servicios": "Inventarios::Registros de Inventarios Servicios",
+  "Gestión de Personal::Nuevo Ingreso": "Gestión de Personal::Nuevo Personal",
+  "Control de Móviles::Combustible": "Control de Móviles::Móviles a Combustible",
+  "Control de Móviles::Carro Eléctrico": "Control de Móviles::Carros Eléctricos",
+  "Solicitud de Indumentaria::Saltan Leer": "Indumentaria::Saltan Leer",
+  "Solicitud de Indumentaria::Próxima Entrega": "Indumentaria::Próxima Entrega",
+  "Solicitud de Indumentaria::Curvas": "Indumentaria::Curvas"
+};
+function _permDe(key){
+  var R=window._PERMISOS_ROL||{};
+  if(R[key]!==undefined)return R[key];
+  if(_PALIAS[key]&&R[_PALIAS[key]]!==undefined)return R[_PALIAS[key]];
+  if(key.indexOf('Datos Varios::')===0){var k2='Datos Vario::'+key.slice(14);if(R[k2]!==undefined)return R[k2];}
+  return 'Sin acceso';
+}
 
 var _HIDE_MAP = {
   "Flota Automotriz::Listado de Flota::Control de Flota": [{id:"btn-control-flota"}],
@@ -953,7 +973,7 @@ function applyDynamicPermissions(){
   var screenHasVisible={};
   Object.keys(_PMAP).forEach(function(key){
     var m=_PMAP[key];
-    var perm=window._PERMISOS_ROL[key]||'Sin acceso';
+    var perm=_permDe(key);
     var canSee=(perm!=='Sin acceso');
     _setTabVisible(m,canSee);
     if(canSee){
@@ -1883,7 +1903,7 @@ function exportarPDFCurvas(){var theadTr=document.getElementById('curvas-thead-t
 function applyCboulger(){
 var isCb=window.SESSION&&String(window.SESSION.usuario||'').toLowerCase()==='cboulger';
 // Trabajos tab
-var t=document.getElementById('btn-tab-trabajos');if(t)t.style.display=isCb?'none':'';
+var t=document.getElementById('btn-tab-trabajos');if(t&&isCb)t.style.setProperty('display','none','important'); // los demás: según Perfiles
 // Registrar Mantenimiento form
 var mf=document.getElementById('form-registrar-mant');if(mf)mf.style.display=isCb?'none':'';
 // Cambiar Contraseña tab btn
