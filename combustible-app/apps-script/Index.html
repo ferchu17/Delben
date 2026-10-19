@@ -412,12 +412,18 @@ const AC = {};         // autocompletables
 
 /* ================== UTILES ================== */
 function run(fn, ...args){
-  return new Promise((ok, ko) => {
+  // Si la conexión con Google falla un momento ("Failed to fetch"), se reintenta sola hasta 2 veces
+  const red = m => /failed to fetch|networkerror|load failed|network request failed|respuesta no v[aá]lida/i.test(m);
+  const intento = n => new Promise((ok, ko) => {
     google.script.run.withSuccessHandler(ok).withFailureHandler(e => {
-      if (String(e && e.message || e).indexOf('SESION_VENCIDA') >= 0){ sesionVencida(); return; }
+      const m = String(e && e.message || e);
+      if (m.indexOf('SESION_VENCIDA') >= 0){ sesionVencida(); return; }
+      if (n < 2 && red(m)) { setTimeout(() => intento(n + 1).then(ok, ko), 1500 * (n + 1)); return; }
+      if (red(m)) { ko(new Error('No se pudo conectar con el servidor. Revisá la conexión y probá de nuevo.')); return; }
       ko(e);
     })[fn](...args);
   });
+  return intento(0);
 }
 function $(id){ return document.getElementById(id); }
 function esc(s){ return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }

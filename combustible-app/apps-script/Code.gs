@@ -89,8 +89,8 @@ function doPost(e) {
 
 /** Ejecutar una vez desde el editor para aceptar todos los permisos. */
 function autorizar() {
-  SpreadsheetApp.openById(CFG.REG_ID).getName();
-  SpreadsheetApp.openById(CFG.STOCK_ID).getName();
+  ss_(CFG.REG_ID).getName();
+  ss_(CFG.STOCK_ID).getName();
   DriveApp.getFolderById(CFG.FOLDER_ID).getName();
   UrlFetchApp.fetch('https://www.google.com', { muteHttpExceptions: true });
   MailApp.getRemainingDailyQuota();
@@ -169,22 +169,36 @@ function sesRinde_(token, como) {
 
 /* ======================= DATOS BASE ======================= */
 
+/** Abre cada planilla una sola vez por pedido (abrir Stock Manager es lo más lento). */
+const SS_ABIERTAS_ = {};
+function ss_(id) { return SS_ABIERTAS_[id] || (SS_ABIERTAS_[id] = SpreadsheetApp.openById(id)); }
+
+/** Guarda listas que cambian poco (supervisores, a quién corresponde) 10 minutos en memoria. */
+function enCache_(clave, fn) {
+  const cache = CacheService.getScriptCache();
+  const c = cache.get(clave);
+  if (c) { try { return JSON.parse(c); } catch (e) {} }
+  const v = fn();
+  try { const txt = JSON.stringify(v); if (txt.length < 90000) cache.put(clave, txt, 600); } catch (e) {}
+  return v;
+}
+
 function getUsuarios_() {
-  const sh = SpreadsheetApp.openById(CFG.STOCK_ID).getSheetByName(CFG.HOJA_USUARIOS);
+  const sh = ss_(CFG.STOCK_ID).getSheetByName(CFG.HOJA_USUARIOS);
   return readSheet_(sh).rows.filter(r => String(r.usuario || '').trim());
 }
 
 function getSupervisores_() {
-  return getUsuarios_()
+  return enCache_('comb_supervisores', () => getUsuarios_()
     .filter(u => CFG.ROLES_CON_FONDO.indexOf(rolApp_(u.rol)) >= 0 && String(u.nombre || '').trim())
     .map(u => ({ nombre: String(u.nombre).trim(), correo: primerCorreo_(u.correo), rol: String(u.rol) }))
-    .sort((a, b) => a.nombre.localeCompare(b.nombre));
+    .sort((a, b) => a.nombre.localeCompare(b.nombre)));
 }
 
 /** Lista de "A quién corresponde": pestaña a_quien_corresponde de la planilla de registros (columnas id, funcion_servicio). */
 const HOJA_CORR = 'a_quien_corresponde';
 function hojaCorresponde_() {
-  const ss = SpreadsheetApp.openById(CFG.REG_ID);
+  const ss = ss_(CFG.REG_ID);
   let sh = ss.getSheetByName(HOJA_CORR);
   if (!sh) {
     sh = ss.insertSheet(HOJA_CORR);
@@ -194,9 +208,9 @@ function hojaCorresponde_() {
   return sh;
 }
 function getCorrespondeRows_() {
-  return readSheet_(hojaCorresponde_()).rows
+  return enCache_('comb_corresponde', () => readSheet_(hojaCorresponde_()).rows
     .filter(r => String(r.funcion_servicio || '').trim())
-    .map(r => ({ id: r.id, nombre: String(r.funcion_servicio).trim() }));
+    .map(r => ({ id: r.id, nombre: String(r.funcion_servicio).trim() })));
 }
 function getCorresponde_() {
   const vistos = {};
@@ -215,6 +229,7 @@ function agregarCorresponde(token, nombre) {
     const tab = readSheet_(hojaCorresponde_());
     if (tab.rows.some(r => norm_(r.funcion_servicio) === norm_(nombre))) throw new Error('"' + nombre + '" ya está en la lista.');
     appendObj_(tab, { id: nextId_(tab.rows, 'id'), funcion_servicio: nombre });
+    CacheService.getScriptCache().remove('comb_corresponde');
     return true;
   } finally {
     lock.releaseLock();
@@ -231,6 +246,7 @@ function eliminarCorresponde(token, id) {
     const r = tab.rows.find(x => String(x.id) === String(id));
     if (!r) throw new Error('No se encontró.');
     tab.sh.deleteRow(r._r);
+    CacheService.getScriptCache().remove('comb_corresponde');
     return true;
   } finally {
     lock.releaseLock();
@@ -238,7 +254,7 @@ function eliminarCorresponde(token, id) {
 }
 
 function getObjetivos_() {
-  const sh = SpreadsheetApp.openById(CFG.STOCK_ID).getSheetByName(CFG.HOJA_OBJETIVOS);
+  const sh = ss_(CFG.STOCK_ID).getSheetByName(CFG.HOJA_OBJETIVOS);
   const lista = readSheet_(sh).rows
     .filter(r => String(r.nombre || '').trim())
     .filter(r => !/^\s*baja/i.test(String(r.anotaciones || '')))
@@ -247,7 +263,7 @@ function getObjetivos_() {
 }
 
 function regSheet_(name) {
-  const sh = SpreadsheetApp.openById(CFG.REG_ID).getSheetByName(name);
+  const sh = ss_(CFG.REG_ID).getSheetByName(name);
   if (!sh) throw new Error('No existe la pestaña "' + name + '" en la planilla de registros.');
   return sh;
 }
@@ -1261,7 +1277,7 @@ const COLS_PEDIDOS = ['ID', 'Fecha', 'Supervisor', 'Monto', 'Motivo', 'Estado', 
 
 /** Pestaña "Pedidos" de la planilla de registros (se crea sola la primera vez). */
 function hojaPedidos_() {
-  const ss = SpreadsheetApp.openById(CFG.REG_ID);
+  const ss = ss_(CFG.REG_ID);
   let sh = ss.getSheetByName(HOJA_PEDIDOS);
   if (!sh) {
     sh = ss.insertSheet(HOJA_PEDIDOS);
@@ -1353,7 +1369,7 @@ function marcarPedido_(id, estado, respuesta, quien) {
  * Incluye su disponible y lo que tiene sin rendir.
  */
 function recordatorioSemanal() {
-  const sh = SpreadsheetApp.openById(CFG.STOCK_ID).getSheetByName('quienRetira');
+  const sh = ss_(CFG.STOCK_ID).getSheetByName('quienRetira');
   if (!sh) throw new Error('No existe la pestaña "quienRetira" en Stock Manager.');
   const t = readSheet_(sh);
   const colSi = t.headers.find(h => norm_(h) === 'correo de combustible') || t.headers[4];
