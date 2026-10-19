@@ -283,6 +283,46 @@
       </div>
     </div>
 
+    <!-- ADMIN: VER CUENTA DE UN SUPERVISOR -->
+    <div id="v-ver" class="vista hidden">
+      <div class="card">
+        <h2>Cuenta de un supervisor</h2>
+        <p class="muted" style="margin-top:-6px">Elegí un supervisor y ves lo mismo que ve él: su disponible, ingresos, rendiciones y tickets. Solo para mirar.</p>
+        <label>Supervisor</label>
+        <select id="verSel" onchange="verCuenta(this.value)" style="font-size:16px"></select>
+      </div>
+      <div id="verCont" class="hidden">
+        <div class="card saldo" id="verSaldoCard">
+          <div class="lbl" id="verLbl">Disponible para gastar</div>
+          <div class="big" id="verSaldo">$ 0,00</div>
+          <div class="sub" id="verSub"></div>
+          <div class="kpis">
+            <div>Recibido<b id="verAsig">$ 0</b></div>
+            <div>Gastado<b id="verCons">$ 0</b></div>
+            <div>Sin rendir<b id="verSin">$ 0</b></div>
+          </div>
+        </div>
+        <div class="fila-btn" style="margin-bottom:14px" id="verAcc">
+          <button class="btn verde" style="flex:1" onclick="verCargarComo()">Cargar ticket por él</button>
+        </div>
+        <div class="card hidden" id="verPedCard">
+          <h2>Pedidos de fondos</h2>
+          <div id="verPed"></div>
+        </div>
+        <div class="card">
+          <h2>Rendiciones e ingresos</h2>
+          <div class="tabla-wrap"><table>
+            <thead><tr><th>Fecha</th><th>Detalle</th><th class="r">Ingreso</th><th class="r">Rendido</th><th class="r">Saldo</th></tr></thead>
+            <tbody id="verMov"></tbody>
+          </table></div>
+        </div>
+        <div class="card">
+          <h2>Tickets</h2>
+          <div id="verTks"></div>
+        </div>
+      </div>
+    </div>
+
     <!-- ADMIN: A QUIÉN CORRESPONDE -->
     <div id="v-corr" class="vista hidden">
       <div class="card">
@@ -587,7 +627,7 @@ function armarNav(){
     if (S.rol === 'admin' || S.rol === 'visor'){
       if (tabs.length) tabs.push(['|']);
       if (S.rol === 'admin') tabs.push(['como','Cargar ticket']);
-      tabs.push(['saldos','Saldos'], ['asignar','Asignaciones'], ['revision','Revisión'], ['rendiciones','Rendiciones']);
+      tabs.push(['saldos','Saldos'], ['ver','Ver supervisor'], ['asignar','Asignaciones'], ['revision','Revisión'], ['rendiciones','Rendiciones']);
       if (S.rol === 'admin') tabs.push(['corr','Corresponde']);
     }
   }
@@ -701,6 +741,49 @@ function initAC(){
   AC.rvSup = makeAC($('rvSup'), () => AD ? AD.supervisores.map(s => s.nombre) : [], () => renderRevision(), {estricto:true, onType: v => { if (!v) renderRevision(); }, onBlur: () => renderRevision()});
 }
 
+/* ---- Administrador / visor: ver la cuenta de un supervisor ---- */
+let VER = '';
+function renderVerSel(){
+  if (!AD) return;
+  const sel = $('verSel');
+  const lista = AD.supervisores.map(s => s.nombre).sort((a, b) => a.localeCompare(b));
+  sel.innerHTML = '<option value="">— Elegí un supervisor —</option>' + lista.map(n => {
+    const s = AD.saldos.find(x => norm(x.nombre) === norm(n));
+    return `<option value="${esc(n)}"${n === VER ? ' selected' : ''}>${esc(n)}${s ? ' · ' + money(s.saldo) : ''}</option>`;
+  }).join('');
+  $('verAcc').classList.toggle('hidden', S.rol !== 'admin');
+}
+function verCuenta(nombre){
+  VER = nombre || '';
+  if (!VER){ $('verCont').classList.add('hidden'); return; }
+  loader(true);
+  run('verSupervisor', S.token, VER).then(D => {
+    if (D.nombre !== VER && norm(D.nombre) !== norm(VER)) return;
+    const s = D.saldo, neg = Math.round(s.saldo * 100) < 0;
+    $('verSaldo').textContent = money(s.saldo);
+    $('verSaldoCard').classList.toggle('neg', neg);
+    $('verLbl').textContent = (neg ? 'Saldo a favor' : 'Disponible para gastar') + ' · ' + D.nombre;
+    $('verSub').textContent = neg ? 'Gastó más de lo que le depositaron: se le deben ' + money(-s.saldo) : '';
+    $('verAsig').textContent = money(s.asignado);
+    $('verCons').textContent = money(s.consumido);
+    $('verSin').textContent = money(s.sinRendir) + ' (' + s.cantSinRendir + ')';
+    const ped = D.pedidos || [];
+    $('verPedCard').classList.toggle('hidden', !ped.length);
+    $('verPed').innerHTML = ped.map(p => `<div class="item"><div class="top"><div>
+        <span class="badge b-${esc(p.estado)}">${esc(p.estado)}</span>
+        <div class="det">${esc(p.fecha)}${p.motivo ? ' · ' + esc(p.motivo) : ''}${p.respuesta ? '<br>' + esc(p.respuesta) : ''}</div></div>
+        <div class="monto ing">${money(p.monto)}</div></div></div>`).join('');
+    renderIngresos(D, 'verMov');
+    $('verTks').innerHTML = D.tickets.map(t => itemTicket(t, true, true)).join('') || '<p class="muted">No cargó tickets.</p>';
+    $('verCont').classList.remove('hidden');
+  }).catch(e => modal('err', 'Error', esc(errMsg(e)))).finally(() => loader(false));
+}
+function verCargarComo(){
+  if (!VER) return;
+  $('comoSup').value = VER;
+  entrarComo();
+}
+
 /* ================== SUPERVISOR ================== */
 function cargarSup(silencioso){
   if (!silencioso) loader(true);
@@ -760,10 +843,12 @@ function renderSup(){
 function isoOf(f){ const m = String(f).match(/(\d{2})\/(\d{2})\/(\d{4})/); return m ? m[3] + m[2] + m[1] : ''; }
 
 /* Rendiciones e ingresos: movimientos en orden de fecha con el saldo acumulado */
-function renderIngresos(){
-  const movs = SD.asignaciones.map(a => ({fecha:a.fecha, orden:0, det:'Ingreso de fondos' + (a.observacion ? ' · ' + a.observacion : ''), ing:a.monto, egr:0}))
-    .concat((SD.rendiciones || []).map(r => ({fecha:r.fecha, orden:1, nro:(r.pdf ? r.nro : 0), det:`Rendición N° ${r.nro} · ${r.cant} ticket(s)` + (r.estado ? ' · ' + r.estado : ''), ing:0, egr:r.total})));
-  const pend = SD.tickets.filter(t => !t.planilla && t.estado !== 'Rechazado');
+function renderIngresos(D, tbody){
+  D = D || SD; tbody = tbody || 'tbMov';
+  const SD_ = D;
+  const movs = SD_.asignaciones.map(a => ({fecha:a.fecha, orden:0, det:'Ingreso de fondos' + (a.observacion ? ' · ' + a.observacion : ''), ing:a.monto, egr:0}))
+    .concat((SD_.rendiciones || []).map(r => ({fecha:r.fecha, orden:1, nro:(r.pdf ? r.nro : 0), det:`Rendición N° ${r.nro} · ${r.cant} ticket(s)` + (r.estado ? ' · ' + r.estado : ''), ing:0, egr:r.total})));
+  const pend = SD_.tickets.filter(t => !t.planilla && t.estado !== 'Rechazado');
   if (pend.length){
     const ult = pend.map(t => t.fecha).sort((a, b) => isoOf(a).localeCompare(isoOf(b))).pop();
     movs.push({fecha:ult, orden:2, det:`Tickets cargados sin rendir · ${pend.length}`, ing:0, egr:pend.reduce((a, t) => a + t.total, 0), pend:true});
@@ -778,12 +863,12 @@ function renderIngresos(){
       <td class="r ${claseSaldo(saldo)}">${money(saldo)}</td></tr>`;
   });
   filas.reverse();
-  const s = SD.saldo.saldo;
-  $('tbMov').innerHTML = (movs.length ? `<tr class="fin"><td colspan="4">${Math.round(s * 100) < 0 ? 'SALDO A TU FAVOR' : 'DISPONIBLE PARA GASTAR'}</td><td class="r ${claseSaldo(s)}">${money(s)}</td></tr>` : '') +
+  const s = SD_.saldo.saldo;
+  $(tbody).innerHTML = (movs.length ? `<tr class="fin"><td colspan="4">${Math.round(s * 100) < 0 ? (tbody === 'tbMov' ? 'SALDO A TU FAVOR' : 'SALDO A SU FAVOR') : 'DISPONIBLE PARA GASTAR'}</td><td class="r ${claseSaldo(s)}">${money(s)}</td></tr>` : '') +
     (filas.join('') || '<tr><td colspan="5" class="muted">Todavía no hay movimientos.</td></tr>');
 }
 
-function itemTicket(t, acciones){
+function itemTicket(t, acciones, soloVer){
   const rend = t.planilla ? `<span class="badge b-rend">Rendición N° ${esc(t.planilla)}</span>` : '<span class="badge b-Pendiente">Sin rendir</span>';
   return `<div class="item"><div class="top"><div>
       <b>${esc(t.correspondeA)}</b>
@@ -791,7 +876,7 @@ function itemTicket(t, acciones){
       <div style="margin-top:6px;display:flex;gap:6px;flex-wrap:wrap"><span class="badge b-${esc(t.estado)}">${esc(t.estado)}</span>${rend}</div>
     </div><div class="monto ${t.estado === 'Rechazado' ? 'neg' : ''}">- ${money(t.total)}</div></div>
     ${t.observacion ? `<div class="obs"><b>Observación:</b> ${esc(t.observacion)}</div>` : ''}
-    ${acciones ? `<div class="fila-btn" style="margin-top:10px"><button class="btn gris sm" onclick="verFoto(${t.id})">Ver foto</button>${!t.planilla ? `<button class="btn rojo sm" onclick="borrarTk(${t.id})">Borrar</button>` : ''}</div>` : ''}
+    ${acciones ? `<div class="fila-btn" style="margin-top:10px"><button class="btn gris sm" onclick="verFoto(${t.id})">Ver foto</button>${!t.planilla && !soloVer ? `<button class="btn rojo sm" onclick="borrarTk(${t.id})">Borrar</button>` : ''}</div>` : ''}
   </div>`;
 }
 
@@ -1087,7 +1172,7 @@ function cargarAdmin(silencioso){
     $('cfgEstado').innerHTML = d.geminiActiva
       ? '<b class="pos">Usando Gemini.</b> Lee los datos impresos y también lo escrito a mano (el servicio).'
       : '<b>Usando la lectura de Google (sin clave).</b> Lee los datos impresos del ticket. Con una clave de Gemini la lectura es más precisa y también lee lo escrito a mano.';
-    renderSaldos(); renderAsig(); renderRevision(); renderRend(); renderPedidosAdm(); renderCorr();
+    renderSaldos(); renderAsig(); renderRevision(); renderRend(); renderPedidosAdm(); renderCorr(); renderVerSel();
   }).catch(e => modal('err', 'Error', esc(errMsg(e)))).finally(() => loader(false));
 }
 

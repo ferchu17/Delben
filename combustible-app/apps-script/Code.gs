@@ -77,7 +77,8 @@ function doPost(e) {
       getAdminData: getAdminData, guardarAsignacion: guardarAsignacion, eliminarAsignacion: eliminarAsignacion,
       actualizarTicket: actualizarTicket, regenerarRendicion: regenerarRendicion,
       cambiarEstadoRendicion: cambiarEstadoRendicion, guardarClaveGemini: guardarClaveGemini, responderPedido: responderPedido,
-      agregarCorresponde: agregarCorresponde, eliminarCorresponde: eliminarCorresponde
+      agregarCorresponde: agregarCorresponde, eliminarCorresponde: eliminarCorresponde,
+      verSupervisor: verSupervisor
     };
     if (!permitidas[fn]) throw new Error('Función no permitida: ' + fn);
     out = { ok: true, result: permitidas[fn].apply(null, args) };
@@ -340,7 +341,22 @@ function calcularSaldos_(asig, tickets, rendiciones) {
 /* ======================= SUPERVISOR ======================= */
 
 function getSupervisorData(token, como) {
-  const s = sesRinde_(token, como);
+  return datosSupervisor_(sesRinde_(token, como).nombre);
+}
+
+/** Administrador / visor: ver la cuenta de un supervisor (lo mismo que ve él), sin cargar nada. */
+function verSupervisor(token, nombre) {
+  const ses = ses_(token);
+  if (ses.rol !== 'admin' && ses.rol !== 'visor') throw new Error('Solo administración puede ver las cuentas de otros.');
+  const u = getSupervisores_().find(x => norm_(x.nombre) === norm_(nombre));
+  if (!u) throw new Error('Elegí un supervisor de la lista.');
+  const d = datosSupervisor_(u.nombre);
+  d.nombre = u.nombre;
+  return d;
+}
+
+function datosSupervisor_(nombre) {
+  const s = { nombre: nombre };
   const asig = readSheet_(regSheet_('Asignaciones')).rows.filter(a => norm_(a.Supervisor) === norm_(s.nombre));
   const tks = readSheet_(regSheet_('Tickets')).rows.filter(t => norm_(t.Supervisor) === norm_(s.nombre));
   const rendRows = readSheet_(regSheet_('Rendiciones')).rows.filter(r => norm_(r.Supervisor) === norm_(s.nombre));
