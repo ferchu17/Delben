@@ -668,7 +668,10 @@ function sesion_(token) {
   if (!c) throw new Error('SESION_VENCIDA');
   // Mientras se usa la app, la sesión se renueva (no vence en medio del trabajo)
   try { cache.put('S_' + token, c, APP.SESION_SEG); } catch (e) { }
-  return JSON.parse(c);
+  var u = JSON.parse(c);
+  // v1.25.6: los permisos se leen de Usuarios y perfiles en cada pedido: lo que se habilita se ve sin volver a entrar
+  if (u.perfil && u.rol !== 'ADMIN') { try { u.permisos = permisosDe_(u.perfil); } catch (e) { } }
+  return u;
 }
 
 function esAdmin_(u) { return u.rol === 'ADMIN'; }
@@ -761,6 +764,9 @@ function api(token, accion, datos) {
 }
 
 var ACCIONES_ = {
+
+  // v1.25.6: permisos al día (el menú se actualiza si administración cambió el perfil)
+  misPermisos: function (u) { return { permisos: u.permisos || {}, rol: u.rol }; },
 
   base: function (u) {
     try { quitarServiciosRepetidos_(); } catch (e) { Logger.log('Servicios repetidos: ' + e.message); }

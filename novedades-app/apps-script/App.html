@@ -631,12 +631,28 @@ function vMenu() {
     if (puede('planillas')) tiles.push({ v: 'planilla', p: { modo: 'proy' }, t: 'Proyección', d: nServ + ' servicio' + (nServ === 1 ? '' : 's') + ' · ' + nombrePeriodo(periodoTrabajo()) + '.', c: '#1565c0' });
     if (puede('programacion')) tiles.push({ v: 'planilla', p: { modo: 'nov', periodo: '__prog' }, ic: 'conformacion', t: 'Novedades semanales', d: 'Las novedades de cada semana de ' + nombrePeriodo(periodoTrabajo()) + '.', c: '#0a8f8f' });
     if (puede('missemanas')) tiles.push({ v: 'missemanas', ic: 'bandeja', t: 'Semanas informadas', d: 'Lo que ya informaste. Para ver y mandar por correo.', c: '#e08a00' });
-    if (puede('informes')) tiles.push({ v: 'informes', ic: 'conformacion', t: 'Informes', d: 'STD, Consolidado, Plus, Facturación y RRHH.', c: '#7b3fb8' });
-    if (puede('resumen')) tiles.push({ v: 'resumen', ic: 'conformacion', t: 'Resumen', d: 'Objetivo por objetivo.', c: '#7b3fb8' });
-    if (puede('ausencias')) tiles.push({ v: 'ausencias', ic: 'ficha', t: 'Ausencias', d: 'Las ausencias de Stock Manager.', c: '#c2410c' });
-    if (puede('consultas')) tiles.push({ v: 'consultas', ic: 'consulta', t: 'Consultas', d: 'Preguntá por una persona o un servicio (texto o audio).', c: '#0b63c9' });
-    if (puede('personal')) tiles.push({ v: 'personal', t: 'Personal', d: 'Listado de personal, con filtros, ficha y descarga.', c: '#0b63c9' });
-    if (puede('sgi')) tiles.push({ v: 'sgi', ic: 'sgi', t: 'SGI', d: 'Entrar al SGI sin volver a poner usuario y clave.', c: '#1f4e79' });
+    // v1.25.6: todo lo demás que se le habilite al perfil en Usuarios y perfiles (Control de cierre, Conformación, Plus, Planificación...)
+    const OTRAS = [
+      { v: 'bandeja', t: 'Semanas informadas (todas)', d: 'Lo que informaron los supervisores, para revisar.', c: '#e08a00' },
+      { v: 'conformacion', t: 'Conformación horaria', d: 'Contratado contra realizado, por servicio y ciclo.', c: '#2e9d3e' },
+      { v: 'plus', t: 'Plus por función', d: 'Días de encargado del período, por persona.', c: '#7b3fb8' },
+      { v: 'informes', ic: 'conformacion', t: 'Informes', d: 'STD, Consolidado, Plus, Facturación y RRHH.', c: '#7b3fb8' },
+      { v: 'resumen', ic: 'conformacion', t: 'Resumen', d: 'Objetivo por objetivo.', c: '#7b3fb8' },
+      { v: 'ausencias', ic: 'ficha', t: 'Ausencias', d: 'Las ausencias de Stock Manager.', c: '#c2410c' },
+      { v: 'consultas', ic: 'consulta', t: 'Consultas', d: 'Preguntá por una persona o un servicio (texto o audio).', c: '#0b63c9' },
+      { v: 'diagrama', ic: 'planilla', t: 'Planificación de servicios', d: 'Cada servicio con el formato de su pestaña de la Planificación.', c: '#0a8f8f' },
+      { v: 'presentismo', ic: 'personal', t: 'Presentismo General', d: 'Todo desde abril 2023, persona por persona.', c: '#1e7a45' },
+      { v: 'servicios', t: 'Servicios', d: 'Cliente, supervisor, ciclo y horas contratadas.', c: '#0a8f8f' },
+      { v: 'personal', t: 'Personal', d: 'Listado de personal, con filtros, ficha y descarga.', c: '#0b63c9' },
+      { v: 'codigos', t: 'Códigos', d: 'Franco, vacaciones, licencias y demás.', c: '#c2410c' },
+      { v: 'usuarios', t: 'Usuarios y perfiles', d: 'Los usuarios de SGI y qué ve cada perfil.', c: '#475569' },
+      { v: 'cargamasiva', ic: 'carga', t: 'Carga masiva', d: 'Subir archivos viejos o traerlos de Drive.', c: '#0b63c9' },
+      { v: 'ficha', ic: 'ficha', t: 'Ficha por período', d: 'Todo lo de una persona en un período, para ver y bajar en PDF.', c: '#1e7a45' },
+      { v: 'cierre', ic: 'cierre', t: 'Control de cierre', d: 'Antes de pasar a RRHH: personal informado contra el listado.', c: '#c2410c' },
+      { v: 'datos', ic: 'config', t: 'Datos', d: 'Feriados, períodos y a quién le llegan los avisos.', c: '#475569' },
+      { v: 'sgi', ic: 'sgi', t: 'SGI', d: 'Entrar al SGI sin volver a poner usuario y clave.', c: '#1f4e79' }
+    ];
+    OTRAS.forEach(t => { if (puede(t.v)) tiles.push(t); });
   }
   // v1.22.11: Instructivo para todos los perfiles (botón distinto, primero)
   tiles.unshift({ v: 'instructivo', ic: 'instructivo', t: 'Instructivo', d: 'Para qué sirve cada pantalla y cómo se usa, con imágenes. Se baja en PDF.', c: '#f97316', instr: true });
@@ -677,6 +693,11 @@ function vMenu() {
       btn.disabled = false; btn.textContent = 'Cargar Agosto - Septiembre 2026';
     }
   };
+  // v1.25.6: si administración habilitó (o quitó) ventanas a este perfil, el menú se actualiza sin volver a entrar
+  if (!esAdmin()) api('misPermisos').then(x => {
+    if (!x || !x.permisos || S.vista !== 'menu') return;
+    if (JSON.stringify(x.permisos) !== JSON.stringify(S.u.permisos || {})) { S.u.permisos = x.permisos; vMenu(); }
+  }).catch(() => {});
 }
 
 /* ============================================================
