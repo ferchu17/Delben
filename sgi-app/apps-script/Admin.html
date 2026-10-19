@@ -210,11 +210,7 @@ body.rol-supervisor #tab-inv-servicios { display:block !important; }
 /* perm-view: ocultar form de carga en ausencias para solo-lectura */
 #tab-per-ausencias.perm-view .form-card:first-child { display: none !important; }
 .perm-view .readonly-notice { display: block !important; }
-/* Status de Flota - solo Administrador */
-#btn-tab-flo-status { display: none !important; }
-#tab-flo-status { display: none !important; }
-body.rol-admin #btn-tab-flo-status { display: inline-flex !important; }
-body.rol-admin #tab-flo-status.active { display: block !important; }
+/* Status de Flota: lo decide Datos Varios > Perfiles (antes era solo para Administrador) */
 /* ===== SPINNER DE CARGA ===== */
 #sgi-loading{position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(15,30,60,.72);z-index:99999;display:none;align-items:center;justify-content:center;flex-direction:column;gap:18px;pointer-events:none;}
 #sgi-loading.visible{display:flex;}
@@ -319,7 +315,7 @@ var _pVM={
   "Registro de Salida":["Nueva Salida","Registros"],
   "Inventarios":["Inventario Oficina","Inventarios Servicios"],
   "Gestión de Personal":["Nuevo Ingreso","Listado de Personal","Cargos del Personal","Vacaciones","Proyección de Vac.","Días por Período","Diagrama","Cambiar Contraseña","Ausencias","Informe de Personal","Cargos Firmados","Devoluciones"],
-  "Flota Automotriz":["Nuevo Vehículo","Listado de Flota","Mantenimiento","Trabajos a Realizar","Documentación","Pólizas","Cambiar Contraseña","Flota Automotriz::Listado de Flota::Control de Flota","Flota Automotriz::Listado de Flota::Seguros","Flota Automotriz::Documentación::Agregar","Flota Automotriz::Pólizas::Agregar","Flota Automotriz::Status de Flota","Flota Automotriz::Movileros"],
+  "Flota Automotriz":["Nuevo Vehículo","Listado de Flota","Mantenimiento","Trabajos a Realizar","Documentación","Pólizas","Cambiar Contraseña","Status de Flota","Movileros","Listado de Flota::Control de Flota","Listado de Flota::Seguros"],
   "Datos Varios":["Quien Retira","Objetivo/Cliente","Empresas","Líneas Tel.","Familia","Forma de Pago","Proveedores","Autorizaciones","Precios","Perfiles"],
   "Anotaciones":["Nueva Anotación","Buscar","Agenda"],
   "Orden de Compra":["Nueva OC","Listado de OC","Ver / Modificar OC","Reimprimir OC","OC Autorizadas","OC NO Autorizadas","OC Pendiente"],
@@ -334,6 +330,8 @@ var _pNUEVOS=[
   {vent:'Flota Automotriz',pest:'Status de Flota',como:'Listado de Flota',despues:'Pólizas'},
   {vent:'Flota Automotriz',pest:'Movileros',como:'control de Móviles',despues:'Status de Flota'},
   {vent:'Flota Automotriz',pest:'Cambiar Contraseña',comoV:'Gestión de Personal',como:'Cambiar Contraseña',despues:'Movileros'},
+  {vent:'Flota Automotriz',pest:'Listado de Flota::Control de Flota',como:'Listado de Flota::Control de Flota',despues:'Listado de Flota',sinCopia:true},
+  {vent:'Flota Automotriz',pest:'Listado de Flota::Seguros',como:'Listado de Flota::Seguros',despues:'Listado de Flota::Control de Flota',sinCopia:true},
   {vent:['Datos Vario','Datos Varios'],pest:'Apariencia',como:'Autorizaciones',despues:'Autorizaciones'},
   {vent:'Indumentaria',pest:'Saltan Leer',como:'Registros de Indumentaria',despues:'Registros de Indumentaria'},
   {vent:'Indumentaria',pest:'Próxima Entrega',como:'Registros de Indumentaria',despues:'Saltan Leer'},
@@ -348,10 +346,12 @@ function _pSyncNuevos(){
   function idxDe(vent,pest){var ix=-1;_pD.rows.forEach(function(r,i){if(_pN(r[kV])===_pN(vent)&&_pN(r[kP])===_pN(pest))ix=i;});return ix;}
   _pNUEVOS.forEach(function(n0){
     var n={vent:n0.vent,pest:n0.pest,como:n0.como,comoV:n0.comoV,despues:n0.despues};
+    // si ya existe con la ventana repetida en la pestaña ("Flota Automotriz::Listado de Flota::Control de Flota"), cuenta como existente
+    if(typeof n.vent==='string'&&idxDe(n.vent,n.vent+'::'+n.pest)>=0)return;
     // la ventana puede figurar con distintos nombres en la hoja (ej.: "Datos Vario" o "Datos Varios"): se usa la que exista
     if(Array.isArray(n.vent)){var vs=n.vent;n.vent=vs.filter(function(v){return _pD.rows.some(function(r){return _pN(r[kV])===_pN(v);});})[0]||vs[0];}
     if(idxDe(n.vent,n.pest)>=0)return;
-    var ib=idxDe(n.comoV||n.vent,n.como),base=ib>=0?_pD.rows[ib]:null;
+    var ib=n0.sinCopia?-1:idxDe(n.comoV||n.vent,n.como),base=ib>=0?_pD.rows[ib]:null;
     var mx=0;_pD.rows.forEach(function(r){var id=parseInt(r[h[0]])||0;if(id>mx)mx=id;});
     var nr={};nr[h[0]]=String(mx+1);nr[kV]=n.vent;nr[kP]=n.pest;
     h.slice(3).forEach(function(c){

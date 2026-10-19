@@ -652,6 +652,7 @@ var perm=SESSION.permisos[screenName];
 var screen=document.getElementById('screen-'+screenName);if(!screen)return;
 if(perm&&perm.ver&&!perm.modificar){
 screen.querySelectorAll('.btn-success,.btn-danger,.btn-primary,.btn-purple').forEach(function(btn){
+var tc=btn.closest&&btn.closest('.tab-content');if(tc&&tc.classList.contains('perm-edit'))return;   // la pestaña tiene "Ver y editar" en Perfiles
 var txt=(btn.textContent||'').toLowerCase();
 if(txt.indexOf('guardar')>=0||txt.indexOf('agregar')>=0||txt.indexOf('eliminar')>=0||
 txt.indexOf('registrar')>=0||txt.indexOf('nuevo')>=0||txt.indexOf('enviar')>=0)
@@ -900,7 +901,10 @@ function loadPermisosFromSheet(callback){
         for(var r=1;r<rows.length;r++){
           var row=rows[r];
           if(!row||row[1]==null||String(row[1]).trim()==='')continue;
-          var key=String(row[1]||'').trim()+'::'+String(row[2]||'').trim();
+          var vRow=String(row[1]||'').trim(),pRow=String(row[2]||'').trim();
+          // filas agregadas con la ventana repetida en la pestaña ("Flota Automotriz::Listado de Flota::Control de Flota")
+          if(pRow.toLowerCase().indexOf(vRow.toLowerCase()+'::')===0)pRow=pRow.slice(vRow.length+2);
+          var key=vRow+'::'+pRow;
           window._PERMISOS_ROL[key]=String(row[rolIdx]||'Sin acceso').trim();
         }
       }
@@ -997,7 +1001,31 @@ function applyDynamicPermissions(){
     }
   });
   applyHideMap();
+  aplicarSoloVerPestanas();
 }
+// Pestañas con "Solo ver" / "Puede Ver" en Perfiles: se ocultan los botones que cargan, modifican o borran,
+// y los campos de carga quedan bloqueados (los filtros, búsquedas, Excel y PDF siguen andando).
+var _RX_EDITA=/guardar|agregar|registrar|nuev[oa]|modific|elimin|borrar|cargar|subir|editar|autoriz|preparaci|masivo|asignar/i;
+function aplicarSoloVerPestanas(){
+  var rol=SESSION&&SESSION.rol?SESSION.rol:'';
+  if(rol==='Administrador'||rol==='administrador')return;
+  document.querySelectorAll('.tab-content.perm-view').forEach(function(tc){
+    tc.querySelectorAll('button,.btn').forEach(function(b){
+      var t=(b.textContent||'')+' '+(b.getAttribute('title')||'')+' '+(b.getAttribute('onclick')||'');
+      if(/pdf|excel|exportar|buscar|limpiar|cerrar|filtr|imprimir|ver |ver$|actualizar/i.test(b.textContent||''))return;
+      if(_RX_EDITA.test(t)||/\bdel[A-Z]|eliminar|borrar/i.test(b.getAttribute('onclick')||''))b.style.setProperty('display','none','important');
+    });
+    tc.querySelectorAll('.form-grid input,.form-grid select,.form-grid textarea').forEach(function(el){
+      if(/buscar|filtr|search/i.test((el.placeholder||'')+' '+(el.id||'')+' '+(el.className||'')))return;
+      el.disabled=true;
+    });
+  });
+}
+(function(){
+  var _tSV=null;
+  new MutationObserver(function(){clearTimeout(_tSV);_tSV=setTimeout(function(){try{aplicarSoloVerPestanas();}catch(e){}},200);})
+    .observe(document.body,{childList:true,subtree:true});
+})();
 
 document.addEventListener('keydown',function(e){
 if(e.key==='Enter'){var ls=document.getElementById('screen-login');if(ls&&ls.classList.contains('active'))intentarLogin();}
@@ -1901,18 +1929,9 @@ function exportarPDFCurvas(){var theadTr=document.getElementById('curvas-thead-t
 // CBOULGER RESTRICTIONS
 (function(){
 function applyCboulger(){
-var isCb=window.SESSION&&String(window.SESSION.usuario||'').toLowerCase()==='cboulger';
-// Trabajos tab
-var t=document.getElementById('btn-tab-trabajos');if(t&&isCb)t.style.setProperty('display','none','important'); // los demás: según Perfiles
-// Registrar Mantenimiento form
-var mf=document.getElementById('form-registrar-mant');if(mf)mf.style.display=isCb?'none':'';
-// Cambiar Contraseña tab btn
-var pwdBtn=document.getElementById('btn-tab-flo-pwd');if(pwdBtn)pwdBtn.style.display=isCb?'':'none';
-// Control de Flota + Seguros LA CAJA
-var bc=document.getElementById('btn-control-flota');if(bc)bc.style.display=isCb?'none':'';
-var bk=document.getElementById('btn-seguros-caja');if(bk)bk.style.display=isCb?'none':'';
-// Documentacion: hide Agregar/Editar button
-var bd=document.getElementById('btn-doc-agregar');if(bd)bd.style.display=isCb?'none':''; // Documentacion renders with/without actions via renderDocumentacion
+// Antes acá se mostraban u ocultaban pestañas y botones de Flota a mano según el usuario (cboulger).
+// Ahora todo lo decide Datos Varios > Perfiles (pestañas, botones Control de Flota / Seguros LA CAJA y solo ver / ver y editar).
+if(typeof aplicarSoloVerPestanas==='function')aplicarSoloVerPestanas();
 }
 setTimeout(applyCboulger,800);
 setTimeout(applyCboulger,2500);
