@@ -1291,11 +1291,12 @@ function controlCierre_(periodo) {
       var v = f[DIAS_COL[i]];
       if (!v) continue;
       var c = leerCelda_(v);
-      (g.dias[i] = g.dias[i] || []).push({ c: c, serv: (servs[f.ServicioId] || {}).Servicio || '' });
+      (g.dias[i] = g.dias[i] || []).push({ c: c, serv: (servs[f.ServicioId] || {}).Servicio || '', sid: f.ServicioId });
     }
   });
   var ddmm = function (i) { var d = fechaDia_(periodo, i); return ('0' + d.getUTCDate()).slice(-2) + '/' + ('0' + (d.getUTCMonth() + 1)).slice(-2); };
-  var out = { noEnListado: [], empresaDistinta: [], bajaConHoras: [], sinInformar: [], diasSinDato: [], dobleCarga: [], informados: 0 };
+  var out = { noEnListado: [], empresaDistinta: [], bajaConHoras: [], sinInformar: [], diasSinDato: [], dobleCarga: [], siglaSinHoras: [], informados: 0 };
+  var validosC = codigosValidos_(), siglasC = siglasServicios_();
   Object.keys(gente).forEach(function (k) {
     var g = gente[k], p = buscar(g);
     if (p) g.p = p;
@@ -1326,6 +1327,19 @@ function controlCierre_(periodo) {
       dobles.push((grave ? '⚠ ' : '') + ddmm(j) + ': ' + cargas.map(function (x) { return x.c.h + ' hs en ' + x.serv; }).join(' + ') + ' = ' + tot + ' hs');
     }
     if (dobles.length) out.dobleCarga.push(Object.assign({ Detalle: dobles.join(' · '), Dias: dobles.length, Graves: graves }, base));
+    // v1.25.5: sigla de otro servicio (P12, AO, OS, R...) y ese día no tiene las horas en el servicio que dice (o en ninguno)
+    var sinCubrir = [];
+    for (var q = 0; q < n; q++) {
+      var ent = g.dias[q] || [];
+      var hq = ent.filter(function (x) { return x.c.tipo === 'horas'; });
+      ent.forEach(function (x) {
+        if (x.c.tipo !== 'codigo' || validosC[x.c.cod]) return;
+        var dest = siglasC[normSigla_(x.c.cod)];
+        var ok = dest ? hq.some(function (y) { return y.sid === dest.Id; }) : hq.length > 0;
+        if (!ok) sinCubrir.push(ddmm(q) + ': ' + x.c.cod + ' en ' + x.serv + (dest ? ' → no tiene horas en ' + dest.Servicio : ' → no tiene horas en ningún servicio') + (dest && hq.length ? ' (tiene en ' + hq.map(function (y) { return y.serv; }).join(', ') + ')' : ''));
+      });
+    }
+    if (sinCubrir.length) out.siglaSinHoras.push(Object.assign({ Detalle: sinCubrir.join(' · '), Dias: sinCubrir.length }, base));
   });
   var informados = [];
   Object.keys(gente).forEach(function (k) { if (gente[k].p) informados.push(gente[k].p); });
@@ -1446,4 +1460,22 @@ function resumenCierre_(periodo) {
   tot.extras = r2(tot.extras);
   return { personas: personas, porCodigo: porCodigo, totales: tot,
     notaExtras: 'Período de ' + n + ' días: cada día de ausentismo descuenta ' + (Math.round(HS_BASE_PERIODO / n * 10000) / 10000) + ' hs (208 / ' + n + '). Cada persona cuenta una sola vez por día aunque esté en dos servicios.' };
+}
+
+// v1.25.5: siglas con que se nombra a un servicio en las otras planillas (P4 = SUCRE 4225, AO = Arauco Oasis...).
+// Primero lo cargado en Servicios (columna Siglas); si no, la tabla de servicios de la empresa.
+var SIGLAS_DEFECTO_ = { P4: 'SUCRE 4225', P6: 'TRES DE FEBRERO 945', P8: 'AMENABAR 1570', P10: 'DIAGONAL NORTE 1145', P12: 'SUCRE 1949', P13: 'CONGRESO 1661',
+  P22: 'OLLEROS 2202', P26: 'ARCOS 1744', P30: 'JOSE HERNANDEZ 1721', P43: 'CORDOBA 1131', P46: 'ACIFI', P55: 'DEMARIA 4780', P56: 'CONGRESO 1622',
+  P57: 'ENRIQUE MARTINEZ 210', P60: 'CONSTRUCTORA SUDAMERICANA', P65: 'LIBERTADOR 3050', AO: 'ARAUCO OASIS', AZ: 'ARAUCO ZARATE' };
+function normSigla_(v) { return String(v || '').toUpperCase().replace(/[.\s\-_]/g, '').replace(/^P0+(\d)/, 'P$1'); }
+function siglasServicios_() {
+  var servs = leer_('Servicios'), out = {};
+  Object.keys(SIGLAS_DEFECTO_).forEach(function (k) {
+    var t = normT_(SIGLAS_DEFECTO_[k]);
+    var c = servs.filter(function (s) { return normT_(String(s.Cliente || '') + ' ' + String(s.Servicio || '')).indexOf(t) >= 0; });
+    var s0 = c.filter(function (s) { return s.Activo !== 'NO'; })[0] || c[0];
+    if (s0) out[k] = s0;
+  });
+  servs.forEach(function (s) { String(s.Siglas || '').split(/[,;\s]+/).forEach(function (x) { x = normSigla_(x); if (x) out[x] = s; }); });
+  return out;
 }

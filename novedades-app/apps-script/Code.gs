@@ -76,7 +76,7 @@ var HOJAS = {
     'JefeOperaciones', 'Ciclo',
     'D_LUN', 'D_MAR', 'D_MIE', 'D_JUE', 'D_VIE', 'D_SAB', 'D_DOM',
     'N_LUN', 'N_MAR', 'N_MIE', 'N_JUE', 'N_VIE', 'N_SAB', 'N_DOM',
-    'Activo', 'FechaBaja', 'CorreoServicio', 'D_FER', 'N_FER', 'Direccion', 'Jurisdiccion', 'Pestana', 'ObjetivoId', 'Localidad', 'SinDiferencia', 'Lineas', 'CargaAdmin'],
+    'Activo', 'FechaBaja', 'CorreoServicio', 'D_FER', 'N_FER', 'Direccion', 'Jurisdiccion', 'Pestana', 'ObjetivoId', 'Localidad', 'SinDiferencia', 'Lineas', 'CargaAdmin', 'Siglas'],
   Planilla: ['Periodo', 'ServicioId', 'Seccion', 'Orden', 'Legajo', 'Nombre',
     'Empresa', 'Puesto', 'Turno'].concat(DIAS_COL).concat(['ActualizadoPor', 'Actualizado']),
   Semanas: ['Periodo', 'ServicioId', 'Semana', 'Desde', 'Hasta', 'EnviadoPor',
@@ -1617,7 +1617,7 @@ function ocupacion_(periodo, servicioId) {
   return leer_('Planilla').filter(function (f) {
     return f.Periodo === periodo && f.ServicioId !== servicioId && (f.Legajo || f.Nombre);
   }).map(function (f) {
-    var o = { Legajo: f.Legajo, Nombre: f.Nombre, Servicio: nombres[f.ServicioId] || f.ServicioId };
+    var o = { Legajo: f.Legajo, Nombre: f.Nombre, Servicio: nombres[f.ServicioId] || f.ServicioId, ServicioId: f.ServicioId };
     DIAS_COL.forEach(function (c) { if (f[c]) o[c] = f[c]; });
     return o;
   });

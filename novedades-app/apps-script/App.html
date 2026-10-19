@@ -349,10 +349,13 @@ document.addEventListener('change', e => { if (e.target.classList && e.target.cl
 // v1.22.8: en Planificación de servicios, STD, Consolidado, 30/31 días y demás tablas por día, lo que está antes del día 26
 // (orden, legajo, nombre, puesto, cliente...) queda fijo y solo se desplazan las fechas.
 const SEL_FIJAR = 'table.plan-t, table.stx, table.std';
-function fijarColumnas(t) {
+function fijarColumnas(t, forzar) {
   if (!t || !t.isConnected || !t.rows.length) return;
   const firma = t.rows.length + '|' + (t.rows[0].cells.length);
-  if (t.dataset.fijado === firma) return;
+  if (!forzar && t.dataset.fijado === firma) return;
+  // v1.25.5: antes de medir se sueltan las columnas fijadas (si cambió el ancho de alguna columna, se vuelve a calcular bien)
+  if (t._fij) t._fij.forEach(td => { td.style.position = ''; td.style.left = ''; td.style.zIndex = ''; if (td._bgFij) { td.style.backgroundColor = ''; td._bgFij = false; } td.classList.remove('fijo-fin'); });
+  t._fij = [];
   const g = (t._g = null, gridTabla(t));
   // primera columna de fechas: la celda que dice 26 (o 26/xx)
   let nFix = -1;
@@ -371,10 +374,23 @@ function fijarColumnas(t) {
   cand.forEach(([td, left, p], k) => {
     td.style.position = 'sticky'; td.style.left = left + 'px';
     td.style.zIndex = td.tagName === 'TH' || td.closest('thead') ? 5 : 3;
-    if (sinFondo(bgs[k])) td.style.backgroundColor = sinFondo(fondoTabla) ? '#fff' : fondoTabla;
+    if (sinFondo(bgs[k])) { td.style.backgroundColor = sinFondo(fondoTabla) ? '#fff' : fondoTabla; td._bgFij = true; }
     if (p.c2 === nFix - 1) td.classList.add('fijo-fin');
+    t._fij.push(td);
   });
   t.dataset.fijado = firma;
+  // v1.25.5: si después cambia el ancho de la tabla o de una columna fija (pantalla completa, letra que tarda en cargar,
+  // filtros), se vuelve a calcular: así las columnas fijas no dejan un hueco por donde se ven los días de atrás.
+  if (window.ResizeObserver && !t._ro) {
+    t._ro = new ResizeObserver(() => { clearTimeout(t._roT); t._roT = setTimeout(() => { if (t.isConnected) { try { fijarColumnas(t, true); } catch (e) { } } else if (t._ro) { t._ro.disconnect(); } }, 150); });
+    t._ro.observe(t);
+  }
+  if (t._ro) {
+    const porFila = {}; cand.forEach(([td, , p]) => { (porFila[p.r] = porFila[p.r] || []).push(td); });
+    const fila = Object.values(porFila).sort((a, b) => b.length - a.length)[0] || [];
+    (t._roCeldas || []).forEach(c => { try { t._ro.unobserve(c); } catch (e) { } });
+    t._roCeldas = fila; fila.forEach(c => t._ro.observe(c));
+  }
 }
 function vigilarCeros() {
   let pend = new Set(), prog = false;
@@ -799,7 +815,88 @@ function parseCelda(v, turno) {
   }
   const c = S.codigos[v];
   if (c) return { t: 'codigo', tipo: v === 'VAC' ? 'VAC' : (c.Tipo || 'OTRO') };
+  // v1.25.5: sigla de otro servicio (P4, AO, OS, R...): no es un error; al guardar se controla que tenga las horas en algún servicio
+  if (/^[A-ZÑ]/.test(v)) return { t: 'sigla', sig: normSigla(v) };
   return { t: 'error' };
+}
+/* ---------- v1.25.5 Siglas de otros servicios ----------
+   En las planillas suelen poner P4 (= servicio 4, SUCRE 4225), AO (Arauco Oasis), OS (otro servicio)... para decir que ese día
+   la persona fue a cubrir otro servicio. Esas horas tienen que estar cargadas en ese otro servicio: si no, es un día sin cubrir. */
+const SIGLAS_DEFECTO = { P4: 'SUCRE 4225', P6: 'TRES DE FEBRERO 945', P8: 'AMENABAR 1570', P10: 'DIAGONAL NORTE 1145', P12: 'SUCRE 1949', P13: 'CONGRESO 1661',
+  P22: 'OLLEROS 2202', P26: 'ARCOS 1744', P30: 'JOSE HERNANDEZ 1721', P43: 'CORDOBA 1131', P46: 'ACIFI', P55: 'DEMARIA 4780', P56: 'CONGRESO 1622',
+  P57: 'ENRIQUE MARTINEZ 210', P60: 'CONSTRUCTORA SUDAMERICANA', P65: 'LIBERTADOR 3050', AO: 'ARAUCO OASIS', AZ: 'ARAUCO ZARATE' };
+function normSigla(v) { return String(v || '').toUpperCase().replace(/[.\s\-_]/g, '').replace(/^P0+(\d)/, 'P$1'); }
+// Servicio al que apunta una sigla: primero lo cargado en Servicios (columna Siglas), después la tabla de la empresa (P4 = SUCRE 4225...)
+function servicioDeSigla(sig) {
+  sig = normSigla(sig);
+  const servs = (S.base && S.base.servicios) || [];
+  const explicito = servs.find(x => String(x.Siglas || '').split(/[,;\s]+/).map(normSigla).filter(Boolean).indexOf(sig) >= 0);
+  if (explicito) return explicito;
+  const objetivo = SIGLAS_DEFECTO[sig]; if (!objetivo) return null;
+  const t = norm(objetivo);
+  const cand = servs.filter(x => norm(String(x.Cliente || '') + ' ' + String(x.Servicio || '')).indexOf(t) >= 0);
+  return cand.find(x => x.Activo !== 'NO') || cand[0] || null;
+}
+// Horas de cada persona por día en todos los servicios del período que tiene la app (planillas abiertas, pendientes y lo de otras zonas)
+function horasPorPersonaDia(periodo) {
+  const out = {}, vistos = {};
+  const nomServ = id => ((S.base.servicios || []).find(x => x.Id === id) || {}).Servicio || id;
+  const sumar = (f, dias, sid, snom) => {
+    const k = clavePersona(f); if (!k) return;
+    const a = out[k] = out[k] || [];
+    dias.forEach((v, i) => { const p = parseCelda(v); if (p.t === 'horas') (a[i] = a[i] || []).push({ id: sid, nom: snom, h: p.h }); });
+  };
+  const usarFilas = (sid, filas, crudas) => {
+    vistos[sid] = 1;
+    filas.forEach(f => sumar(f, crudas ? Array.from({ length: 31 }, (_, i) => f['D' + pad(i + 1)] || (f.Dias || [])[i] || '') : f.Dias, sid, nomServ(sid)));
+  };
+  if (S.pl && S.pl.periodo === periodo) usarFilas(S.pl.servicioId, S.pl.filas, false);
+  tabsPendientes().filter(p => p.periodo === periodo && !vistos[p.servicioId]).forEach(p => usarFilas(p.servicioId, p.filas, false));
+  Object.keys(S.cachePl || {}).forEach(k => {
+    const c = S.cachePl[k], sid = k.split('|')[1];
+    if (k.split('|')[0] !== periodo || !c || !c.filas || vistos[sid]) return;
+    usarFilas(sid, c.filas, true);
+  });
+  // Lo de las otras zonas (que no se tiene abierto): viene con la planilla
+  const nomVistos = {}; Object.keys(vistos).forEach(id => { nomVistos[norm(nomServ(id))] = 1; });
+  ((S.pl && S.pl.periodo === periodo && S.pl.ocup) || []).forEach(o => { if (!nomVistos[norm(o.Servicio)]) sumar(o, o.Dias, o.ServicioId || '', o.Servicio); });
+  return out;
+}
+// Días con una sigla en los que la persona no tiene horas cargadas (o no las tiene en el servicio de la sigla)
+function siglasSinHoras(filas, periodo, nombreServ) {
+  const horas = horasPorPersonaDia(periodo), n = periodoInfo(periodo).n, out = [];
+  filas.forEach(f => {
+    if (!(f.Nombre || f.Legajo)) return;
+    const hs = horas[clavePersona(f)] || [];
+    for (let i = 0; i < n; i++) {
+      const p = parseCelda(f.Dias[i]); if (p.t !== 'sigla') continue;
+      const dest = servicioDeSigla(p.sig), del = hs[i] || [];
+      const ok = dest ? del.some(x => x.id === dest.Id || norm(x.nom) === norm(dest.Servicio)) : del.length > 0;
+      if (ok) continue;
+      out.push({ nombre: f.Nombre, fecha: ddmm(fechaDia(periodo, i)), sigla: valorBase(f.Dias[i]), servicio: nombreServ,
+        motivo: dest ? 'Dice que fue a cubrir ' + dest.Servicio + ', pero ahí no tiene horas ese día' + (del.length ? ' (tiene horas en ' + del.map(x => x.nom).join(', ') + ')' : '')
+          : (SIGLAS_DEFECTO[p.sig] ? 'Dice que fue a cubrir ' + SIGLAS_DEFECTO[p.sig] + ', pero no tiene horas en ningún servicio ese día' : 'La sigla no corresponde a ningún código y no tiene horas en ningún servicio ese día') });
+    }
+  });
+  return out;
+}
+// Aviso al guardar: muestra los días con sigla sin horas. Devuelve true para guardar igual, false para corregir.
+function avisoSiglas() {
+  const lista = [];
+  tabsPendientes().forEach(p => siglasSinHoras(p.filas, p.periodo, p.nombre).forEach(x => lista.push(x)));
+  if (S.pl && !S.pl.soloVer) siglasSinHoras(S.pl.filas, S.pl.periodo, (S.pl.serv && S.pl.serv.Servicio) || '').forEach(x => lista.push(x));
+  if (!lista.length) return Promise.resolve(true);
+  return new Promise(res => {
+    const m = modal('<div class="aviso-doble"><div class="aviso-icono">!</div><h3>Días sin cubrir: la sigla no tiene horas cargadas</h3>' +
+      '<p>Estos días tienen una sigla (P4, AO, OS…) pero la persona no tiene las horas cargadas en el servicio que corresponde. Si no se corrige, ese día queda sin cubrir.</p></div>' +
+      '<div class="tabla-wrap" style="max-height:50vh;overflow:auto"><table class="t"><thead><tr><th>Apellido y nombre</th><th>Día</th><th>Sigla</th><th>Servicio</th><th>Qué pasa</th></tr></thead><tbody>' +
+      lista.map(x => '<tr><td><b>' + esc(x.nombre) + '</b></td><td>' + esc(x.fecha) + '</td><td><b>' + esc(x.sigla) + '</b></td><td>' + esc(x.servicio) + '</td><td>' + esc(x.motivo) + '</td></tr>').join('') +
+      '</tbody></table></div><div class="pie"><button class="btn" id="sgCorregir">Corregir</button><button class="btn prim" id="sgIgual">Guardar igual</button></div>');
+    m.classList.add('modal-aviso', 'modal-ancho');
+    $('#sgCorregir').onclick = () => { cerrarModal(); res(false); };
+    $('#sgIgual').onclick = () => { cerrarModal(); res(true); };
+    S.modalCancelar = () => res(false);
+  });
 }
 
 // Feriados cargados en Datos (iguales para todos los servicios).
@@ -948,7 +1045,9 @@ async function vPlanilla(params) {
   precargarPestanas(per);
 }
 async function traerPlanilla(periodo, servicioId) {
+  const t0 = Date.now();
   const r = await api('planilla', { periodo, servicioId });
+  if (((S.guardadoEn || {})[periodo + '|' + servicioId] || 0) > t0) return S.cachePl[periodo + '|' + servicioId] || r;
   S.cachePl = S.cachePl || {};
   S.cachePl[periodo + '|' + servicioId] = r;
   return r;
@@ -971,10 +1070,12 @@ async function precargarPestanas(periodo, primero) {
   try { await run; } finally { delete PRECARGA[periodo]; }
 }
 async function lotePlanillas(periodo, ids) {
+  const t0 = Date.now();
   const r = await api('planillas', { periodo, ids });
   if (!r || !r.planillas) return;
   S.cachePl = S.cachePl || {};
   Object.keys(r.planillas).forEach(id => {
+    if (((S.guardadoEn || {})[periodo + '|' + id] || 0) > t0) return;   // v1.25.5: se guardó mientras se traía: no se pisa con lo viejo
     const x = r.planillas[id];
     S.cachePl[periodo + '|' + id] = Object.assign({}, x, { ocupacion: x.ocupacion || (r.ocupacion || []).filter(o => o.ServicioId !== id) });
   });
@@ -1006,7 +1107,7 @@ function armarPlanilla(r, servicioId, params) {
     cargaAdminSup: !esAdmin() && cargaAdmin(r.servicio),
     // Lo cargado en los otros servicios en el mismo período, para avisar si alguien queda en dos lugares a la vez.
     ocup: (r.ocupacion || []).map(o => ({
-      Legajo: o.Legajo, Nombre: o.Nombre, Servicio: o.Servicio,
+      Legajo: o.Legajo, Nombre: o.Nombre, Servicio: o.Servicio, ServicioId: o.ServicioId || "",
       Dias: Array.from({ length: 31 }, (_, i) => o['D' + pad(i + 1)] || '')
     }))
   };
@@ -1816,6 +1917,7 @@ function claseCelda(f, i) {
   else if (p.t === 'vacio' && f.Col[i] === 'T') c = 'tarde';
   else if (p.t === 'codigo') c = 'k-' + p.tipo + ' ' + claseCodigoXl(valorBase(f.Dias[i]));
   else if (p.t === 'error') c = 'k-ERROR';
+  else if (p.t === 'sigla') c = 'k-SIGLA';
   if (notaDe(f.Dias[i])) c += ' con-nota';
   if (bloqueado(i)) c += ' bloq';
   c += bordeSemanaInformada(i);
@@ -1833,8 +1935,12 @@ function claseCodigoXl(cod) {
 
 function tituloCelda(f, i) {
   const nota = notaDe(f.Dias[i]);
-  if (!nota) return '';
   const p = parseCelda(f.Dias[i]);
+  if (p.t === 'sigla') {
+    const d = servicioDeSigla(p.sig);
+    return ' title="' + esc((d ? valorBase(f.Dias[i]) + ' = ' + d.Servicio + ': las horas tienen que estar cargadas en ese servicio' : SIGLAS_DEFECTO[p.sig] ? valorBase(f.Dias[i]) + ' = ' + SIGLAS_DEFECTO[p.sig] : 'Sigla de otro servicio: las horas tienen que estar cargadas en el servicio que cubrió') + (nota ? '\n' + nota : '')) + '"';
+  }
+  if (!nota) return '';
   let t = nota;
   if (p.t === 'horas' && p.horario) t += '\n' + hhmm(p.horario.ini) + ' a ' + hhmm(p.horario.ini + p.h) + ': ' + fmtN(p.d) + ' diurnas y ' + fmtN(p.n) + ' nocturnas';
   return ' title="' + esc(t) + '"';
@@ -2178,6 +2284,8 @@ function validarPuestosReten() {
 async function guardarPlanilla(silencioso, forzar) {
   const pl = S.pl;
   const btn = $('#btnGuardar');
+  // v1.25.5: siglas de otro servicio sin horas cargadas: aviso antes de guardar
+  if (!S._siglasVistas) { if (!(await avisoSiglas())) return false; S._siglasVistas = true; setTimeout(() => { S._siglasVistas = false; }, 4000); }
   // v1.25.0: primero las otras pestañas con cambios pendientes (Novedades semanales: se guarda todo junto al final)
   let nOtras = 0;
   if (tabsPendientes().length) {
@@ -4108,6 +4216,7 @@ function formServicio(s) {
     '<label class="campo" title="Ej.: RAZ Barracas, Trelles y Montenegro: se factura lo que se cubre">Horas contratadas<select name="SinDiferencia">' +
       opciones([{ v: '', t: 'Según el contrato' + (sinDiferencia(Object.assign({}, s, { SinDiferencia: '' })) ? ' (por nombre: igual a las realizadas)' : '') },
         { v: 'SI', t: 'Iguales a las realizadas (sin diferencias)' }, { v: 'NO', t: 'Según el contrato (siempre)' }], s.SinDiferencia || '') + '</select></label>' +
+    '<label class="campo" title="Cómo lo nombran en las otras planillas cuando alguien va a cubrir (ej.: P4 o AO). Varias, separadas por coma.">Siglas (P4, AO…)<input name="Siglas" value="' + esc(s.Siglas || '') + '" placeholder="' + esc(Object.keys(SIGLAS_DEFECTO).filter(k => { const t = norm(SIGLAS_DEFECTO[k]); return norm(String(s.Cliente || '') + ' ' + String(s.Servicio || '')).indexOf(t) >= 0; }).join(', ')) + '"></label>' +
     '<label class="campo" title="Ej.: RAIZEN Dock Sud Supervisores y los RAZ: los carga Administración y el supervisor no los tiene que completar">Lo carga<select name="CargaAdmin">' +
       opciones([{ v: '', t: 'Según el nombre' + (cargaAdmin(Object.assign({}, s, { CargaAdmin: '' })) ? ' (Administración)' : ' (el supervisor)') },
         { v: 'SI', t: 'Administración (el supervisor solo consulta)' }, { v: 'NO', t: 'El supervisor' }], s.CargaAdmin || '') + '</select></label>' +
@@ -5710,6 +5819,7 @@ async function vCierre(params) {
   if (r.demo) { $('#ciRes').innerHTML = '<div class="vacio-msg">' + esc(r.demo) + '</div>'; return; }
   const BLOQUES = [
     ['dobleCarga', 'Informados el mismo día en dos o más servicios', 'La misma persona con horas el mismo día en más de un servicio (las horas se suman). Los estados y abreviaturas no cuentan (F, VAC, OS, AO, P4…: P4 quiere decir que fue a cubrir el servicio 4 y sus horas están en ese servicio). Con ⚠: suma más de 24 hs.', 'bad'],
+    ['siglaSinHoras', 'Días sin cubrir: sigla de otro servicio sin las horas cargadas', 'En un servicio pusieron una sigla (P12, AO, OS, R…) pero la persona no tiene las horas en el servicio que dice la sigla (P12 = SUCRE 1949) o, si la sigla no es de un servicio, en ningún servicio ese día.', 'bad'],
     ['noEnListado', 'No están en el listado de personal', 'Revisar el legajo o el nombre: así no se pueden liquidar.', 'bad'],
     ['bajaConHoras', 'De baja en el listado y con horas', 'Confirmar la fecha de baja.', 'bad'],
     ['empresaDistinta', 'Empresa distinta a la del listado', 'Corregir la empresa en la planilla o en el listado.', 'warn'],
@@ -5720,6 +5830,7 @@ async function vCierre(params) {
   const tabla = (l, renglones) => '<div class="tabla-wrap"><table class="t"><thead><tr><th>Legajo</th><th>Apellido y nombre</th><th>Empresa</th><th>Servicios</th><th>Detalle</th></tr></thead><tbody>' +
     l.map(x => '<tr><td>' + esc(x.Legajo || '') + '</td><td><b>' + esc(x.Nombre) + '</b></td><td>' + esc(x.Empresa || '') + '</td><td><small>' + esc(x.Servicios || '') + '</small></td><td>' +
       (renglones ? String(x.Detalle).split(' · ').map(d => /^⚠/.test(d) ? '<b style="color:#b91c1c">' + esc(d) + '</b>' : esc(d)).join('<br>') : esc(x.Detalle)) + '</td></tr>').join('') + '</tbody></table></div>';
+  BLOQUES.forEach(b => { r[b[0]] = r[b[0]] || []; });
   const totalProb = BLOQUES.reduce((a, b) => a + r[b[0]].length, 0);
   $('#ciRes').innerHTML =
     (!r.conDatos ? '<div class="panel vacio-msg">El período ' + esc(r.nombrePeriodo) + ' no tiene planillas cargadas.</div>' : '') +
@@ -5728,7 +5839,7 @@ async function vCierre(params) {
       '<div class="ci-card ' + (totalProb ? 'mal' : 'bien') + '"><b>' + totalProb + '</b><span>' + (totalProb ? 'cosas para revisar' : 'todo en orden') + '</span></div></div>' +
     htmlResumenCierre(r.resumen) +
     BLOQUES.map(b => '<div class="panel ci-blq ' + b[3] + '"><div class="barra" style="margin:0"><div><h2 style="margin:0">' + esc(b[1]) + ' <span class="pill ' + (r[b[0]].length ? (b[3] === 'bad' ? 'bad' : 'warn') : 'ok') + '">' + r[b[0]].length + '</span></h2>' +
-      '<p class="sub" style="margin:0">' + esc(b[2]) + '</p></div></div>' + (r[b[0]].length ? tabla(r[b[0]], b[0] === 'dobleCarga') : '<p class="sub" style="margin:6px 0 0">Sin observaciones.</p>') + '</div>').join('');
+      '<p class="sub" style="margin:0">' + esc(b[2]) + '</p></div></div>' + ((r[b[0]] || []).length ? tabla(r[b[0]], b[0] === 'dobleCarga' || b[0] === 'siglaSinHoras') : '<p class="sub" style="margin:6px 0 0">Sin observaciones.</p>') + '</div>').join('');
   $$('[data-cires]').forEach(b => b.onclick = () => ventanaResumenCierre(b.dataset.cires));
   $('#ciBajar').disabled = false;
   $('#ciBajar').onclick = () => {
@@ -7154,8 +7265,12 @@ async function planGuardarEdicion(repintar) {
     }
     const prev = PLANS.datos[ed.key] || {};
     PLANS.datos[ed.key] = Object.assign({}, prev, { filas: orden.map((f, i) => Object.assign({}, f, { Orden: String(i + 1) })) });
-    if (S.cachePl) S.cachePl[ed.key] = null;
-    PLANS.ed = null; toast('Planificación guardada.'); repintar();
+    // v1.25.5: la planilla del servicio en Proyección y Novedades semanales queda con lo que se guardó acá
+    if (S.cachePl) delete S.cachePl[ed.key];
+    if (S.tabsPend) delete S.tabsPend[ed.key];
+    S.guardadoEn = S.guardadoEn || {}; S.guardadoEn[ed.key] = Date.now();
+    traerPlanilla(ed.per, ed.id).catch(() => {});
+    PLANS.ed = null; toast('Planificación guardada. Ya se ve en Proyección y Novedades semanales.'); repintar();
   } catch (e) { toast('No se guardó: ' + e.message, true); if (btn) { btn.disabled = false; btn.textContent = 'Guardar cambios'; } }
 }
 
@@ -8221,7 +8336,8 @@ const INSTR = [
       { m: '.dia-tab', t: 'Los <b>lunes</b> todas las pestañas arrancan sin pintar y se pintan de rojo a medida que se cargan o modifican esa semana: así se ve qué servicios ya informó cada supervisor.', solo: 'NOSUP' },
       { m: '#btnSinNov', t: '<b>Sin novedades esta semana</b>: si en un servicio no cambió nada, tocalo y la pestaña queda pintada igual.' },
       { m: '#btnGuardar', t: '<b>Guardar</b>: no hace falta guardar pestaña por pestaña. Pasá por todas las que tengas que cambiar (las que tienen cambios sin guardar muestran un punto blanco) y al terminar tocá <b>Guardar todo</b>: se guardan todas juntas.' },
-      { m: '#btnCopiarTodo', t: '<b>Copiar todo el listado</b>: selecciona todo el personal del servicio de una vez y lo copia con los colores, para pegarlo con Ctrl+V en cualquier hoja de Excel.', solo: 'ADMIN' }
+      { m: '#btnCopiarTodo', t: '<b>Copiar todo el listado</b>: selecciona todo el personal del servicio de una vez y lo copia con los colores, para pegarlo con Ctrl+V en cualquier hoja de Excel.', solo: 'ADMIN' },
+      { m: '.k-SIGLA||#c-0-0', t: '<b>Siglas de otro servicio</b> (P4, AO, OS…): quedan en gris. Al guardar, si ese día la persona no tiene las horas cargadas en el servicio que dice la sigla (P4 = SUCRE 4225), o en ninguno, aparece un aviso para corregirlo.' }
     ],
     tips: [
       { t: 'Solo se modifican los días desde la semana que estás informando en adelante. Las semanas anteriores quedan cerradas: si hay que corregir algo, pedíselo a administración.', solo: 'SUP' },
@@ -8415,6 +8531,7 @@ const INSTR = [
       { m: '.af-btn', t: 'Filtrá por tipo de aviso.' },
       { m: '#ciBajar', t: '<b>Descargar (Excel)</b>: también lleva el resumen de vacaciones, horas extras y licencias.' },
       { m: 'text=Informados el mismo día', t: '<b>Informados el mismo día en dos o más servicios</b>: la misma persona con horas el mismo día en más de un servicio, con las horas que cargó cada supervisor y el total (un día por renglón). Los estados y abreviaturas (F, VAC, OS, AO, P4…) no cuentan. Con ⚠: más de 24 hs.' },
+      { m: 'text=Días sin cubrir', t: '<b>Días sin cubrir</b>: en un servicio pusieron una sigla (P12, AO, OS, R…) y la persona no tiene las horas en el servicio que dice la sigla (P12 = SUCRE 1949), o en ninguno si la sigla no es de un servicio.' },
       { m: 'text=Resumen del período', t: '<b>Resumen del período</b>: total de días de vacaciones, total de horas extras y cada licencia o ausencia con sus días y personas. Cada persona cuenta una sola vez por día aunque esté cargada en dos servicios. <b>Tocá un total o un estado</b> (por ejemplo VAC) y se abre la lista de personas con sus días y su servicio, ordenada por supervisor y por empresa, con subtotales; se puede copiar o bajar a Excel.' }
     ],
     tips: [

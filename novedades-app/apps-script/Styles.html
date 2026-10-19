@@ -446,6 +446,9 @@ table.g.xl td.cx-BAJA input.cel { color: #fff; }
 table.g.xl td[class*="cx-"] input.cel { font-weight: 700; }
 table.g.xl td.k-ERROR { box-shadow: inset 0 0 0 2px #ff0000; }
 table.g.xl td.k-ERROR input.cel { color: #c00000; }
+/* v1.25.5: sigla de otro servicio (P4, AO, OS...): no es error, se ve en gris */
+table.g td.k-SIGLA input.cel { color: #64748b; font-style: italic; }
+table.g td.k-SIGLA { background-image: linear-gradient(135deg, rgba(100,116,139,.10) 25%, transparent 25%, transparent 50%, rgba(100,116,139,.10) 50%, rgba(100,116,139,.10) 75%, transparent 75%); background-size: 8px 8px; }
 
 /* semanas enviadas: celdas bloqueadas, sin cambiar el color */
 table.g.xl td.bloq { background-image: repeating-linear-gradient(135deg, transparent 0 5px, rgba(0,0,0,.06) 5px 6px); }
