@@ -1380,36 +1380,69 @@ function accionSimExcel_(u, d) {
 
 // v1.25.2: estados que no son una carga (no cuentan como "informado en dos servicios el mismo día")
 var FRANCOS_CIERRE_ = { F: 1, FCO: 1, FR: 1, FRANCO: 1, X: 1, '-': 1 };
-// v1.25.2: resumen del período para el Control de cierre: vacaciones, horas extras y licencias, con sus totales
+// v1.25.3: resumen del período para el Control de cierre: vacaciones, horas extras y licencias, con sus totales.
+// Cada persona cuenta UNA sola vez por día aunque esté cargada en dos o más servicios:
+//  - un estado (VAC, ENF, ...) repetido el mismo día en dos servicios cuenta un día;
+//  - las horas iguales repetidas el mismo día en dos servicios cuentan una vez (si son distintas, se suman);
+//  - si ese día tiene horas en algún servicio, cuenta como trabajado (como en el 30/31 días).
+// Las horas extras salen con las mismas fórmulas del Consolidado, sobre lo de cada persona sin repetir.
 function resumenCierre_(periodo) {
-  var lic = datosLicencias_(periodo), out = { vacaciones: [], extras: [], licencias: [], porCodigo: {} };
-  var vac = {};
-  lic.forEach(function (x) {
-    var pc = out.porCodigo[x.Codigo] = out.porCodigo[x.Codigo] || { dias: 0, personas: {} };
-    pc.dias += Number(x.Dias) || 0; pc.personas[(x.Legajo || '') + '|' + x.Nombre] = 1;
-    if (x.Codigo === 'VAC') {
-      var k = (x.Legajo || '') + '|' + x.Nombre;
-      var v = vac[k] = vac[k] || { Legajo: x.Legajo, Nombre: x.Nombre, Empresa: x.Empresa, Servicios: [], Dias: 0, Fechas: [] };
-      if (v.Servicios.indexOf(x.Servicio) < 0) v.Servicios.push(x.Servicio);
-      v.Dias += Number(x.Dias) || 0; v.Fechas.push(x.Fechas);
-    } else out.licencias.push({ Codigo: x.Codigo, Legajo: x.Legajo, Nombre: x.Nombre, Empresa: x.Empresa, Servicios: x.Servicio, Dias: Number(x.Dias) || 0, Fechas: x.Fechas });
-  });
-  Object.keys(out.porCodigo).forEach(function (c) { out.porCodigo[c].personas = Object.keys(out.porCodigo[c].personas).length; });
-  out.vacaciones = Object.keys(vac).map(function (k) { var v = vac[k]; return { Legajo: v.Legajo, Nombre: v.Nombre, Empresa: v.Empresa, Servicios: v.Servicios.join(', '), Dias: v.Dias, Fechas: v.Fechas.join(', ') }; })
-    .sort(function (a, b) { return b.Dias - a.Dias || String(a.Nombre).localeCompare(String(b.Nombre)); });
-  try {
-    var ex = vistaTabla_('extras', periodo);
-    out.extras = (ex.filas || []).filter(function (f) { return Number(f.Ext) > 0; }).map(function (f) {
-      return { Legajo: f.Legajo, Nombre: f.Nombre, Empresa: f.Empresa, Servicios: f.Servicio, Total: f.Liq, Normales: f.Norm, Extras: f.Ext, Ausentismo: f.Aus };
-    });
-    out.notaExtras = ex.nota || '';
-  } catch (e) { out.errorExtras = e.message; }
+  var dx = datosSTD_(periodo, 'consolidado'), ctx = dx.ctx, n = dx.n;
+  var ddmm = function (i) { var d = fechaDia_(periodo, i); return ('0' + d.getUTCDate()).slice(-2) + '/' + ('0' + (d.getUTCMonth() + 1)).slice(-2); };
   var r2 = function (x) { return Math.round(x * 100) / 100; };
-  out.totales = {
-    vacDias: out.vacaciones.reduce(function (a, x) { return a + x.Dias; }, 0), vacPersonas: out.vacaciones.length,
-    extras: r2(out.extras.reduce(function (a, x) { return a + (Number(x.Extras) || 0); }, 0)), extrasPersonas: out.extras.length,
-    licDias: out.licencias.reduce(function (a, x) { return a + x.Dias; }, 0),
-    licPersonas: out.licencias.map(function (x) { return (x.Legajo || '') + '|' + x.Nombre; }).filter(function (x, i, a) { return a.indexOf(x) === i; }).length
-  };
-  return out;
+  var gente = {};
+  dx.items.forEach(function (it) {
+    var f = it.f; if (it.vacio) return;
+    var k = f.Legajo ? 'L' + String(f.Legajo).trim() : 'N' + normT_(f.Nombre);
+    var serv = it.serv || {};
+    var g = gente[k] = gente[k] || { Legajo: f.Legajo, Nombre: f.Nombre, Empresa: f.Empresa, partes: [] };
+    if (!g.Empresa && f.Empresa) g.Empresa = f.Empresa;
+    g.partes.push({ it: it, serv: serv.Servicio || f.ServicioId, sup: ctx.nomSup[String(serv.Supervisor || '').toLowerCase()] || serv.Supervisor || '' });
+  });
+  var personas = [], porCodigo = {};
+  Object.keys(gente).forEach(function (k) {
+    var g = gente[k], cods = {}, tot = 0, de = 0, aus = 0, hsServ = {};
+    for (var i = 0; i < n; i++) {
+      var vistos = {}, codDia = {}, conHoras = false;
+      g.partes.forEach(function (p) {
+        var d = p.it.x.dias[i] || ['', ''];
+        if (typeof d[0] === 'number') {
+          conHoras = true;
+          var clave = (p.it.reten ? 'R' : 'C') + d[0] + '|' + d[1];
+          if (vistos[clave]) return;          // la misma carga repetida en otro servicio: una sola vez
+          vistos[clave] = 1;
+          if (p.it.reten) de += d[0] + d[1]; else tot += d[0] + d[1];
+          hsServ[p.serv] = (hsServ[p.serv] || 0) + d[0] + d[1];
+        } else if (d[0] && d[0] !== 'F' && d[0] !== 'FCO') codDia[d[0]] = 1;
+      });
+      Object.keys(codDia).forEach(function (c) {
+        if (CODIGOS_LICENCIA_.indexOf(c) < 0) return;
+        var x = cods[c] = cods[c] || { dias: 0, fechas: [] };
+        x.dias++; x.fechas.push(ddmm(i));
+      });
+      if (!conHoras && Object.keys(codDia).some(function (c) { return COD_AUSENTISMO_.indexOf(c) >= 0; })) aus++;
+    }
+    var he = horasExtras_(tot, aus, n);
+    // Servicio y supervisor: el de más horas (si está en dos servicios, figura uno)
+    var princ = g.partes.slice().sort(function (a, b) { return (hsServ[b.serv] || 0) - (hsServ[a.serv] || 0); })[0];
+    var pers = { Legajo: g.Legajo, Nombre: g.Nombre, Empresa: g.Empresa || '', Servicio: princ.serv, Supervisor: princ.sup,
+      Servicios: g.partes.map(function (p) { return p.serv; }).filter(function (x, j, a) { return a.indexOf(x) === j; }).join(', '),
+      codigos: {}, Total: r2(tot + de), Cobertura: r2(tot), Normales: he.normales, Ausentismo: aus, Extras: he.extras };
+    Object.keys(cods).forEach(function (c) {
+      pers.codigos[c] = { dias: cods[c].dias, fechas: cods[c].fechas.join(', ') };
+      var pc = porCodigo[c] = porCodigo[c] || { dias: 0, personas: 0 };
+      pc.dias += cods[c].dias; pc.personas++;
+    });
+    if (Object.keys(pers.codigos).length || pers.Extras > 0) personas.push(pers);
+  });
+  var tot = { vacDias: 0, vacPersonas: 0, extras: 0, extrasPersonas: 0, licDias: 0, licPersonas: 0 };
+  personas.forEach(function (p) {
+    if (p.codigos.VAC) { tot.vacDias += p.codigos.VAC.dias; tot.vacPersonas++; }
+    if (p.Extras > 0) { tot.extras += p.Extras; tot.extrasPersonas++; }
+    var otros = Object.keys(p.codigos).filter(function (c) { return c !== 'VAC'; });
+    if (otros.length) { tot.licPersonas++; otros.forEach(function (c) { tot.licDias += p.codigos[c].dias; }); }
+  });
+  tot.extras = r2(tot.extras);
+  return { personas: personas, porCodigo: porCodigo, totales: tot,
+    notaExtras: 'Período de ' + n + ' días: cada día de ausentismo descuenta ' + (Math.round(HS_BASE_PERIODO / n * 10000) / 10000) + ' hs (208 / ' + n + '). Cada persona cuenta una sola vez por día aunque esté en dos servicios.' };
 }

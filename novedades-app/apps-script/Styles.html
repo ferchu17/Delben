@@ -1082,6 +1082,15 @@ table.sim-grid td:nth-child(2).fijo, table.sim-grid th:nth-child(2).fijo { min-w
 .ci-res .ci-card.ci-vac b { color: #1565c0; }
 .ci-res .ci-card.ci-ext b { color: #2e7d32; }
 .ci-res .ci-card.ci-lic b { color: #c2410c; }
+/* v1.25.3: totales y estados que abren la lista de personas */
+button.ci-card { font: inherit; text-align: left; cursor: pointer; transition: box-shadow .15s, transform .15s; }
+button.ci-card:hover { box-shadow: 0 4px 14px rgba(15, 23, 42, .12); transform: translateY(-1px); }
+tr.ci-clic { cursor: pointer; } tr.ci-clic:hover td { background: #eef6ff; }
+.ci-ver { color: #1565c0; margin-left: 6px; }
+table.ci-lista tr.ci-grp td { background: #1f4e79; color: #fff; font-weight: 800; }
+table.ci-lista tr.ci-sub1 td { background: #dbe7f5; font-weight: 700; }
+table.ci-lista tr.ci-sub2 td { background: #f3f6fa; color: #475569; font-style: italic; }
+.ci-modal-tabla { max-height: 62vh; overflow: auto; }
 .ci-det { margin-top: 10px; border: 1px solid #e2e8f0; border-radius: 8px; padding: 8px 12px; }
 .ci-det summary { cursor: pointer; font-weight: 700; color: #1f4e79; }
 .ci-det[open] summary { margin-bottom: 8px; }
