@@ -40,6 +40,10 @@ jobs:
           python3 tools/armar_pagina.py sgi-app _site/sgi Admin
           # Informe de Novedades: app estática (HTML + JS), se copia tal cual
           cp -R informe-de-novedades _site/informe-de-novedades
+          # Minuta Operativa del Servicio: app estática (HTML + JS), se copia tal cual (sin el backend de Apps Script)
+          # https://ferchu17.github.io/Delben/minuta-operativa/
+          cp -R minuta-operativa _site/minuta-operativa
+          rm -rf _site/minuta-operativa/backend
           # Control de Combustible: la página se arma con los archivos de Apps Script de combustible-app/apps-script
           # (sin el cartel de Google; el link /exec del backend está en combustible-app/web/config.js)
           mkdir -p _site/combustible
