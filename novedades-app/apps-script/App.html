@@ -596,6 +596,8 @@ function puede(clave, editar) {
   return editar ? a === 'E' : !!a;
 }
 
+// La consulta está en la app Minuta Operativa (se entra con el mismo usuario y clave de SGI)
+const MINUTA_PRESENTES_URL = 'https://ferchu17.github.io/Delben/minuta-operativa/?vista=presentes';
 function vMenu() {
   let tiles;
   if (esAdmin() || S.u.rol === 'CONSULTA') {
@@ -656,6 +658,8 @@ function vMenu() {
     ];
     OTRAS.forEach(t => { if (puede(t.v)) tiles.push(t); });
   }
+  // Presentes de los servicios (Minuta Operativa): para administración y supervisores
+  if (esAdmin() || S.u.rol === 'SUPERVISOR') tiles.push({ v: 'presentesServicios', ic: 'personal', t: 'Presentes de los servicios', d: 'El personal que informan los servicios en la Minuta Operativa: por empresa, fecha, legajo, servicio u hora.', c: '#20a464' });
   // v1.22.11: Instructivo para todos los perfiles (botón distinto, primero)
   tiles.unshift({ v: 'instructivo', ic: 'instructivo', t: 'Instructivo', d: 'Para qué sirve cada pantalla y cómo se usa, con imágenes. Se baja en PDF.', c: '#f97316', instr: true });
   const cargaPendiente = esAdmin() && S.base.baseVacia;
@@ -673,7 +677,7 @@ function vMenu() {
       '<button class="tile' + (t.instr ? ' tile-instr' : '') + '" style="--c:' + t.c + '" data-i="' + i + '"><i class="tile-ic">' + icono(iconoTile(t)) + '</i><b>' + esc(t.t) + '</b><span>' + esc(t.d) + '</span></button>'
     ).join('') + '</div>' : '') +
     (tiles.length < 2 ? '<div class="panel vacio-msg">Todavía no tenés servicios asignados. Pedile a administración que te asigne uno.</div>' : '');
-  $$('.tile').forEach(b => b.onclick = () => { const t = tiles[+b.dataset.i]; if (t.v === 'sgi') { abrirSGI(); return; } ir(t.v, t.p); });
+  $$('.tile').forEach(b => b.onclick = () => { const t = tiles[+b.dataset.i]; if (t.v === 'sgi') { abrirSGI(); return; } if (t.v === 'presentesServicios') { window.open(MINUTA_PRESENTES_URL, '_blank'); return; } ir(t.v, t.p); });
   // Administración: aviso si falta un archivo del proyecto o un permiso (Drive, conexión externa)
   if (esAdmin() && !window.MODO_DEMO) api('diagnostico').then(d => {
     if (!d || (!d.faltan.length && !d.permisos.length) || !$('#diagAviso')) return;

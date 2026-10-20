@@ -5,10 +5,10 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#1F3864">
 <link rel="manifest" href="manifest.webmanifest">
-<link rel="icon" href="assets/delben-64.png">
-<link rel="apple-touch-icon" href="assets/delben-192.png">
+<link rel="icon" href="assets/minuta-64.png">
+<link rel="apple-touch-icon" href="assets/icono-192.png">
 <title>Minuta Operativa del Servicio · DelBen</title>
-<link rel="stylesheet" href="css/app.css?v=20261020c">
+<link rel="stylesheet" href="css/app.css?v=20261020d">
 </head>
 <body>
 
@@ -45,6 +45,7 @@
     <nav class="tabs">
       <button class="tab on" data-tab="nueva">📝 Nueva minuta</button>
       <button class="tab" data-tab="informes">📂 Informes</button>
+      <button class="tab" data-tab="presentes" hidden>👥 Presentes</button>
     </nav>
     <div class="stripe"></div>
   </header>
@@ -82,6 +83,26 @@
     <div id="resumenBusqueda" class="hint"></div>
     <div id="resultados" class="results"></div>
   </main>
+
+  <main id="vista-presentes" class="wrap view">
+    <section class="card c-green">
+      <h2 class="ct">👥 Presentes de los servicios <small>· lo que informan los servicios en sus minutas</small></h2>
+      <div class="grid4">
+        <label class="f span2">Buscar <small>(nombre, legajo, puesto, hora, código…)</small>
+          <input id="pTexto" placeholder="Ej: Pérez, 2233, encargado, 19:00" autocomplete="off">
+        </label>
+        <label class="f">Desde<input type="date" id="pDesde"></label>
+        <label class="f">Hasta<input type="date" id="pHasta"></label>
+        <label class="f span2">Servicio<select id="pServ"></select></label>
+        <label class="f">Empresa<select id="pEmp"></select></label>
+        <label class="f">Turno<select id="pTurno"><option value="">Los dos</option><option>Diurno</option><option>Nocturno</option></select></label>
+        <label class="chk span2"><input type="checkbox" id="pTodos"> Incluir francos y licencias</label>
+      </div>
+      <div class="row-end"><button class="btn ghost" id="pExcel">⬇ Descargar Excel</button><button class="btn" id="pBuscar">Buscar</button></div>
+    </section>
+    <div id="pResumen" class="hint"></div>
+    <div id="pResultados"></div>
+  </main>
 </section>
 
 <div id="cargando" class="splash"><img id="logoSplash" alt=""><div class="spin"></div></div>
@@ -90,9 +111,9 @@
 <div id="toast" class="toast" hidden></div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js"></script>
-<script src="js/config.js?v=20261020c"></script>
-<script src="js/pdf.js?v=20261020c"></script>
-<script src="js/app.js?v=20261020c"></script>
+<script src="js/config.js?v=20261020d"></script>
+<script src="js/pdf.js?v=20261020d"></script>
+<script src="js/app.js?v=20261020d"></script>
 <script>
   if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js").catch(() => {});
 </script>

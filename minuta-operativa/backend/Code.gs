@@ -15,6 +15,7 @@ const CONFIG = {
   USUARIOS_GID: 310678371,      // id | nombre | usuario | password | rol | correo
   PERSONAL_GID: 1959223792,     // pestaña "personal"
   OBJETIVOS_GID: 1642036355,    // pestaña "objetivos" (dirección, localidad y empresa de cada servicio)
+  FLOTA_GID: 2118940029,        // pestaña "flota" (patentes de los vehículos)
 
   // Condiciones (códigos de francos y licencias): solo hasta la fila 17
   SS_CODIGOS: '1fZj6ItMB60XCp8tcLhTJQoeOt4ELMku6',
@@ -38,7 +39,8 @@ const CONFIG = {
 
   REMITENTE: 'Delben - Minuta Operativa',
   ZONA: 'America/Argentina/Buenos_Aires',
-  HORAS_SESION: 16
+  // La sesión queda abierta hasta que tocan "Salir" (se renueva sola cada vez que abren la app).
+  DIAS_SESION: 120
 };
 
 // Si la planilla de condiciones no se puede abrir, se usan estos (filas 2 a 17).
@@ -61,14 +63,14 @@ const TABS = {
   Minutas: ['idMinuta', 'fechaCarga', 'fecha', 'dia', 'turno', 'horario', 'idServicio', 'servicio', 'empresa', 'localidad',
     'supervisor', 'jefeOperaciones', 'encargado', 'horaInicio', 'responsableInicio', 'detalleInicio', 'horaFin', 'entregaA',
     'observacionesFinales', 'novedadesRelevantes', 'usuario', 'estado', 'urlPDF', 'idPDF', 'correosEnviados', 'fechaEnvio',
-    'guardia', 'tituloInforme'],
+    'guardia', 'tituloInforme', 'paraCorreo', 'ccCorreo', 'errorCorreo'],
   Minuta_Personal: ['idMinuta', 'fecha', 'turno', 'servicio', 'legajo', 'apellidoNombre', 'empresa', 'puesto', 'horaIngreso',
     'horaEgreso', 'horas', 'codigo', 'observacion', 'horasDiurnas', 'horasNocturnas'],
   Minuta_Novedades: ['idMinuta', 'fecha', 'turno', 'servicio', 'hora', 'seccion', 'personal', 'accion', 'detalle', 'resultado'],
   Minuta_Rondines: ['idMinuta', 'fecha', 'turno', 'servicio', 'horaInicio', 'horaReporte', 'vigilador', 'sector', 'resultado',
     'modo', 'horaFin', 'qr'],
   Minuta_Vehiculos: ['idMinuta', 'fecha', 'turno', 'servicio', 'vehiculo', 'dominio', 'kmInicio', 'kmFin', 'kmTotal', 'gnc',
-    'combustible', 'vigilador'],
+    'combustible', 'vigilador'],   // gnc ya no se carga (queda la columna por las minutas viejas)
   Minuta_Equipos: ['idMinuta', 'fecha', 'turno', 'servicio', 'equipo', 'estado', 'observaciones'],
   Minuta_Fotos: ['idMinuta', 'fecha', 'servicio', 'nroFoto', 'descripcion', 'urlFoto', 'idArchivo'],
   Config_Servicios: ['idServicio', 'servicio', 'direccion', 'localidad', 'empresa', 'usuario', 'supervisor', 'jefeOperaciones',
@@ -116,7 +118,9 @@ function doPost(e) {
     const req = JSON.parse(e.postData.contents);
     switch (req.action) {
       case 'login':     return json_(login_(req));
-      case 'inicio':    return json_(inicio_(sesion_(req.token)));
+      case 'inicio':    { const u = sesion_(req.token); const r = inicio_(u); r.token = crearToken_(u.usuario); return json_(r); }
+      case 'presentes': return json_(presentes_(sesion_(req.token), req));
+      case 'reintentarCorreo': return json_(reintentarCorreo_(sesion_(req.token), req));
       case 'guardar':   return json_(guardar_(sesion_(req.token), req));
       case 'buscar':    return json_(buscar_(sesion_(req.token), req));
       case 'pdf':       return json_(pdf_(sesion_(req.token), req));
@@ -214,7 +218,7 @@ function b64_(s) { return Utilities.base64EncodeWebSafe(s).replace(/=+$/, ''); }
 function firma_(txt) { return b64_(Utilities.computeHmacSha256Signature(txt, secreto_())); }
 
 function crearToken_(usuario) {
-  const cuerpo = b64_(JSON.stringify({ u: usuario, x: Date.now() + CONFIG.HORAS_SESION * 3600 * 1000 }));
+  const cuerpo = b64_(JSON.stringify({ u: usuario, x: Date.now() + CONFIG.DIAS_SESION * 24 * 3600 * 1000 }));
   return cuerpo + '.' + firma_(cuerpo);
 }
 
@@ -290,6 +294,26 @@ function codigos_() {
     if (out.length) return out;
   } catch (e) { console.warn('Códigos: se usan los fijos (' + e.message + ')'); }
   return CODIGOS_FIJOS.map(r => ({ codigo: r[0], descripcion: r[1] }));
+}
+
+/* ======================= Flota ======================= */
+
+// Vehículos de la pestaña flota, sin los que dicen "no ver" o "baja"
+function flota_() {
+  try {
+    const vals = hojaGid_(CONFIG.SS_SGI, CONFIG.FLOTA_GID).getDataRange().getDisplayValues();
+    const h = vals[0].map(x => norm_(x));
+    const c = n => h.indexOf(n);
+    return vals.slice(1).filter(r => String(r[c('dominio')] || '').trim())
+      .filter(r => !/no ver|baja/.test(norm_(r.join(' '))))
+      .map(r => {
+        const emp = String(r[c('empresa')] || '').trim();
+        return {
+          dominio: String(r[c('dominio')]).toUpperCase().replace(/[\s-]/g, ''), marca: r[c('marca')], modelo: r[c('modelo')], anio: r[c('anio')],
+          color: r[c('color')], empresa: EMPRESAS_SIGLA[emp.toUpperCase()] || emp, ubicacion: r[c('ubicacion')]
+        };
+      });
+  } catch (e) { console.warn('Flota: ' + e.message); return []; }
 }
 
 /* ======================= Servicios ======================= */
@@ -402,7 +426,8 @@ function inicio_(u) {
     supervisores: sup,
     fijos: fijos,
     personal: personal_().map(p => ({ n: p.n, l: p.l, e: p.e, c: p.c })),   // sin correos
-    codigos: codigos_()
+    codigos: codigos_(),
+    flota: norm_(u.rol) === 'servicios' ? flota_() : []
   };
 }
 
@@ -484,7 +509,7 @@ function guardar_(u, req) {
     horaInicio: r.inicio, horaReporte: r.reporte, vigilador: r.vigilador, sector: r.sector, resultado: r.resultado, modo: r.modo, horaFin: r.fin, qr: r.qr ? 'SI' : 'NO'
   })));
   agregarFilas_('Minuta_Vehiculos', (d.vehiculos || []).map(v => Object.assign({}, base, {
-    vehiculo: v.vehiculo, dominio: v.dominio, kmInicio: v.kmInicio, kmFin: v.kmFin, kmTotal: v.kmTotal, gnc: v.gnc, combustible: v.combustible, vigilador: v.vigilador
+    vehiculo: v.vehiculo, dominio: v.dominio, kmInicio: v.kmInicio, kmFin: v.kmFin, kmTotal: v.kmTotal, combustible: v.combustible, vigilador: v.vigilador
   })));
   agregarFilas_('Minuta_Equipos', (d.equipos || []).map(q => Object.assign({}, base, { equipo: q.equipo, estado: q.estado, observaciones: q.observaciones })));
   agregarFilas_('Minuta_Fotos', filasFotos);
@@ -495,8 +520,11 @@ function guardar_(u, req) {
   agregarFilas_('Minuta_Contactos', nuevos.map(c => ({ idServicio: s.idServicio, servicio: s.servicio, nombre: String(c.nombre || '').trim(), correo: emails_([c.correo])[0], fechaAlta: hoy_(), usuario: u.usuario })));
 
   // Correo
+  // Si el correo falla, la minuta queda guardada igual y se puede reintentar el envío desde Informes.
   const dest = destinatarios_(u, s, d, req, us);
-  const env = enviar_(s, d, titulo, id, pdfFile.getBlob().setName(nombrePdf), dest.to, dest.cc);
+  let env, errorCorreo = '';
+  try { env = enviar_(s, d, titulo, id, pdfFile.getBlob().setName(nombrePdf), dest.to, dest.cc); }
+  catch (e) { errorCorreo = String(e && e.message || e); env = { prueba: !!CONFIG.MODO_PRUEBA, enviadoA: '' }; console.error('Correo: ' + errorCorreo); }
 
   // Completa la fila de la minuta
   const sh = tab_('Minutas'), head = encabezados_(sh);
@@ -505,18 +533,19 @@ function guardar_(u, req) {
   const datos = {
     idMinuta: id, fechaCarga: hoy_(), fecha: d.fecha, dia: d.dia, turno: d.turno, horario: d.horario, idServicio: s.idServicio,
     servicio: s.servicio, empresa: s.empresa, localidad: s.localidad, supervisor: d.supervisor || (sup ? sup.nombre : s.supervisor),
+    paraCorreo: dest.to.join('; '), ccCorreo: dest.cc.join('; '), errorCorreo: errorCorreo,
     jefeOperaciones: d.jefeOperaciones, encargado: d.encargado ? d.encargado.nombre : '', horaInicio: d.horaInicio,
     responsableInicio: d.responsableInicio, detalleInicio: d.detalleInicio, horaFin: d.horaFin, entregaA: d.entregaA,
     observacionesFinales: d.observacionesFinales, novedadesRelevantes: (d.relevantes || []).join(' | '), usuario: u.usuario,
-    estado: env.prueba ? 'ENVIADO (PRUEBA)' : 'ENVIADO', urlPDF: pdfFile.getUrl(), idPDF: pdfFile.getId(),
-    correosEnviados: (env.prueba ? 'PRUEBA → ' + env.enviadoA + ' | hubiera ido a: ' : '') + dest.to.concat(dest.cc).join('; '),
+    estado: errorCorreo ? 'GUARDADO - CORREO NO ENVIADO' : env.prueba ? 'ENVIADO (PRUEBA)' : 'ENVIADO', urlPDF: pdfFile.getUrl(), idPDF: pdfFile.getId(),
+    correosEnviados: errorCorreo ? '' : (env.prueba ? 'PRUEBA → ' + env.enviadoA + ' | hubiera ido a: ' : '') + dest.to.concat(dest.cc).join('; '),
     fechaEnvio: hoy_(), guardia: d.guardia, tituloInforme: titulo
   };
   const rango = sh.getRange(fila, 1, 1, head.length);
   rango.setNumberFormat('@');
   rango.setValues([head.map(h => (datos[h] == null ? '' : datos[h]))]);
 
-  return { ok: true, idMinuta: id, titulo: titulo, url: pdfFile.getUrl(), to: dest.to, cc: dest.cc, prueba: env.prueba, enviadoA: env.enviadoA };
+  return { ok: true, idMinuta: id, titulo: titulo, url: pdfFile.getUrl(), to: dest.to, cc: dest.cc, prueba: env.prueba, enviadoA: env.enviadoA, errorCorreo: errorCorreo };
 }
 
 function filaDe_(sh, id) {
@@ -526,20 +555,13 @@ function filaDe_(sh, id) {
   throw new Error('No se encontró la minuta ' + id);
 }
 
-// Para: supervisor de turno elegido, el que hace el informe y el correo del servicio.
-// Copia: Gustavo San Martín, Fernando, supervisor del servicio, correos fijos del servicio y los que agreguen (cliente, nocturno…).
+// Para: el servicio (usuario logueado) y el supervisor elegido en la minuta.
+// Copia: Gustavo San Martín, Fernando, correos fijos del servicio y los contactos que elija quien hace el informe.
 function destinatarios_(u, s, d, req, us) {
-  const to = [], cc = [];
-  const supTurno = persona_(req.supervisorTurno, us);
-  if (supTurno) to.push(supTurno.correo);
-  if (d.encargado && d.encargado.legajo) {
-    const p = personal_().find(x => x.l === String(d.encargado.legajo) && x.n === String(d.encargado.nombre || '').toUpperCase());
-    if (p && p.m) to.push(p.m);
-  }
-  to.push(u.correo);
+  const to = [u.correo], cc = [];
+  const sup = persona_(d.supervisorUsuario || req.supervisorTurno, us) || persona_(s.supervisor, us);
+  if (sup) to.push(sup.correo);
   CONFIG.SIEMPRE_COPIA.forEach(k => { const p = persona_(k, us); if (p) cc.push(p.correo); });
-  const supServ = persona_(s.supervisor, us);
-  if (supServ) cc.push(supServ.correo);
   cc.push(s.correos);
   (req.cc || []).forEach(x => cc.push(x));
   const T = emails_(to);
@@ -612,7 +634,7 @@ function buscar_(u, req) {
     items.push({
       id: m.idMinuta, fecha: m.fecha, dia: m.dia, turno: m.turno, guardia: m.guardia, servicio: m.servicio, idServicio: m.idServicio,
       encargado: m.encargado, supervisor: m.supervisor, relevantes: m.novedadesRelevantes, titulo: m.tituloInforme, coincide: coincide,
-      enviados: m.correosEnviados, tienePdf: !!m.idPDF
+      enviados: m.correosEnviados, tienePdf: !!m.idPDF, sinCorreo: !!m.errorCorreo && !m.correosEnviados
     });
   });
   items.sort((a, b) => (fechaNum_(b.fecha) - fechaNum_(a.fecha)) || (b.id > a.id ? 1 : -1));
@@ -644,6 +666,69 @@ function reenviar_(u, req) {
   const sh = tab_('Minutas'), head = encabezados_(sh), fila = filaDe_(sh, m.idMinuta), c = head.indexOf('correosEnviados') + 1;
   sh.getRange(fila, c).setValue(String(m.correosEnviados || '') + ' || Reenviado ' + hoy_() + ' por ' + u.usuario + ': ' + to.join('; ') + (env.prueba ? ' (PRUEBA → ' + env.enviadoA + ')' : ''));
   return { ok: true, to: to, prueba: env.prueba, enviadoA: env.enviadoA };
+}
+
+// Vuelve a mandar una minuta cuyo correo falló, a los mismos destinatarios
+function reintentarCorreo_(u, req) {
+  const m = minutaPermitida_(u, req.id);
+  const to = emails_([m.paraCorreo]), cc = emails_([m.ccCorreo]);
+  if (!to.length && !cc.length) throw new Error('La minuta no tiene destinatarios guardados.');
+  const f = DriveApp.getFileById(m.idPDF);
+  const env = enviar_({ servicio: m.servicio }, { fecha: m.fecha, dia: m.dia, turno: m.turno, horario: m.horario, guardia: m.guardia, encargado: { nombre: m.encargado },
+    relevantes: lista_(String(m.novedadesRelevantes || '').replace(/ \| /g, ';')) }, m.tituloInforme || f.getName().replace(/\.pdf$/i, ''), m.idMinuta, f.getBlob(), to, cc);
+  const sh = tab_('Minutas'), head = encabezados_(sh), fila = filaDe_(sh, m.idMinuta);
+  const set = (k, v) => { const c = head.indexOf(k) + 1; if (c) sh.getRange(fila, c).setValue(v); };
+  set('estado', env.prueba ? 'ENVIADO (PRUEBA)' : 'ENVIADO'); set('errorCorreo', '');
+  set('correosEnviados', (env.prueba ? 'PRUEBA → ' + env.enviadoA + ' | hubiera ido a: ' : '') + to.concat(cc).join('; ')); set('fechaEnvio', hoy_());
+  return { ok: true, prueba: env.prueba, enviadoA: env.enviadoA, to: to, cc: cc };
+}
+
+/* ======================= Presentes de los servicios =======================
+   Para administración, visores y supervisores: el personal informado en las minutas,
+   con buscador por cualquier dato (nombre, legajo, empresa, servicio, fecha, hora, puesto, código). */
+function presentes_(u, req) {
+  if (norm_(u.rol) === 'servicios') throw new Error('Esta consulta es para supervisores y administración.');
+  const permitidos = {};
+  serviciosDe_(u).forEach(s => { permitidos[String(s.idServicio)] = s.servicio; });
+  const minutas = {};
+  leerObjetos_('Minutas').forEach(m => { if (m.idMinuta && m.estado !== 'GUARDANDO' && permitidos[String(m.idServicio)] !== undefined) minutas[m.idMinuta] = m; });
+  const desde = req.desde ? Number(String(req.desde).replace(/-/g, '')) : 0;
+  const hasta = req.hasta ? Number(String(req.hasta).replace(/-/g, '')) : 99999999;
+  const tokens = norm_(req.q || '').split(' ').filter(Boolean);
+  const emp = norm_(req.empresa || ''), serv = String(req.idServicio || ''), turno = norm_(req.turno || '');
+  const soloPresentes = req.soloPresentes !== false;
+  const items = [];
+  leerObjetos_('Minuta_Personal').forEach(p => {
+    const m = minutas[p.idMinuta];
+    if (!m) return;
+    if (serv && String(m.idServicio) !== serv) return;
+    if (emp && norm_(p.empresa) !== emp) return;
+    if (turno && norm_(p.turno) !== turno) return;
+    if (soloPresentes && p.codigo && !p.horaIngreso) return;
+    const f = fechaNum_(p.fecha);
+    if (f && (f < desde || f > hasta)) return;
+    const texto = norm_([p.legajo, p.apellidoNombre, p.empresa, p.puesto, p.horaIngreso, p.horaEgreso, p.codigo, p.observacion, p.fecha, p.turno, m.servicio, m.dia, m.guardia].join(' '));
+    if (!tokens.every(t => texto.indexOf(t) >= 0)) return;
+    items.push({
+      id: p.idMinuta, fecha: p.fecha, dia: m.dia, turno: p.turno, servicio: m.servicio, legajo: p.legajo, nombre: p.apellidoNombre, empresa: p.empresa,
+      puesto: p.puesto, ingreso: p.horaIngreso, egreso: p.horaEgreso, horas: p.horas, diurnas: p.horasDiurnas, nocturnas: p.horasNocturnas,
+      codigo: p.codigo, observacion: p.observacion
+    });
+  });
+  items.sort((a, b) => (fechaNum_(b.fecha) - fechaNum_(a.fecha)) || String(a.servicio).localeCompare(String(b.servicio)) || String(a.nombre).localeCompare(String(b.nombre)));
+  return { ok: true, items: items.slice(0, 3000), total: items.length,
+    servicios: Object.keys(permitidos).map(k => ({ idServicio: k, servicio: permitidos[k] })) };
+}
+
+// Ejecutala desde el editor si no llegan los correos: manda una prueba y muestra el error si lo hay.
+function probarCorreo() {
+  const para = CONFIG.CORREO_PRUEBA;
+  try {
+    MailApp.sendEmail({ to: para, name: CONFIG.REMITENTE, subject: 'Prueba Minuta Operativa', htmlBody: 'Si te llegó este correo, el envío de la Minuta Operativa funciona.' });
+    Logger.log('Correo de prueba ENVIADO a ' + para + ' desde ' + Session.getEffectiveUser().getEmail() + ' · cupo restante hoy: ' + MailApp.getRemainingDailyQuota());
+  } catch (e) { Logger.log('NO se pudo enviar: ' + e.message); }
+  // Minutas guardadas cuyo correo no salió
+  leerObjetos_('Minutas').filter(m => m.errorCorreo || m.estado === 'GUARDANDO').forEach(m => Logger.log('Minuta ' + m.idMinuta + ' (' + m.estado + '): ' + (m.errorCorreo || 'se cortó antes de terminar')));
 }
 
 /* ======================= Puesta en marcha =======================
@@ -687,5 +772,6 @@ function probar() {
   Logger.log('Servicios: ' + servicios_().map(s => s.servicio).join(', '));
   Logger.log('MODO PRUEBA: ' + (CONFIG.MODO_PRUEBA ? 'SÍ, los correos van solo a ' + CONFIG.CORREO_PRUEBA : 'NO, los correos van a los destinatarios reales'));
   try { Logger.log('Carpeta: ' + DriveApp.getFolderById(CONFIG.CARPETA_ID).getName()); } catch (e) { Logger.log('NO se puede abrir la carpeta: ' + e.message); }
-  Logger.log('Cupo de correos hoy: ' + MailApp.getRemainingDailyQuota());
+  Logger.log('Cupo de correos hoy: ' + MailApp.getRemainingDailyQuota() + ' · los correos salen desde: ' + Session.getEffectiveUser().getEmail());
+  Logger.log('Vehículos en flota (sin baja / no ver): ' + flota_().map(v => v.dominio).join(', '));
 }
