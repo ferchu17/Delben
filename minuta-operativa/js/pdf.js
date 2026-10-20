@@ -161,6 +161,8 @@
     }
 
     const persona = (p) => p.nombre + (p.legajo ? "  (Leg. " + p.legajo + (p.empresa ? " · " + p.empresa : "") + ")" : "");
+    // nombre con legajo y empresa para los campos de persona (movilero, vigilador, personal, responsable, recibe)
+    const conLeg = (o, k) => !o[k] ? "" : o[k] + (o[k + "Leg"] ? " (Leg. " + o[k + "Leg"] + (o[k + "Emp"] ? " · " + o[k + "Emp"] : "") + ")" : "");
 
     /* ------------------------- contenido ------------------------- */
     nuevaPagina();
@@ -190,15 +192,15 @@
     ], d.ausentes.map((p) => [p.legajo, p.nombre, p.empresa, p.codigo + " - " + p.descripcion, p.observacion]));
 
     tabla("Vehículos", COL.teal, [
-      { t: "Vehículo", w: 30, bold: true }, { t: "Dominio / N°", w: 22, align: "center" }, { t: "Km inicio", w: 20, align: "center" }, { t: "Km fin", w: 20, align: "center" },
-      { t: "Total", w: 16, align: "center" }, { t: "GNC", w: 12, align: "center" }, { t: "Combustible", w: 26, align: "center" }, { t: "Vigilador", w: 40 }
-    ], d.vehiculos.map((v) => [v.vehiculo, v.dominio, v.kmInicio, v.kmFin, v.kmTotal === "" ? "" : v.kmTotal + " km", v.gnc, v.combustible, v.vigilador]));
+      { t: "Patente / N°", w: 22, align: "center", bold: true }, { t: "Vehículo", w: 40 }, { t: "Km inicio", w: 20, align: "center" }, { t: "Km fin", w: 20, align: "center" },
+      { t: "Recorrido total", w: 22, align: "center", bold: true }, { t: "Combustible", w: 22, align: "center" }, { t: "Movilero", w: 40 }
+    ], d.vehiculos.map((v) => [v.dominio, [v.vehiculo, v.datos].filter(Boolean).join("\n"), v.kmInicio, v.kmFin, v.kmTotal === "" ? "" : Number(v.kmTotal).toLocaleString("es-AR") + " km", v.combustible, conLeg(v, "vigilador")]));
 
     tabla("Estado de equipos", COL.violet, [{ t: "Equipo", w: 56, bold: true }, { t: "Estado", w: 40 }, { t: "Observaciones", w: 90 }],
       d.equipos.map((q) => { const r = [q.equipo, q.estado, q.observaciones]; if (q.estado && q.estado !== "En condiciones") r.resalta = COL.red; return r; }));
 
     titulo("Inicio de turno", COL.indigo);
-    claveValorSimple([["Hora de toma de servicio", d.horaInicio ? d.horaInicio + " hs" : "-"], ["Responsable", d.responsableInicio || "-"]], COL.indigo);
+    claveValorSimple([["Hora de toma de servicio", d.horaInicio ? d.horaInicio + " hs" : "-"], ["Responsable", conLeg(d, "responsableInicio") || "-"]], COL.indigo);
     parrafo("Detalle", d.detalleInicio, COL.indigo);
 
     // Novedades agrupadas por sección, en orden de hora
@@ -207,12 +209,12 @@
     if (!secciones.length) tabla("Registro de novedades", COL.orange, [], [], { vacio: "Sin novedades registradas." });
     secciones.forEach((s) => tabla(s.n || "Registro de novedades", COL.orange, [
       { t: "Hora", w: 14, align: "center", bold: true }, { t: "Personal", w: 34 }, { t: "Acción / evento", w: 32 }, { t: "Detalle", w: 76 }, { t: "Resultado", w: 30 }
-    ], s.l.map((n) => [n.hora, n.personal, n.accion, n.detalle, n.resultado])));
+    ], s.l.map((n) => [n.hora, conLeg(n, "personal"), n.accion, n.detalle, n.resultado])));
 
     tabla("Recorridas / rondines", COL.cyan, [
       { t: "Inicio", w: 13, align: "center", bold: true }, { t: "Reporte", w: 14, align: "center" }, { t: "Vigilador", w: 34 }, { t: "Sector", w: 28 },
       { t: "Resultado", w: 52 }, { t: "Modo", w: 22 }, { t: "QR", w: 9, align: "center" }, { t: "Fin", w: 14, align: "center" }
-    ], d.rondines.map((r) => [r.inicio, r.reporte, r.vigilador, r.sector, r.resultado, r.modo, r.qr ? "Sí" : "", r.fin]));
+    ], d.rondines.map((r) => [r.inicio, r.reporte, conLeg(r, "vigilador"), r.sector, r.resultado, r.modo, r.qr ? "Sí" : "", r.fin]));
 
     // Anomalías
     if (d.relevantes.length) {
@@ -257,7 +259,7 @@
 
     // Cierre
     titulo("Cierre de turno", COL.navy);
-    claveValorSimple([["Hora de finalización", d.horaFin ? d.horaFin + " hs" : "-"], ["Se entrega la guardia a", d.entregaA || "-"]], COL.navy);
+    claveValorSimple([["Hora de finalización", d.horaFin ? d.horaFin + " hs" : "-"], ["Se entrega la guardia a", conLeg(d, "entregaA") || "-"]], COL.navy);
     parrafo("Observaciones finales", d.observacionesFinales, COL.navy);
 
     // Firmas
@@ -272,13 +274,15 @@
     y += 12;
 
     function claveValorSimple(pares, color) {
-      const colW = CW / pares.length, h = 7;
+      const colW = CW / pares.length;
+      const cols = pares.map((p) => { const lw = Math.min(colW * 0.48, W(p[0], 7.6, bold) + 4); return { lw: lw, ls: wrap(p[1], colW - lw - 3, 8.8, bold) }; });
+      const h = Math.max.apply(null, cols.map((c) => c.ls.length)) * 3.9 + 3.1;
       lugar(h);
       pares.forEach((p, k) => {
-        const x = ML + k * colW, lw = Math.min(colW * 0.48, W(p[0], 7.6, bold) + 4);
+        const x = ML + k * colW, lw = cols[k].lw;
         rect(x, y, lw, h, { color: mix(color, 0.12) });
         text(p[0], x + 1.6, y + 4.6, 7.6, { f: bold, color: C(color) });
-        text(wrap(p[1], colW - lw - 3, 8.8, bold)[0], x + lw + 1.8, y + 4.6, 8.8, { f: bold });
+        cols[k].ls.forEach((l, i) => text(l, x + lw + 1.8, y + 4.6 + i * 3.9, 8.8, { f: bold }));
       });
       line(ML, y + h, ML + CW, y + h);
       y += h + 2.5;

@@ -33,6 +33,11 @@ window.PORTAL_APPS = [
     link: '../informe-de-novedades/', guia: '../instructivos/informe.html',
     perfiles: ['Supervisor', 'Coordinador', 'Administrativo'], color1: '#1a7a40', color2: '#2db865' },
 
+  { id: 'minuta', nombre: 'Minuta Operativa del Servicio', desc: 'Minuta diaria de cada servicio: presentismo, novedades, fotos y PDF', img: '../iconos/minuta-192.png', icono: 'fa-solid fa-clipboard-check',
+    link: '../minuta-operativa/', guia: '../instructivos/minuta.html', guiaRol: { Servicios: 'servicio', '*': 'supervisor' },
+    perfiles: ['Servicios', 'Supervisor', 'Coordinador', 'Administrativo', 'Visor'], color1: '#1F3864', color2: '#2E5597',
+    nota: 'Los servicios entran con su usuario y cargan la minuta del turno. Supervisores y administración ven los Informes y los Presentes.' },
+
   { id: 'moviles', nombre: 'Control de Móviles', desc: 'Control de vehículos con fotos e informe', img: '../iconos/moviles-192.png', icono: 'fa-solid fa-car-side',
     link: '../', guia: '../instructivos/moviles.html',
     perfiles: ['Supervisor', 'Coordinador', 'Administrativo', 'Flota'], color1: '#1a4a7a', color2: '#2060b0' },

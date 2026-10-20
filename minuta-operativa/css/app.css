@@ -192,3 +192,18 @@ input[type=checkbox]{width:22px;height:22px;margin:0;vertical-align:middle;accen
   font-weight:700;font-size:14.5px;max-width:92vw;box-shadow:0 10px 30px rgba(0,0,0,.3)}
 .toast.err{background:var(--red)}
 #pdfPaginas canvas{width:100%;height:auto;border:1px solid #d3dbe6;border-radius:6px;background:#fff}
+
+/* ---------- v2 ---------- */
+.foto-add.adj{border-color:#9fb7e6;color:var(--indigo);background:#f3f6ff}
+.chip.pick{cursor:pointer;font:inherit;font-size:13.5px;font-weight:700;padding:6px 12px}
+.chip.pick.on{background:var(--green);border-color:var(--green);color:#fff}
+.tb.err{background:#fde8e8;color:#b71c1c}
+.tick.warn-t{background:linear-gradient(135deg,var(--amber),#d48806)}
+.veh-datos{font-weight:700;color:var(--teal)}
+.tabla-wrap{overflow-x:auto;background:#fff;border-radius:14px;box-shadow:0 6px 20px rgba(20,40,80,.08);margin-top:10px}
+.tabla{border-collapse:collapse;width:100%;font-size:13px;min-width:900px}
+.tabla th{position:sticky;top:0;background:var(--navy);color:#fff;text-align:left;padding:8px;font-size:12px;white-space:nowrap}
+.tabla td{padding:7px 8px;border-bottom:1px solid #edf1f6;vertical-align:top}
+.tabla td.c{text-align:center;white-space:nowrap}
+.tabla tr:nth-child(even) td{background:#f8fafc}
+.tabla tr.aus td{color:#8a5a00;background:#fff8e6}

@@ -80,26 +80,53 @@
   const TXT_CIERRE = "Siendo la hora indicada, finalizo servicio de guardia con los elementos asignados al puesto y novedades que anteceden; demás existencias sin novedad. Quedo a su entera disposición por cualquier consulta.";
 
   function turnoHorario(turno) { return turno === "Nocturno" ? S.serv.horarioNocturno : S.serv.horarioDiurno; }
-  function minutaNueva() {
+  const sumarDias = (iso, n) => { const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso); const d = new Date(+m[1], +m[2] - 1, +m[3] + n); return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0"); };
+  // sig: { fecha, turno } para arrancar la minuta del turno siguiente después de enviar una
+  function minutaNueva(sig) {
     const h = new Date().getHours();
-    const turno = h >= 6 && h < 18 ? "Diurno" : "Nocturno";
-    const horario = turnoHorario(turno);
-    const [hi, hf] = String(horario).split(/\s*a\s*/);
+    let turno = h >= 6 && h < 18 ? "Diurno" : "Nocturno";
     // De madrugada, la minuta es la del turno noche que empezó el día anterior
     let fecha = hoyISO();
-    if (h < 6) { const d = new Date(); d.setDate(d.getDate() - 1); fecha = new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 10); }
+    if (h < 6) fecha = sumarDias(fecha, -1);
+    if (sig) { turno = sig.turno; fecha = sig.fecha; }
+    const horario = turnoHorario(turno);
+    const [hi, hf] = String(horario).split(/\s*a\s*/);
     return {
       fecha: fecha, turno: turno, horario: horario, guardia: "",
       encargado: { nombre: "", legajo: "", empresa: "" },
       personal: [{ nombre: "", legajo: "", empresa: "", puesto: "Encargado", ingreso: hi || "", egreso: hf || "", observacion: "" }],
       ausentes: [],
-      vehiculos: (S.serv.vehiculos || []).map((v) => ({ vehiculo: v.vehiculo, dominio: v.dominio, kmInicio: "", kmFin: "", gnc: "", combustible: "", vigilador: "" })),
+      vehiculos: vehiculosIniciales(),
+      supervisorUsuario: S.serv.supervisor.usuario || "",
       equipos: (S.serv.equipos || []).map((e) => ({ equipo: e, estado: "En condiciones", observaciones: "Sin novedad" })),
       horaInicio: hi || "", responsableInicio: "", detalleInicio: TXT_INICIO,
       novedades: [], rondines: [], relevantes: [""],
       horaFin: hf || "", entregaA: "", observacionesFinales: TXT_CIERRE, recibe: ""
     };
   }
+  /* ----------------------- flota (patentes) ----------------------- */
+  const dom = (x) => String(x || "").toUpperCase().replace(/[\s.-]/g, "");
+  const flota = () => (S.ses && S.ses.flota) || [];
+  const enFlota = (d) => flota().find((v) => v.dominio === dom(d));
+  function nombreVehiculo(v) {
+    const marca = String(v.marca || "").trim(), modelo = String(v.modelo || "").trim();
+    return norm(modelo).indexOf(norm(marca).split(" ")[0]) === 0 ? modelo : (marca + " " + modelo).trim();
+  }
+  const datosVehiculo = (v) => [v.color, v.anio, v.empresa].filter(Boolean).join(" · ");
+  // Vehículos de la flota que están en este servicio (columna ubicación)
+  function flotaDelServicio() {
+    const sn = norm(S.serv.servicio);
+    return flota().filter((v) => { const u = norm(v.ubicacion); if (!u) return false; const pal = u.split(" ").filter((w) => w.length > 3 && w !== "barrio"); return pal.length && pal.every((w) => sn.indexOf(w) >= 0); });
+  }
+  function vehiculosIniciales() {
+    const lista = (S.serv.vehiculos || []).map((v) => ({ vehiculo: v.vehiculo, dominio: v.dominio }));
+    flotaDelServicio().forEach((f) => { if (!lista.some((v) => dom(v.dominio) === f.dominio)) lista.unshift({ vehiculo: nombreVehiculo(f), dominio: f.dominio }); });
+    return lista.map((v) => {
+      const f = enFlota(v.dominio);
+      return { vehiculo: f ? nombreVehiculo(f) : v.vehiculo, dominio: f ? f.dominio : v.dominio, datos: f ? datosVehiculo(f) : "", kmInicio: "", kmFin: "", combustible: "", vigilador: "" };
+    });
+  }
+
   const claveBorrador = () => "minuta_op_borrador_" + (S.ses ? S.ses.usuario.usuario : "") + "_" + (S.serv ? S.serv.idServicio : "");
   // Las fotos del borrador van a IndexedDB (localStorage tiene un límite de ~5 MB y no entran muchas fotos)
   const IDB = {
@@ -137,7 +164,7 @@
     $("#lDemo").hidden = !DEMO; $("#demoBar").hidden = !DEMO;
     S.token = LS.get(CLAVE_TOKEN) || "";
     if (!S.token) { ver("login"); return; }
-    try { S.ses = await api("inicio", {}, 90000); entrarApp(); }
+    try { S.ses = await api("inicio", {}, 90000); if (S.ses.token) { S.token = S.ses.token; LS.set(CLAVE_TOKEN, S.token); } entrarApp(); }
     catch (e) { if (S.token) { LS.del(CLAVE_TOKEN); S.token = ""; } ver("login"); $("#lError").textContent = e.message; }
   }
 
@@ -155,7 +182,7 @@
   $("#lVer").onclick = () => { const i = $("#lClave"); i.type = i.type === "password" ? "text" : "password"; };
   $("#bSalir").onclick = () => salir(false);
   function salir(vencida) {
-    LS.del(CLAVE_TOKEN); S.token = ""; S.ses = null; S.serv = null; closeModal(); overlay();
+    LS.del(CLAVE_TOKEN); LS.del("minuta_op_vista"); S.token = ""; S.ses = null; S.serv = null; closeModal(); overlay();
     ver("login"); if (vencida) $("#lError").textContent = "La sesión venció. Volvé a ingresar.";
   }
 
@@ -168,12 +195,18 @@
     // El usuario del servicio entra directo a su servicio. Supervisores, administradores y visores solo ven los informes.
     const carga = !!S.ses.cargaMinutas;
     $('.tab[data-tab="nueva"]').hidden = !carga;
+    $('.tab[data-tab="presentes"]').hidden = carga;
     $("#servCard").hidden = !carga;
     if (carga) { S.serv = S.ses.servicios[0]; pintarServicio(); cargarBorradorOnueva(); }
+    prepararPresentes();
     const qs = $("#qServ");
     qs.innerHTML = '<option value="">Todos mis servicios</option>' + S.ses.servicios.map((s) => `<option value="${esc(s.idServicio)}">${esc(s.servicio)}</option>`).join("");
     $("#qServWrap").hidden = S.ses.servicios.length < 2;
-    if (!carga) $('.tab[data-tab="informes"]').click();
+    // Vuelve a la pestaña donde estaba (o la que pide el link: ?vista=presentes)
+    const pedida = (new URLSearchParams(location.search).get("vista") || "").toLowerCase();
+    const guardada = LS.get("minuta_op_vista");
+    const vista = [pedida, guardada].find((v) => v && !$('.tab[data-tab="' + v + '"]').hidden) || (carga ? "nueva" : "informes");
+    if (vista !== "nueva") $('.tab[data-tab="' + vista + '"]').click();
   }
 
   function pintarServicio() {
@@ -198,17 +231,25 @@
     const av = $("#borradorAviso");
     if (b && b.m) {
       S.m = b.m; S.fotos = (await IDB.get(claveBorrador() + "_fotos")) || b.fotos || [];
-      av.innerHTML = `📝 Se recuperó la minuta que estabas cargando (${new Date(b.t).toLocaleString("es-AR")}).`;
+      if (S.m.supervisorUsuario === undefined) S.m.supervisorUsuario = S.serv.supervisor.usuario || "";
+      av.innerHTML = `📝 Seguís con la minuta que venías cargando (último cambio: ${new Date(b.t).toLocaleString("es-AR")}). Se envía cuando termina la guardia.`;
       av.hidden = false;
     } else { S.m = minutaNueva(); S.fotos = []; av.hidden = true; }
     pintarForm();
+    // Vuelve a donde estaba en la pantalla
+    const y = +LS.get("minuta_op_scroll") || 0;
+    if (y && $("#vista-nueva").classList.contains("on")) setTimeout(() => window.scrollTo(0, y), 50);
   }
+  let tScroll = null;
+  window.addEventListener("scroll", () => { clearTimeout(tScroll); tScroll = setTimeout(() => { if ($("#vista-nueva").classList.contains("on")) LS.set("minuta_op_scroll", String(Math.round(window.scrollY))); }, 300); }, { passive: true });
 
   /* ----------------------- pestañas ----------------------- */
   $$(".tab").forEach((b) => b.addEventListener("click", () => {
     $$(".tab").forEach((x) => x.classList.toggle("on", x === b));
     $$(".view").forEach((v) => v.classList.toggle("on", v.id === "vista-" + b.dataset.tab));
     if (b.dataset.tab === "informes" && !$("#resultados").dataset.ok) iniciarBusqueda();
+    if (b.dataset.tab === "presentes" && !$("#pResultados").dataset.ok) iniciarPresentes();
+    LS.set("minuta_op_vista", b.dataset.tab);
     window.scrollTo(0, 0);
   }));
 
@@ -231,13 +272,13 @@
     input.setAttribute("autocomplete", "off");
     let items = [], sel = -1;
     const pintar = () => {
-      items = buscarPersonal(input.value, opts.prefer ? opts.prefer() : null);
+      items = opts.buscar ? opts.buscar(input.value) : buscarPersonal(input.value, opts.prefer ? opts.prefer() : null);
       if (!items.length || document.activeElement !== input) { box.hidden = true; return; }
-      box.innerHTML = items.map((p, i) => `<div class="ac-it${i === sel ? " sel" : ""}" data-i="${i}"><span class="ac-n">${esc(p.n)}</span>
-        <span class="ac-m"><span class="leg">Leg. ${esc(p.l)}</span><span class="emp ${esc(p.e)}">${esc(p.e || "—")}</span></span></div>`).join("");
+      const fila = opts.render || ((p) => `<span class="ac-n">${esc(p.n)}</span><span class="ac-m"><span class="leg">Leg. ${esc(p.l)}</span><span class="emp ${esc(p.e)}">${esc(p.e || "—")}</span></span>`);
+      box.innerHTML = items.map((p, i) => `<div class="ac-it${i === sel ? " sel" : ""}" data-i="${i}">${fila(p)}</div>`).join("");
       box.hidden = false;
     };
-    const elegir = (i) => { const p = items[i]; if (!p) return; input.value = p.n; box.hidden = true; onPick(p); };
+    const elegir = (i) => { const p = items[i]; if (!p) return; input.value = opts.valor ? opts.valor(p) : p.n; box.hidden = true; onPick(p); };
     input.addEventListener("input", () => { sel = -1; pintar(); if (opts.libre) opts.libre(input.value); });
     input.addEventListener("focus", pintar);
     input.addEventListener("blur", () => setTimeout(() => { box.hidden = true; }, 180));
@@ -248,6 +289,17 @@
       else if (e.key === "Enter" && sel >= 0) { elegir(sel); e.preventDefault(); }
     });
     box.addEventListener("mousedown", (e) => { const it = e.target.closest(".ac-it"); if (it) { e.preventDefault(); elegir(+it.dataset.i); } });
+  }
+  // Campos de persona dentro de filas (movilero, vigilador, personal de una novedad): guardan nombre, legajo y empresa
+  const chipK = (o, k) => chipPersona({ legajo: o[k + "Leg"], empresa: o[k + "Emp"] });
+  function personasFila(cont, arr) {
+    $$("input.per2", cont).forEach((inp) => {
+      const i = +inp.closest("[data-i]").dataset.i, k = inp.dataset.k, chip = inp.parentNode.querySelector(".sel-per");
+      autocompletar(inp, (p) => {
+        arr[i][k] = p.n; arr[i][k + "Leg"] = p.l; arr[i][k + "Emp"] = p.e;
+        if (chip) chip.innerHTML = chipPersona({ legajo: p.l, empresa: p.e }); guardarBorrador();
+      }, { prefer: enServicio, libre: () => { arr[i][k + "Leg"] = ""; arr[i][k + "Emp"] = ""; if (chip) chip.innerHTML = ""; } });
+    });
   }
   const chipPersona = (p) => p && p.legajo ? `<span class="leg">Leg. ${esc(p.legajo)}</span><span class="emp ${esc(p.empresa)}">${esc(p.empresa || "—")}</span>` : "";
 
@@ -270,7 +322,7 @@
           <input id="fEncargado" value="${esc(m.encargado.nombre)}" placeholder="Escribí apellido o legajo y elegilo de la lista">
           <div class="sel-per" id="fEncChip">${chipPersona(m.encargado)}</div>
         </label>
-        <label class="f span2">Supervisor<input readonly value="${esc(s.supervisor.nombre || "")}"></label>
+        <label class="f span2">Supervisor <span class="req">*</span><select id="fSup"><option value="">Elegí el supervisor…</option>${(S.ses.supervisores || []).map((x) => `<option value="${esc(x.usuario)}"${x.usuario === m.supervisorUsuario ? " selected" : ""}>${esc(x.nombre)}</option>`).join("")}</select></label>
         <label class="f span2">Jefe de Operaciones<input readonly value="${esc(s.jefeOperaciones || "")}"></label>
       </div>
       <datalist id="dlGuardia">${["Guardia principal", "Guardia de ingreso", "Puesto 1", "Puesto 2", "Puesto 3", "Bunker", "CCTV"].map((x) => `<option value="${esc(x)}">`).join("")}</datalist>
@@ -305,7 +357,7 @@
       <h2 class="ct"><span class="ico">🟢</span>Inicio de turno</h2>
       <div class="grid3">
         <label class="f">Hora de toma de servicio<input type="time" id="fHoraInicio" value="${esc(m.horaInicio)}"></label>
-        <label class="f span2">Responsable<input id="fRespInicio" value="${esc(m.responsableInicio)}" placeholder="Quién toma el servicio"></label>
+        <label class="f span2">Responsable<input id="fRespInicio" value="${esc(m.responsableInicio)}" placeholder="Quién toma el servicio"><div class="sel-per" id="fRespChip">${chipK(m, "responsableInicio")}</div></label>
         <label class="f span3">Detalle<textarea id="fDetInicio" rows="2">${esc(m.detalleInicio)}</textarea></label>
       </div>
     </section>
@@ -331,14 +383,15 @@
     <section class="card c-pink">
       <h2 class="ct"><span class="ico">📷</span>Registro fotográfico <small id="fotosCant"></small></h2>
       <div class="fotos" id="lFotos"></div>
-      <input type="file" id="inFotos" accept="image/*" multiple hidden>
+      <input type="file" id="inCamara" accept="image/*" capture="environment" hidden>
+      <input type="file" id="inArchivos" accept="image/*" multiple hidden>
     </section>
 
     <section class="card c-navy">
       <h2 class="ct"><span class="ico">🏁</span>Cierre de turno y firmas</h2>
       <div class="grid3">
         <label class="f">Hora de finalización<input type="time" id="fHoraFin" value="${esc(m.horaFin)}"></label>
-        <label class="f span2">Se entrega la guardia a<input id="fEntregaA" value="${esc(m.entregaA)}" placeholder="Nombre de quien recibe"></label>
+        <label class="f span2">Se entrega la guardia a<input id="fEntregaA" value="${esc(m.entregaA)}" placeholder="Nombre de quien recibe"><div class="sel-per" id="fEntChip">${chipK(m, "entregaA")}</div></label>
         <label class="f span3">Observaciones finales<textarea id="fObsFin" rows="3">${esc(m.observacionesFinales)}</textarea></label>
       </div>
     </section>`;
@@ -359,21 +412,22 @@
     on("#fHorario", "input", (v) => { m.horario = v; });
     on("#fGuardia", "input", (v) => { m.guardia = v; });
     on("#fHoraInicio", "change", (v) => { m.horaInicio = v; });
-    on("#fRespInicio", "input", (v) => { m.responsableInicio = v; });
+    on("#fRespInicio", "input", (v) => { m.responsableInicio = v; m.responsableInicioLeg = ""; m.responsableInicioEmp = ""; $("#fRespChip").innerHTML = ""; });
+    on("#fSup", "change", (v) => { m.supervisorUsuario = v; });
     on("#fDetInicio", "input", (v) => { m.detalleInicio = v; });
     on("#fHoraFin", "change", (v) => { m.horaFin = v; });
-    on("#fEntregaA", "input", (v) => { m.entregaA = v; });
+    on("#fEntregaA", "input", (v) => { m.entregaA = v; m.entregaALeg = ""; m.entregaAEmp = ""; $("#fEntChip").innerHTML = ""; });
     on("#fObsFin", "input", (v) => { m.observacionesFinales = v; });
     autocompletar($("#fEncargado"), (p) => {
       m.encargado = { nombre: p.n, legajo: p.l, empresa: p.e };
       $("#fEncChip").innerHTML = chipPersona(m.encargado);
-      if (!m.responsableInicio) { m.responsableInicio = p.n; $("#fRespInicio").value = p.n; }
+      if (!m.responsableInicio) { Object.assign(m, { responsableInicio: p.n, responsableInicioLeg: p.l, responsableInicioEmp: p.e }); $("#fRespInicio").value = p.n; $("#fRespChip").innerHTML = chipK(m, "responsableInicio"); }
       const enc = m.personal.find((x) => /encargado|jefe/i.test(x.puesto) && !x.nombre);
       if (enc) { enc.nombre = p.n; enc.legajo = p.l; enc.empresa = p.e; pintarPersonal(); }
       guardarBorrador();
     }, { prefer: enServicio, libre: () => { m.encargado = { nombre: "", legajo: "", empresa: "" }; $("#fEncChip").innerHTML = ""; } });
-    autocompletar($("#fRespInicio"), (p) => { m.responsableInicio = p.n; guardarBorrador(); }, { prefer: enServicio });
-    autocompletar($("#fEntregaA"), (p) => { m.entregaA = p.n; guardarBorrador(); }, { prefer: () => [] });
+    autocompletar($("#fRespInicio"), (p) => { Object.assign(m, { responsableInicio: p.n, responsableInicioLeg: p.l, responsableInicioEmp: p.e }); $("#fRespChip").innerHTML = chipK(m, "responsableInicio"); guardarBorrador(); }, { prefer: enServicio });
+    autocompletar($("#fEntregaA"), (p) => { Object.assign(m, { entregaA: p.n, entregaALeg: p.l, entregaAEmp: p.e }); $("#fEntChip").innerHTML = chipK(m, "entregaA"); guardarBorrador(); }, { prefer: () => [] });
 
     $$("#form [data-add]").forEach((b) => b.addEventListener("click", () => agregar(b.dataset.add)));
     pintarPersonal(); pintarAusentes(); pintarVehiculos(); pintarEquipos(); pintarNovedades(); pintarRondines(); pintarRelevantes(); pintarFotos();
@@ -384,7 +438,7 @@
     const nuevos = {
       personal: { nombre: "", legajo: "", empresa: "", puesto: "Vigilador", ingreso: ult.ingreso || "", egreso: ult.egreso || "", observacion: "" },
       ausentes: { nombre: "", legajo: "", empresa: "", codigo: "F", observacion: "" },
-      vehiculos: { vehiculo: "", dominio: "", kmInicio: "", kmFin: "", gnc: "", combustible: "", vigilador: "" },
+      vehiculos: { vehiculo: "", dominio: "", datos: "", kmInicio: "", kmFin: "", combustible: "", vigilador: "" },
       equipos: { equipo: "", estado: "En condiciones", observaciones: "Sin novedad" },
       novedades: { hora: ahora(), seccion: (S.serv.secciones || [])[0] || "", personal: "", accion: "", detalle: "", resultado: "Sin novedad" },
       rondines: { inicio: ahora(), reporte: "", vigilador: "", sector: "", resultado: "Sin novedad", modo: "Caminando", fin: "", qr: false },
@@ -468,25 +522,50 @@
     });
   }
 
-  const kmTotal = (v) => { const a = parseFloat(String(v.kmInicio).replace(/\./g, "").replace(",", ".")), b = parseFloat(String(v.kmFin).replace(/\./g, "").replace(",", ".")); return isFinite(a) && isFinite(b) && b >= a ? Math.round((b - a) * 10) / 10 : ""; };
+  // Km: acepta 141708, 141.708 o 141708,5
+  const numKm = (x) => { const t = String(x == null ? "" : x).replace(/[^\d,]/g, "").replace(",", "."); return t ? parseFloat(t) : NaN; };
+  const kmTotal = (v) => { const a = numKm(v.kmInicio), b = numKm(v.kmFin); return isFinite(a) && isFinite(b) && b >= a ? Math.round((b - a) * 10) / 10 : ""; };
+  const kmTxt = (v) => { const a = numKm(v.kmInicio), b = numKm(v.kmFin); if (isFinite(a) && isFinite(b) && b < a) return "⚠️ Km fin menor que Km inicio"; const t = kmTotal(v); return t === "" ? "" : t.toLocaleString("es-AR") + " km"; };
+  function buscarFlota(q) {
+    const t = norm(q).replace(/[\s.-]/g, ""), propios = flotaDelServicio().map((v) => v.dominio);
+    const lista = flota().filter((v) => !t || norm(v.dominio + nombreVehiculo(v) + v.color).replace(/[\s.-]/g, "").indexOf(t) >= 0);
+    lista.sort((a, b) => (propios.indexOf(b.dominio) >= 0) - (propios.indexOf(a.dominio) >= 0) || a.dominio.localeCompare(b.dominio));
+    return lista.slice(0, 30);
+  }
   function pintarVehiculos() {
     const cont = $("#lVehiculos"), arr = S.m.vehiculos;
-    cont.innerHTML = arr.length ? arr.map((v, i) => `<div class="rowc" data-i="${i}">${cabFila(i + 1, v.vehiculo)}
+    cont.innerHTML = arr.length ? arr.map((v, i) => `<div class="rowc" data-i="${i}">${cabFila(i + 1, [v.dominio, v.vehiculo].filter(Boolean).join(" · "))}
       <div class="grid4">
-        <label class="f">Vehículo<input data-k="vehiculo" value="${esc(v.vehiculo)}"></label>
-        <label class="f">Dominio / N°<input data-k="dominio" value="${esc(v.dominio)}"></label>
-        <label class="f">Km inicio<input data-k="kmInicio" inputmode="decimal" value="${esc(v.kmInicio)}"></label>
-        <label class="f">Km fin<input data-k="kmFin" inputmode="decimal" value="${esc(v.kmFin)}"></label>
-        <label class="f">Total recorrido<input class="kmt" readonly value="${esc(kmTotal(v) === "" ? "" : kmTotal(v) + " km")}"></label>
-        <label class="f">GNC<select data-k="gnc">${optsVacio(["Sí", "No"], v.gnc)}</select></label>
+        <label class="f">Patente / N°<input data-k="dominio" class="dom" value="${esc(v.dominio)}" placeholder="Escribí la patente" autocapitalize="characters"><div class="sel-per veh-datos">${esc(v.datos || "")}</div></label>
+        <label class="f span3">Vehículo<input data-k="vehiculo" value="${esc(v.vehiculo)}" placeholder="Se completa con la patente"></label>
+        <label class="f">Km inicio<input data-k="kmInicio" inputmode="numeric" value="${esc(v.kmInicio)}"></label>
+        <label class="f">Km fin<input data-k="kmFin" inputmode="numeric" value="${esc(v.kmFin)}"></label>
+        <label class="f">Recorrido total<input class="kmt" readonly value="${esc(kmTxt(v))}"></label>
         <label class="f">Combustible / carga<select data-k="combustible">${optsVacio(COMBUSTIBLE, v.combustible)}</select></label>
-        <label class="f">Vigilador<input data-k="vigilador" class="per2" value="${esc(v.vigilador)}"></label>
+        <label class="f span4">Movilero<input data-k="vigilador" class="per2" value="${esc(v.vigilador)}" placeholder="Apellido o legajo…"><div class="sel-per">${chipK(v, "vigilador")}</div></label>
       </div></div>`).join("") : `<div class="hint">Sin vehículos.</div>`;
+    const titulo = (el, v) => { el.closest(".rowc").querySelector(".rowh b").textContent = [v.dominio, v.vehiculo].filter(Boolean).join(" · "); };
     ligar(cont, arr, pintarVehiculos, (i, k, el) => {
-      if (k === "kmInicio" || k === "kmFin") { const t = kmTotal(arr[i]); el.closest(".rowc").querySelector(".kmt").value = t === "" ? "" : t + " km"; }
-      if (k === "vehiculo") el.closest(".rowc").querySelector(".rowh b").textContent = el.value;
+      if (k === "kmInicio" || k === "kmFin") el.closest(".rowc").querySelector(".kmt").value = kmTxt(arr[i]);
+      if (k === "dominio") {
+        const f = enFlota(el.value);
+        arr[i].datos = f ? datosVehiculo(f) : "";
+        if (f) { arr[i].dominio = f.dominio; arr[i].vehiculo = nombreVehiculo(f); el.closest(".rowc").querySelector('[data-k="vehiculo"]').value = arr[i].vehiculo; }
+        el.parentNode.querySelector(".veh-datos").textContent = arr[i].datos;
+      }
+      if (k === "dominio" || k === "vehiculo") titulo(el, arr[i]);
     });
-    $$("input.per2", cont).forEach((inp) => { const i = +inp.closest("[data-i]").dataset.i; autocompletar(inp, (p) => { arr[i].vigilador = p.n; guardarBorrador(); }, { prefer: enServicio }); });
+    $$("input.dom", cont).forEach((inp) => {
+      const i = +inp.closest("[data-i]").dataset.i;
+      autocompletar(inp, (f) => {
+        Object.assign(arr[i], { dominio: f.dominio, vehiculo: nombreVehiculo(f), datos: datosVehiculo(f) });
+        const row = inp.closest(".rowc");
+        row.querySelector('[data-k="vehiculo"]').value = arr[i].vehiculo; row.querySelector(".veh-datos").textContent = arr[i].datos;
+        titulo(inp, arr[i]); guardarBorrador();
+      }, { buscar: buscarFlota, valor: (f) => f.dominio,
+        render: (f) => `<span class="ac-n">${esc(f.dominio)} <small style="font-weight:600">${esc(nombreVehiculo(f))}</small></span><span class="ac-m">${esc(datosVehiculo(f))}</span>` });
+    });
+    personasFila(cont, arr);
   }
 
   function pintarEquipos() {
@@ -506,13 +585,13 @@
       <div class="grid4">
         <label class="f">Hora<input type="time" data-k="hora" value="${esc(n.hora)}"></label>
         <label class="f">Sección<select data-k="seccion">${opts(secs.indexOf(n.seccion) < 0 && n.seccion ? secs.concat([n.seccion]) : secs, n.seccion)}</select></label>
-        <label class="f">Personal<input data-k="personal" class="per2" value="${esc(n.personal)}" placeholder="Quién"></label>
+        <label class="f">Personal<input data-k="personal" class="per2" value="${esc(n.personal)}" placeholder="Quién"><div class="sel-per">${chipK(n, "personal")}</div></label>
         <label class="f">Acción / evento<input data-k="accion" value="${esc(n.accion)}" placeholder="Ej: Ingreso, recorrido, cierre"></label>
         <label class="f span3">Detalle<textarea data-k="detalle" rows="2" placeholder="Qué pasó">${esc(n.detalle)}</textarea></label>
         <label class="f">Resultado<input data-k="resultado" value="${esc(n.resultado)}"></label>
       </div></div>`).join("") : `<div class="hint">Todavía no hay novedades. Tocá “Agregar novedad” (la hora se completa sola).</div>`;
     ligar(cont, arr, pintarNovedades, (i, k, el) => { if (k === "hora") el.closest(".rowc").querySelector(".rowh b").textContent = el.value ? el.value + " hs" : ""; });
-    $$("input.per2", cont).forEach((inp) => { const i = +inp.closest("[data-i]").dataset.i; autocompletar(inp, (p) => { arr[i].personal = p.n; guardarBorrador(); }, { prefer: enServicio }); });
+    personasFila(cont, arr);
   }
 
   function pintarRondines() {
@@ -523,13 +602,13 @@
         <label class="f">Hora de reporte<input type="time" data-k="reporte" value="${esc(r.reporte)}"></label>
         <label class="f">Hora fin<input type="time" data-k="fin" value="${esc(r.fin)}"></label>
         <label class="f">Modo<select data-k="modo">${opts(MODOS, r.modo)}</select></label>
-        <label class="f span2">Vigilador<input data-k="vigilador" class="per2" value="${esc(r.vigilador)}"></label>
+        <label class="f span2">Vigilador<input data-k="vigilador" class="per2" value="${esc(r.vigilador)}" placeholder="Apellido o legajo…"><div class="sel-per">${chipK(r, "vigilador")}</div></label>
         <label class="f span2">Sector / lote<input data-k="sector" value="${esc(r.sector)}" placeholder="Ej: Perímetro, Lote 23, Todo el barrio"></label>
         <label class="f span3">Resultado<input data-k="resultado" value="${esc(r.resultado)}"></label>
         <label class="chk"><input type="checkbox" data-k="qr"${r.qr ? " checked" : ""}> Con marcación QR</label>
       </div></div>`).join("") : `<div class="hint">Sin recorridas cargadas.</div>`;
     ligar(cont, arr, pintarRondines);
-    $$("input.per2", cont).forEach((inp) => { const i = +inp.closest("[data-i]").dataset.i; autocompletar(inp, (p) => { arr[i].vigilador = p.n; guardarBorrador(); }, { prefer: enServicio }); });
+    personasFila(cont, arr);
   }
 
   function pintarRelevantes() {
@@ -544,17 +623,19 @@
     const cont = $("#lFotos");
     cont.innerHTML = S.fotos.map((f, i) => `<div class="foto" data-i="${i}"><img src="${f.src}" alt=""><button type="button" data-del aria-label="Quitar">✕</button>
       <input data-k="d" value="${esc(f.descripcion)}" placeholder="Descripción de la foto"></div>`).join("") +
-      (S.fotos.length < (CFG.FOTOS_MAX || 60) ? `<label class="foto-add" for="inFotos"><span>📷</span>${S.fotos.length ? "Agregar más fotos" : "Agregar fotos"}<small class="hint">cámara o galería · podés elegir varias</small></label>` : "");
+      (S.fotos.length < (CFG.FOTOS_MAX || 60) ? `<label class="foto-add" for="inCamara"><span>📷</span>Sacar foto<small class="hint">con la cámara del celular</small></label>
+        <label class="foto-add adj" for="inArchivos"><span>📎</span>Adjuntar archivos<small class="hint">fotos de la galería o de la PC · podés elegir varias</small></label>` : "");
     $("#fotosCant").textContent = S.fotos.length ? "· " + S.fotos.length + " foto" + (S.fotos.length > 1 ? "s" : "") : "";
     $$("[data-k]", cont).forEach((el) => el.addEventListener("input", () => { S.fotos[+el.closest("[data-i]").dataset.i].descripcion = el.value; guardarBorrador(); }));
     $$("[data-del]", cont).forEach((b) => b.addEventListener("click", () => { S.fotos.splice(+b.closest("[data-i]").dataset.i, 1); guardarBorrador(); pintarFotos(); }));
-    $("#inFotos").onchange = async (e) => {
+    $("#inCamara").onchange = $("#inArchivos").onchange = async (e) => {
       const files = Array.from(e.target.files || []); e.target.value = "";
       if (!files.length) return;
       overlay("Preparando fotos…");
       for (const f of files) {
         if (S.fotos.length >= (CFG.FOTOS_MAX || 60)) { toast("Máximo " + CFG.FOTOS_MAX + " fotos por minuta.", true); break; }
-        try { S.fotos.push({ src: await comprimir(f), descripcion: "" }); } catch (err) { toast("No se pudo leer una foto.", true); }
+        if (f.type && !/^image\//.test(f.type)) { toast("“" + f.name + "” no es una imagen: solo se pueden adjuntar fotos.", true); continue; }
+        try { S.fotos.push({ src: await comprimir(f), descripcion: "" }); } catch (err) { toast("No se pudo leer “" + f.name + "”.", true); }
       }
       overlay(); guardarBorrador(); pintarFotos();
     };
@@ -583,6 +664,8 @@
     if (!m.fecha) err.push("Falta la fecha.");
     if (!m.turno) err.push("Falta el turno.");
     if (!m.encargado.nombre) err.push("Elegí el jefe de servicio / encargado de la lista.");
+    if (!m.supervisorUsuario) err.push("Elegí el supervisor.");
+    m.vehiculos.forEach((v, i) => { if (/⚠️/.test(kmTxt(v))) err.push("Vehículo " + (i + 1) + ": el Km fin es menor que el Km inicio."); });
     const pers = m.personal.filter((p) => p.nombre.trim());
     if (!pers.length) err.push("Cargá al menos una persona en servicio.");
     m.personal.forEach((p, i) => {
@@ -599,16 +682,17 @@
     return {
       idServicio: s.idServicio, servicio: s.servicio, direccion: s.direccion, localidad: s.localidad, empresa: s.empresa,
       fecha: isoAtxt(m.fecha), dia: diaDe(m.fecha), turno: m.turno, horario: m.horario, guardia: m.guardia.trim(), titulo: titulo(),
-      supervisor: s.supervisor.nombre, jefeOperaciones: s.jefeOperaciones, encargado: m.encargado,
+      supervisor: ((S.ses.supervisores || []).find((x) => x.usuario === m.supervisorUsuario) || s.supervisor).nombre, supervisorUsuario: m.supervisorUsuario,
+      jefeOperaciones: s.jefeOperaciones, encargado: m.encargado,
       personal: m.personal.filter((p) => p.nombre.trim()).map((p) => { const h = calcHoras(p.ingreso, p.egreso) || { total: 0, d: 0, n: 0 }; return Object.assign({}, p, { horas: fmtH(h.total), diurnas: fmtH(h.d), nocturnas: fmtH(h.n) }); }),
       ausentes: m.ausentes.filter((p) => p.nombre.trim()).map((p) => Object.assign({}, p, { descripcion: ((S.ses.codigos || []).find((c) => c.codigo === p.codigo) || {}).descripcion || p.codigo })),
       vehiculos: m.vehiculos.filter((v) => v.vehiculo || v.dominio).map((v) => Object.assign({}, v, { kmTotal: kmTotal(v) })),
       equipos: m.equipos.filter((q) => q.equipo),
-      horaInicio: m.horaInicio, responsableInicio: m.responsableInicio, detalleInicio: m.detalleInicio,
+      horaInicio: m.horaInicio, responsableInicio: m.responsableInicio, responsableInicioLeg: m.responsableInicioLeg || "", responsableInicioEmp: m.responsableInicioEmp || "", detalleInicio: m.detalleInicio,
       novedades: m.novedades.filter((n) => n.detalle || n.accion).sort((a, b) => ordHora(a.hora) - ordHora(b.hora)),
       rondines: m.rondines.filter((r) => r.vigilador || r.sector || r.resultado).sort((a, b) => ordHora(a.inicio) - ordHora(b.inicio)),
       relevantes: m.relevantes.map((x) => x.trim()).filter(Boolean),
-      horaFin: m.horaFin, entregaA: m.entregaA, observacionesFinales: m.observacionesFinales
+      horaFin: m.horaFin, entregaA: m.entregaA, entregaALeg: m.entregaALeg || "", entregaAEmp: m.entregaAEmp || "", observacionesFinales: m.observacionesFinales
     };
   }
   // Ordena horas dentro del turno (en el nocturno, las 01:00 van después de las 23:00)
@@ -628,34 +712,42 @@
   });
 
   function modalEnvio() {
-    const s = S.serv, ses = S.ses;
-    const fijos = ses.fijos.map((p) => p.nombre).concat(s.supervisor.nombre ? [s.supervisor.nombre + " (supervisor del servicio)"] : [])
-      .concat([S.m.encargado.nombre + " (quien hace el informe)", ses.usuario.nombre + " (cuenta del servicio)"]);
+    const s = S.serv, ses = S.ses, m = S.m;
+    const sup = (ses.supervisores || []).find((x) => x.usuario === m.supervisorUsuario);
+    const fijos = [ses.usuario.nombre + " (el servicio)"].concat(sup ? [sup.nombre + " (supervisor)"] : []).concat(ses.fijos.map((p) => p.nombre));
+    const contactos = s.contactos || [];
     openModal(`<h2>📨 Guardar y enviar la minuta</h2>
       <div class="hint"><b>${esc(titulo())}</b></div>
-      <div class="sec-m">Va siempre a</div>
+      <div class="sec-m">Le llega siempre a</div>
       <div class="chips">${fijos.map((x) => `<span class="chip lock">🔒 ${esc(x)}</span>`).join("")}</div>
-      <label class="f">Supervisor de turno <span class="req">*</span>
-        <select id="mSup">${ses.supervisores.map((p) => `<option value="${esc(p.usuario)}"${p.usuario === s.supervisor.usuario ? " selected" : ""}>${esc(p.nombre)}</option>`).join("")}</select>
-      </label>
-      <div class="sec-m">Con copia <small class="hint">(cliente, guardia nocturna u otros · opcional)</small></div>
+      <div class="sec-m">Además, a <small class="hint">(intendente, auditor, cliente… · tocá para elegir)</small></div>
+      <div class="chips" id="mGuardados"></div>
       <div class="chips" id="mChips"></div>
       <div class="grid3">
-        <label class="f">Nombre<span class="ac"><input id="mNom" placeholder="Ej: Juan Pérez" autocomplete="off"><div class="ac-list" id="mAc" hidden></div></span></label>
+        <label class="f">Nombre<span class="ac"><input id="mNom" placeholder="Ej: Juan Pérez (intendente)" autocomplete="off"><div class="ac-list" id="mAc" hidden></div></span></label>
         <label class="f">Correo<input id="mMail" type="email" placeholder="correo@cliente.com" autocomplete="off"></label>
         <div style="display:flex;align-items:flex-end"><button class="btn teal" id="mAdd" type="button" style="width:100%">＋ Agregar</button></div>
       </div>
-      <div class="hint">Los contactos nuevos quedan guardados para este servicio: la próxima vez escribís el nombre y aparece el correo.</div>
+      <div class="hint">Los contactos nuevos quedan guardados para este servicio: la próxima vez aparecen arriba para elegirlos.</div>
       ${ses.modoPrueba ? `<div class="aviso">🧪 <b>Modo prueba:</b> el correo solo le llega a ${esc(ses.correoPrueba)}. El mail dice a quiénes se hubiera enviado.</div>` : ""}
       <div class="warn">🔒 Una vez guardada, la minuta no se puede modificar.</div>
       <div class="row-end"><button class="btn ghost" id="mCancel">Cancelar</button><button class="btn big" id="mEnviar">✅ Guardar y enviar</button></div>`);
-    const pintarChips = () => {
-      $("#mChips").innerHTML = CC.lista.map((c, i) => `<span class="chip">${esc(c.nombre ? c.nombre + " · " : "")}${esc(c.correo)}<button data-q="${i}" type="button">✕</button></span>`).join("") || `<span class="hint">Sin copias adicionales.</span>`;
-      $$("#mChips [data-q]").forEach((b) => b.onclick = () => { const c = CC.lista.splice(+b.dataset.q, 1)[0]; CC.nuevos = CC.nuevos.filter((x) => x !== c); pintarChips(); });
+    const elegido = (c) => CC.lista.some((x) => x.correo === norm(c.correo));
+    const pintarGuardados = () => {
+      $("#mGuardados").innerHTML = contactos.map((c, i) => `<button type="button" class="chip pick${elegido(c) ? " on" : ""}" data-g="${i}">${elegido(c) ? "✔" : "＋"} ${esc(c.nombre || c.correo)}</button>`).join("") || `<span class="hint">Todavía no hay contactos guardados para este servicio.</span>`;
+      $$("#mGuardados [data-g]").forEach((b) => b.onclick = () => {
+        const c = contactos[+b.dataset.g];
+        if (elegido(c)) CC.lista = CC.lista.filter((x) => x.correo !== norm(c.correo)); else CC.lista.push({ nombre: c.nombre, correo: norm(c.correo) });
+        pintarGuardados(); pintarChips();
+      });
     };
-    pintarChips();
+    const pintarChips = () => {
+      const nuevos = CC.lista.filter((c) => !contactos.some((x) => norm(x.correo) === c.correo));
+      $("#mChips").innerHTML = nuevos.map((c) => `<span class="chip">${esc(c.nombre ? c.nombre + " · " : "")}${esc(c.correo)}<button data-q="${esc(c.correo)}" type="button">✕</button></span>`).join("");
+      $$("#mChips [data-q]").forEach((b) => b.onclick = () => { CC.lista = CC.lista.filter((x) => x.correo !== b.dataset.q); CC.nuevos = CC.nuevos.filter((x) => x.correo !== b.dataset.q); pintarChips(); });
+    };
+    pintarGuardados(); pintarChips();
     const nom = $("#mNom"), mail = $("#mMail"), ac = $("#mAc");
-    const contactos = s.contactos || [];
     const sugerir = () => {
       const q = norm(nom.value); const it = contactos.filter((c) => !q || norm(c.nombre + " " + c.correo).indexOf(q) >= 0).slice(0, 20);
       if (!it.length || document.activeElement !== nom) { ac.hidden = true; return; }
@@ -666,16 +758,14 @@
     const agregarCc = () => {
       const correo = mail.value.trim().toLowerCase(), nombre = nom.value.trim();
       if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(correo)) { toast("Poné un correo válido.", true); mail.focus(); return; }
-      if (CC.lista.some((c) => c.correo === correo)) { toast("Ese correo ya está agregado."); return; }
-      const c = { nombre: nombre, correo: correo };
-      CC.lista.push(c);
-      if (!contactos.some((x) => norm(x.correo) === correo)) CC.nuevos.push(c);
-      nom.value = ""; mail.value = ""; pintarChips();
+      if (!CC.lista.some((c) => c.correo === correo)) CC.lista.push({ nombre: nombre, correo: correo });
+      if (!contactos.some((x) => norm(x.correo) === correo) && !CC.nuevos.some((x) => x.correo === correo)) CC.nuevos.push({ nombre: nombre, correo: correo });
+      nom.value = ""; mail.value = ""; pintarGuardados(); pintarChips();
     };
     $("#mAdd").onclick = agregarCc;
     mail.addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); agregarCc(); } });
     $("#mCancel").onclick = closeModal;
-    $("#mEnviar").onclick = () => { if (mail.value.trim()) { agregarCc(); if (mail.value.trim()) return; } enviar($("#mSup").value); };
+    $("#mEnviar").onclick = () => { if (mail.value.trim()) { agregarCc(); if (mail.value.trim()) return; } enviar(m.supervisorUsuario); };
   }
 
   async function enviar(supUsuario) {
@@ -686,21 +776,27 @@
       const pdf = await window.MinutaPDF.build(d, S.fotos, { logoKtl: CFG.LOGO_PDF, logoCliente: S.serv.logoCliente || "", logoTexto: S.serv.logoTexto || "" });
       overlay("Guardando y enviando… (no cierres la app)");
       const fotos = S.fotos.map((f) => ({ descripcion: f.descripcion, b64: f.src.slice(f.src.indexOf("base64,") + 7) }));
-      const r = await api("guardar", { data: d, pdfBase64: pdf.base64, fotos: fotos, supervisorTurno: supUsuario, cc: CC.lista.map((c) => c.correo), contactosNuevos: CC.nuevos }, 240000);
+      const r = await api("guardar", { data: d, pdfBase64: pdf.base64, fotos: fotos, supervisorTurno: supUsuario, cc: CC.lista.map((c) => c.correo), contactosNuevos: CC.nuevos }, 300000);
       // contactos nuevos quedan disponibles enseguida
       CC.nuevos.forEach((c) => { if (!S.serv.contactos.some((x) => norm(x.correo) === norm(c.correo))) S.serv.contactos.push(c); });
+      // La guardia sigue: queda lista la minuta del turno siguiente (sin cerrar sesión)
+      const sig = S.m.turno === "Diurno" ? { turno: "Nocturno", fecha: S.m.fecha } : { turno: "Diurno", fecha: sumarDias(S.m.fecha, 1) };
       borrarBorrador();
+      S.m = minutaNueva(sig); S.fotos = []; $("#borradorAviso").hidden = true; pintarForm(); LS.set("minuta_op_scroll", "0"); window.scrollTo(0, 0);
       S.ultimoPdf = { blob: pdf.blob, nombre: r.titulo + ".pdf" };
       overlay();
-      openModal(`<div class="ok-big"><div class="tick">✓</div><h2>¡Minuta guardada y enviada!</h2>
+      openModal(`<div class="ok-big"><div class="tick${r.errorCorreo ? " warn-t" : ""}">${r.errorCorreo ? "!" : "✓"}</div><h2>${r.errorCorreo ? "Minuta guardada, pero el correo no salió" : "¡Minuta guardada y enviada!"}</h2>
         <p class="hint">${esc(r.titulo)} · N° ${esc(r.idMinuta)}</p></div>
-        ${r.prueba ? `<div class="aviso">🧪 <b>Modo prueba:</b> el correo solo se envió a ${esc(r.enviadoA)}.</div>` : ""}
+        ${r.errorCorreo ? `<div class="warn">El PDF y los datos quedaron guardados. Error del correo: ${esc(r.errorCorreo)}<br>Podés reintentar el envío ahora o después desde 📂 Informes.</div>` : ""}
+        ${r.prueba && !r.errorCorreo ? `<div class="aviso">🧪 <b>Modo prueba:</b> el correo solo se envió a ${esc(r.enviadoA)}.</div>` : ""}
         <p style="font-size:13.5px">${r.prueba ? "<b>Cuando se active, va a ir a:</b><br>" : ""}<b>Para:</b> ${esc((r.to || []).join(", "))}<br><b>Copia:</b> ${esc((r.cc || []).join(", "))}</p>
-        <div class="row-end"><button class="btn ghost" id="okDl">⬇ Descargar</button><button class="btn teal" id="okVer">📄 Ver PDF</button><button class="btn big" id="okNueva">📝 Nueva minuta</button></div>`);
+        <div class="aviso">📝 Ya quedó abierta la minuta nueva del turno <b>${esc(sig.turno)}</b> (${esc(isoAtxt(sig.fecha))}) para seguir cargando.</div>
+        <div class="row-end">${r.errorCorreo ? `<button class="btn orange" id="okRe">🔁 Reintentar envío</button>` : ""}<button class="btn ghost" id="okDl">⬇ Descargar</button><button class="btn teal" id="okVer">📄 Ver PDF</button><button class="btn big" id="okNueva">📝 Seguir</button></div>`);
       $("#okDl").onclick = () => descargar(S.ultimoPdf.blob, S.ultimoPdf.nombre);
       $("#okVer").onclick = () => verPdf(S.ultimoPdf.blob, r.titulo);
-      $("#okNueva").onclick = () => { closeModal(); S.m = minutaNueva(); S.fotos = []; $("#borradorAviso").hidden = true; pintarForm(); window.scrollTo(0, 0); };
-      $("#resultados").dataset.ok = "";
+      $("#okNueva").onclick = closeModal;
+      if ($("#okRe")) $("#okRe").onclick = () => reintentarCorreo(r.idMinuta);
+      $("#resultados").dataset.ok = ""; $("#pResultados").dataset.ok = "";
     } catch (e) {
       overlay(); console.error(e);
       openModal(`<h2>❌ No se pudo guardar</h2><p>${esc(e.message)}</p><p class="hint">La minuta sigue cargada en el celular: revisá la conexión y volvé a tocar “Guardar y enviar”.</p><div class="row-end"><button class="btn" id="mOk">Entendido</button></div>`);
@@ -782,19 +878,30 @@
       const marcar = (t) => { let h = esc(t); toks.forEach((k) => { if (k.length > 1) h = h.replace(new RegExp("(" + k.replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + ")", "gi"), "<mark>$1</mark>"); }); return h; };
       $("#resultados").innerHTML = r.items.map((it, i) => `<div class="res ${esc(it.turno)}" data-i="${i}">
         <div class="res-top"><span class="res-f">${esc((it.dia ? it.dia + " " : "") + it.fecha)}</span><span class="tb ${esc(it.turno)}">${it.turno === "Nocturno" ? "🌙" : "☀️"} ${esc(it.turno)}</span>
-          ${it.guardia ? `<span class="pill">${esc(it.guardia)}</span>` : ""}<span class="hint">N° ${esc(it.id)}</span></div>
+          ${it.guardia ? `<span class="pill">${esc(it.guardia)}</span>` : ""}<span class="hint">N° ${esc(it.id)}</span>${it.sinCorreo ? `<span class="tb err">✉️ Correo no enviado</span>` : ""}</div>
         <div class="res-s">${S.ses.servicios.length > 1 ? "<b>" + esc(it.servicio) + "</b> · " : ""}Encargado: ${esc(it.encargado || "—")} · Supervisor: ${esc(it.supervisor || "—")}</div>
         ${it.relevantes ? `<div class="res-rel">⚠️ ${esc(it.relevantes)}</div>` : ""}
         ${it.coincide ? `<div class="res-co">🔎 ${marcar(it.coincide)}</div>` : ""}
-        <div class="res-a"><button class="btn small teal" data-a="ver">📄 Ver PDF</button><button class="btn small ghost" data-a="dl">⬇ Descargar</button><button class="btn small orange" data-a="re">📨 Reenviar</button></div>
+        <div class="res-a"><button class="btn small teal" data-a="ver">📄 Ver PDF</button><button class="btn small ghost" data-a="dl">⬇ Descargar</button><button class="btn small orange" data-a="re">📨 Reenviar</button>${it.sinCorreo ? `<button class="btn small red" data-a="ri">🔁 Reintentar envío</button>` : ""}</div>
       </div>`).join("");
       $$("#resultados .res").forEach((el) => {
         const it = r.items[+el.dataset.i];
         el.querySelector('[data-a="ver"]').onclick = async () => { try { overlay("Abriendo PDF…"); const p = await pdfDeMinuta(it.id); overlay(); verPdf(p.blob, it.titulo || p.nombre.replace(/\.pdf$/i, "")); } catch (e) { overlay(); toast(e.message, true); } };
         el.querySelector('[data-a="dl"]').onclick = async () => { try { overlay("Preparando PDF…"); const p = await pdfDeMinuta(it.id); overlay(); descargar(p.blob, p.nombre); } catch (e) { overlay(); toast(e.message, true); } };
         el.querySelector('[data-a="re"]').onclick = () => reenviar(it);
+        if (el.querySelector('[data-a="ri"]')) el.querySelector('[data-a="ri"]').onclick = () => reintentarCorreo(it.id);
       });
     } catch (e) { $("#resultados").innerHTML = `<div class="warn">${esc(e.message)}</div>`; }
+  }
+
+  async function reintentarCorreo(id) {
+    try {
+      overlay("Enviando…");
+      const r = await api("reintentarCorreo", { id: id }, 120000);
+      overlay(); closeModal();
+      toast(r.prueba ? "Modo prueba: se envió a " + r.enviadoA : "Enviada a " + r.to.concat(r.cc).join(", "));
+      if ($("#resultados").dataset.ok) buscar();
+    } catch (e) { overlay(); toast("No se pudo enviar: " + e.message, true); }
   }
 
   function reenviar(it) {
@@ -814,6 +921,51 @@
     };
   }
 
+  /* ----------------------- presentes de los servicios (supervisores y administración) ----------------------- */
+  const EMPRESAS = ["PPQ", "KDE", "LEG", "LEGUYET"];
+  let PRES = [];
+  function prepararPresentes() {
+    if (S.ses.cargaMinutas) return;
+    $("#pServ").innerHTML = '<option value="">Todos</option>' + S.ses.servicios.map((s) => `<option value="${esc(s.idServicio)}">${esc(s.servicio)}</option>`).join("");
+    $("#pEmp").innerHTML = '<option value="">Todas</option>' + EMPRESAS.map((e) => `<option>${e}</option>`).join("");
+  }
+  function iniciarPresentes() {
+    const d = new Date(); d.setDate(d.getDate() - 7);
+    if (!$("#pDesde").value) $("#pDesde").value = new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 10);
+    if (!$("#pHasta").value) $("#pHasta").value = hoyISO();
+    buscarPresentes();
+  }
+  $("#pBuscar").addEventListener("click", buscarPresentes);
+  $("#pTexto").addEventListener("keydown", (e) => { if (e.key === "Enter") buscarPresentes(); });
+  ["#pServ", "#pEmp", "#pTurno", "#pTodos"].forEach((id) => $(id).addEventListener("change", buscarPresentes));
+  async function buscarPresentes() {
+    $("#pResultados").innerHTML = `<div class="hint center"><div class="spin"></div>Buscando…</div>`; $("#pResumen").textContent = "";
+    try {
+      const r = await api("presentes", { q: $("#pTexto").value.trim(), desde: $("#pDesde").value, hasta: $("#pHasta").value, idServicio: $("#pServ").value,
+        empresa: $("#pEmp").value, turno: $("#pTurno").value, soloPresentes: !$("#pTodos").checked }, 120000);
+      PRES = r.items; $("#pResultados").dataset.ok = "1";
+      let h = 0, hd = 0, hn = 0;
+      const num = (x) => parseFloat(String(x || "0").replace(",", ".")) || 0;
+      PRES.forEach((p) => { h += num(p.horas); hd += num(p.diurnas); hn += num(p.nocturnas); });
+      const personas = new Set(PRES.map((p) => p.legajo + "|" + p.empresa)).size;
+      $("#pResumen").innerHTML = r.total ? `<b>${r.total}</b> registro${r.total > 1 ? "s" : ""} · <b>${personas}</b> persona${personas > 1 ? "s" : ""} · <b>${fmtH(h)}</b> h (☀️ ${fmtH(hd)} · 🌙 ${fmtH(hn)})` + (r.total > PRES.length ? ` · se muestran ${PRES.length}` : "") : "";
+      if (!PRES.length) { $("#pResultados").innerHTML = `<div class="card c-navy center">No hay presentes informados con esos datos.</div>`; return; }
+      $("#pResultados").innerHTML = `<div class="tabla-wrap"><table class="tabla"><thead><tr><th>Fecha</th><th>Turno</th><th>Servicio</th><th>Legajo</th><th>Apellido y nombre</th><th>Emp.</th><th>Puesto</th><th>Ingreso</th><th>Egreso</th><th>Horas</th><th>☀️</th><th>🌙</th><th>Cód. / Obs.</th></tr></thead><tbody>` +
+        PRES.map((p) => `<tr${p.codigo && !p.ingreso ? ' class="aus"' : ""}><td>${esc(p.fecha)}</td><td>${p.turno === "Nocturno" ? "🌙" : "☀️"} ${esc(p.turno)}</td><td>${esc(p.servicio)}</td><td class="c">${esc(p.legajo)}</td><td><b>${esc(p.nombre)}</b></td>
+          <td class="c"><span class="emp ${esc(p.empresa)}">${esc(p.empresa)}</span></td><td>${esc(p.puesto)}</td><td class="c">${esc(p.ingreso)}</td><td class="c">${esc(p.egreso)}</td>
+          <td class="c"><b>${esc(p.horas)}</b></td><td class="c">${esc(p.diurnas)}</td><td class="c">${esc(p.nocturnas)}</td><td>${esc([p.codigo, p.observacion].filter(Boolean).join(" · "))}</td></tr>`).join("") +
+        `</tbody></table></div>`;
+    } catch (e) { $("#pResultados").innerHTML = `<div class="warn">${esc(e.message)}</div>`; }
+  }
+  $("#pExcel").addEventListener("click", () => {
+    if (!PRES.length) { toast("Primero buscá los presentes.", true); return; }
+    const cols = [["fecha", "Fecha"], ["dia", "Día"], ["turno", "Turno"], ["servicio", "Servicio"], ["legajo", "Legajo"], ["nombre", "Apellido y nombre"], ["empresa", "Empresa"], ["puesto", "Puesto"],
+      ["ingreso", "Ingreso"], ["egreso", "Egreso"], ["horas", "Horas"], ["diurnas", "Horas diurnas"], ["nocturnas", "Horas nocturnas"], ["codigo", "Código"], ["observacion", "Observación"], ["id", "N° minuta"]];
+    const cel = (v) => { const t = String(v == null ? "" : v); return /[";\n]/.test(t) ? '"' + t.replace(/"/g, '""') + '"' : t; };
+    const csv = "﻿" + cols.map((c) => c[1]).join(";") + "\n" + PRES.map((p) => cols.map((c) => cel(p[c[0]])).join(";")).join("\n");
+    descargar(new Blob([csv], { type: "text/csv;charset=utf-8" }), "Presentes de los servicios " + $("#pDesde").value + " a " + $("#pHasta").value + ".csv");
+  });
+
   /* ----------------------- MODO DEMO ----------------------- */
   const DEMO_DB = {
     minutas: [],
@@ -829,6 +981,9 @@
           equipos: ["Vehículo eléctrico", "Celulares", "Equipos HT", "PC / CCTV"], logoCliente: "assets/logos/san-francisco.png", logoTexto: "",
           contactos: [{ nombre: "Juan Pérez (Administración)", correo: "juan.perez@ejemplo.com" }] }
       ],
+      flota: [{ dominio: "OOL102", marca: "FIAT", modelo: "Fiat Strada Adv. 1.6", anio: "2015", color: "ROJO", empresa: "KDE", ubicacion: "SAN FRANCISCO" },
+        { dominio: "AF055YL", marca: "TOYOTA", modelo: "Toyota Etios 4P XL", anio: "2021", color: "BLANCO", empresa: "LEGUYET", ubicacion: "FINCAS DE IRAOLA 2" },
+        { dominio: "AF937GI", marca: "FIAT", modelo: "Fiat Cronos 1.3 Like", anio: "2023", color: "BLANCO", empresa: "PPQ", ubicacion: "GERARDO VICA" }],
       supervisores: [{ nombre: "Gerardo Vica", usuario: "gvica" }, { nombre: "Sergio Carabetta", usuario: "scarabetta" }, { nombre: "Daniel Cruz", usuario: "dcruz" }, { nombre: "Carlos Sandoval", usuario: "csandoval" }],
       fijos: [{ nombre: "Gustavo San Martin" }, { nombre: "Fernando Jacyno" }],
       personal: [
@@ -845,10 +1000,22 @@
   async function demo(action, p) {
     await new Promise((r) => setTimeout(r, 300));
     if (action === "login") {
-      if (p.usuario !== "demo" || p.password !== "demo") throw new Error("En modo demo: usuario demo, contraseña demo.");
-      return Object.assign({ token: "demo" }, DEMO_DB.inicio);
+      if (p.usuario === "admin" && p.password === "admin") { DEMO_DB.rol = "admin"; return Object.assign({ token: "admin" }, DEMO_DB.inicio, { cargaMinutas: false, usuario: { nombre: "Administración (demo)", usuario: "admin", rol: "Administrador" } }); }
+      if (p.usuario !== "demo" || p.password !== "demo") throw new Error("En modo demo: usuario demo / demo (servicio) o admin / admin (administración).");
+      DEMO_DB.rol = "servicio"; return Object.assign({ token: "demo" }, DEMO_DB.inicio);
     }
-    if (action === "inicio") return DEMO_DB.inicio;
+    if (action === "inicio") return S.token === "admin" ? Object.assign({}, DEMO_DB.inicio, { cargaMinutas: false, usuario: { nombre: "Administración (demo)", usuario: "admin", rol: "Administrador" } }) : DEMO_DB.inicio;
+    if (action === "presentes") {
+      const t = norm(p.q).split(" ").filter(Boolean), out = [];
+      DEMO_DB.minutas.forEach((x) => (x.d.personal.concat(p.soloPresentes ? [] : x.d.ausentes)).forEach((q) => {
+        const it = { id: x.id, fecha: x.d.fecha, dia: x.d.dia, turno: x.d.turno, servicio: x.d.servicio, legajo: q.legajo, nombre: q.nombre, empresa: q.empresa, puesto: q.puesto,
+          ingreso: q.ingreso || "", egreso: q.egreso || "", horas: q.horas || "", diurnas: q.diurnas || "", nocturnas: q.nocturnas || "", codigo: q.codigo || "", observacion: q.observacion || "" };
+        if (p.empresa && it.empresa !== p.empresa) return; if (p.turno && it.turno !== p.turno) return;
+        const h = norm(Object.values(it).join(" ")); if (t.every((k) => h.indexOf(k) >= 0)) out.push(it);
+      }));
+      return { ok: true, items: out, total: out.length };
+    }
+    if (action === "reintentarCorreo") return { ok: true, prueba: true, enviadoA: "fjacyno@ktl-seguridad.com", to: [], cc: [] };
     if (action === "guardar") {
       const id = "MO-" + String(DEMO_DB.minutas.length + 1).padStart(6, "0");
       const b = atob(p.pdfBase64), u = new Uint8Array(b.length); for (let i = 0; i < b.length; i++) u[i] = b.charCodeAt(i);
@@ -858,7 +1025,7 @@
     if (action === "buscar") {
       const t = norm(p.q).split(" ").filter(Boolean);
       const items = DEMO_DB.minutas.filter((x) => { const h = norm(JSON.stringify(x.d)); return t.every((k) => h.indexOf(k) >= 0); })
-        .map((x) => ({ id: x.id, fecha: x.d.fecha, dia: x.d.dia, turno: x.d.turno, guardia: x.d.guardia, servicio: x.d.servicio, idServicio: x.d.idServicio, encargado: x.d.encargado.nombre, supervisor: x.d.supervisor, relevantes: x.d.relevantes.join(" | "), titulo: x.d.titulo }))
+        .map((x) => ({ sinCorreo: false, id: x.id, fecha: x.d.fecha, dia: x.d.dia, turno: x.d.turno, guardia: x.d.guardia, servicio: x.d.servicio, idServicio: x.d.idServicio, encargado: x.d.encargado.nombre, supervisor: x.d.supervisor, relevantes: x.d.relevantes.join(" | "), titulo: x.d.titulo }))
         .reverse();
       return { ok: true, items: items, total: items.length };
     }
