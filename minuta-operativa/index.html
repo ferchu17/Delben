@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#1F3864">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="assets/delben-64.png">
+<link rel="apple-touch-icon" href="assets/delben-192.png">
+<title>Minuta Operativa del Servicio · DelBen</title>
+<link rel="stylesheet" href="css/app.css?v=20261020c">
+</head>
+<body>
+
+<!-- ===================== INGRESO ===================== -->
+<section id="vLogin" class="login-wrap" hidden>
+  <div class="login-bg"></div>
+  <form class="login-card" id="fLogin" autocomplete="on">
+    <img class="login-logo" id="logoLogin" alt="DelBen">
+    <h1>Minuta Operativa<br><span>del Servicio</span></h1>
+    <label class="lf">Usuario
+      <input id="lUsuario" name="username" autocomplete="username" autocapitalize="none" spellcheck="false" required>
+    </label>
+    <label class="lf">Contraseña
+      <span class="pass"><input id="lClave" name="password" type="password" autocomplete="current-password" required>
+      <button type="button" id="lVer" class="ojo" aria-label="Mostrar contraseña">👁</button></span>
+    </label>
+    <div id="lError" class="lerror" aria-live="polite"></div>
+    <button class="btn big" id="lEntrar" type="submit">Ingresar</button>
+    <div id="lDemo" class="hint center" hidden>Modo demo: usuario <b>demo</b> · contraseña <b>demo</b></div>
+  </form>
+</section>
+
+<!-- ===================== APP ===================== -->
+<section id="vApp" hidden>
+  <header class="top">
+    <div class="top-in">
+      <img class="top-logo" id="logoTop" alt="DelBen">
+      <div class="top-tit">
+        <div class="top-k">Minuta Operativa del Servicio</div>
+        <div class="top-u" id="topUsuario"></div>
+      </div>
+      <button class="btn small ghost-w" id="bSalir">Salir</button>
+    </div>
+    <nav class="tabs">
+      <button class="tab on" data-tab="nueva">📝 Nueva minuta</button>
+      <button class="tab" data-tab="informes">📂 Informes</button>
+    </nav>
+    <div class="stripe"></div>
+  </header>
+
+  <div id="demoBar" class="demo" hidden>MODO DEMO · datos de ejemplo, no se guarda ni se envía nada</div>
+  <div id="pruebaBar" class="demo prueba" hidden></div>
+
+  <!-- Servicio -->
+  <div class="wrap">
+    <div class="serv-card" id="servCard"></div>
+  </div>
+
+  <main id="vista-nueva" class="wrap view on">
+    <div id="borradorAviso" class="aviso" hidden></div>
+    <div id="form"></div>
+    <div class="bottom-bar">
+      <button class="btn ghost" id="bLimpiar">🗑 Empezar de nuevo</button>
+      <button class="btn big" id="bGuardar">💾 Guardar y enviar</button>
+    </div>
+  </main>
+
+  <main id="vista-informes" class="wrap view">
+    <section class="card c-navy">
+      <h2 class="ct">🔎 Buscar minutas</h2>
+      <div class="grid4">
+        <label class="f span2">Buscar <small>(novedad, vigilador, legajo, patente, sector…)</small>
+          <input id="qTexto" placeholder="Ej: Pérez, portón, ambulancia, lote 23…" autocomplete="off">
+        </label>
+        <label class="f">Desde<input type="date" id="qDesde"></label>
+        <label class="f">Hasta<input type="date" id="qHasta"></label>
+        <label class="f span2" id="qServWrap" hidden>Servicio<select id="qServ"></select></label>
+      </div>
+      <div class="row-end"><button class="btn" id="bBuscar">Buscar</button></div>
+    </section>
+    <div id="resumenBusqueda" class="hint"></div>
+    <div id="resultados" class="results"></div>
+  </main>
+</section>
+
+<div id="cargando" class="splash"><img id="logoSplash" alt=""><div class="spin"></div></div>
+<div id="overlay" class="overlay" hidden><div class="ov-box"><div class="spin"></div><div id="ovTxt">Procesando…</div></div></div>
+<div id="modal" class="modal" hidden><div class="modal-box" id="modalBox"></div></div>
+<div id="toast" class="toast" hidden></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js"></script>
+<script src="js/config.js?v=20261020c"></script>
+<script src="js/pdf.js?v=20261020c"></script>
+<script src="js/app.js?v=20261020c"></script>
+<script>
+  if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js").catch(() => {});
+</script>
+</body>
+</html>
