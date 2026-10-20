@@ -34,7 +34,7 @@ const CONFIG = {
 
   // MODO PRUEBA: mientras esté en true, TODOS los correos van solo a CORREO_PRUEBA
   // (el mail dice a quiénes se hubiera enviado). Cuando esté todo bien, poner false.
-  MODO_PRUEBA: true,
+  MODO_PRUEBA: false,
   CORREO_PRUEBA: 'fjacyno@ktl-seguridad.com',
 
   REMITENTE: 'Delben - Minuta Operativa',
