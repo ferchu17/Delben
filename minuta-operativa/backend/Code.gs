@@ -118,6 +118,7 @@ function doPost(e) {
     const req = JSON.parse(e.postData.contents);
     switch (req.action) {
       case 'login':     return json_(login_(req));
+      case 'sso':       return json_(loginSSO_(req));
       case 'inicio':    { const u = sesion_(req.token); const r = inicio_(u); r.token = crearToken_(u.usuario); return json_(r); }
       case 'presentes': return json_(presentes_(sesion_(req.token), req));
       case 'reintentarCorreo': return json_(reintentarCorreo_(sesion_(req.token), req));
@@ -397,6 +398,29 @@ function login_(req) {
   if (!serviciosDe_(x).length) return { ok: false, error: 'Tu usuario no tiene servicios asignados en la Minuta Operativa. Avisale a Fernando.' };
   const r = inicio_(x);
   r.token = crearToken_(x.usuario);
+  return r;
+}
+
+// Acceso directo desde Novedades del Personal (botón "Presentes de los servicios"), igual que el botón SGI:
+// el pase lo firma Novedades con la clave de la pestaña oculta SSO_Novedades de Stock Manager. Vence a los 2 minutos y se usa una sola vez.
+function loginSSO_(req) {
+  const p = String(req.pase || '').split('.');
+  if (p.length !== 3) return { ok: false, error: 'Acceso directo inválido: entrá con tu usuario y clave.' };
+  if (!Number(p[1]) || Date.now() > Number(p[1])) return { ok: false, error: 'El acceso directo venció: volvé a tocar el botón en Novedades del Personal.' };
+  const h = SpreadsheetApp.openById(CONFIG.SS_SGI).getSheetByName('SSO_Novedades');
+  const secreto = h ? String(h.getRange('A1').getValue() || '').trim() : '';
+  if (!secreto) return { ok: false, error: 'Falta la clave del acceso directo: entrá con tu usuario y clave.' };
+  if (b64_(Utilities.computeHmacSha256Signature(p[0] + '.' + p[1], secreto)) !== p[2]) return { ok: false, error: 'Acceso directo inválido: entrá con tu usuario y clave.' };
+  const cache = CacheService.getScriptCache(), k = 'mo_sso_' + p[2].slice(0, 40);
+  if (cache.get(k)) return { ok: false, error: 'Ese acceso directo ya se usó: volvé a tocar el botón en Novedades del Personal.' };
+  cache.put(k, '1', 600);
+  const b64 = p[0] + '===='.slice(0, (4 - p[0].length % 4) % 4);
+  const usuario = Utilities.newBlob(Utilities.base64DecodeWebSafe(b64)).getDataAsString('UTF-8').trim().toLowerCase();
+  const u = usuarios_().find(x => x.usuario === usuario);
+  if (!u) return { ok: false, error: 'El usuario no está en el SGI.' };
+  if (!serviciosDe_(u).length) return { ok: false, error: 'Tu usuario no tiene servicios asignados en la Minuta Operativa.' };
+  const r = inicio_(u);
+  r.token = crearToken_(u.usuario);
   return r;
 }
 

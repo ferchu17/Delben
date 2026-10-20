@@ -162,6 +162,16 @@
   async function arrancar() {
     ["#logoLogin", "#logoTop", "#logoSplash"].forEach((s) => { $(s).src = CFG.LOGO_APP; });
     $("#lDemo").hidden = !DEMO; $("#demoBar").hidden = !DEMO;
+    // Acceso directo desde Novedades del Personal (?sso=...): entra sin pedir usuario y clave
+    const qs = new URLSearchParams(location.search), pase = qs.get("sso");
+    if (pase && !DEMO) {
+      qs.delete("sso");
+      try { history.replaceState(null, "", location.pathname + (qs.toString() ? "?" + qs : "")); } catch (e) {}
+      try {
+        const r = await api("sso", { pase: pase }, 90000);
+        S.token = r.token; LS.set(CLAVE_TOKEN, r.token); S.ses = r; entrarApp(); return;
+      } catch (e) { $("#lError").textContent = e.message; }
+    }
     S.token = LS.get(CLAVE_TOKEN) || "";
     if (!S.token) { ver("login"); return; }
     try { S.ses = await api("inicio", {}, 90000); if (S.ses.token) { S.token = S.ses.token; LS.set(CLAVE_TOKEN, S.token); } entrarApp(); }
