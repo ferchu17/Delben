@@ -422,6 +422,8 @@ async function iniciar() {
   $('#btnMenu').onclick = () => ir('menu');
   $('#btnSGI').onclick = () => abrirSGI();
   $('#btnSalir').onclick = () => salir();
+  // v1.26.0: llegada desde el Portal de acceso (ya entró con su usuario): la sesión viene en la dirección (#tk=...)
+  try { const mt = String(location.hash || '').match(/(?:^#|&)tk=([\w-]+)/); if (mt) { guardarToken(mt[1]); history.replaceState(null, '', location.pathname + location.search); } } catch (e) { }
   const t = tokenGuardado();
   if (t) {
     S.token = t;

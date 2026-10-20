@@ -56,6 +56,11 @@ jobs:
           cp instructivos/*.html instructivos/motor.css instructivos/motor.js _site/instructivos/
           # Portal DELBEN: página con todas las apps (https://ferchu17.github.io/Delben/portal/)
           cp -R portal _site/portal
+          # Portal de acceso con usuario (https://ferchu17.github.io/Delben/acceso/): cada perfil ve sus apps e instructivos.
+          # Usa el servidor de Novedades del Personal (mismo config.js) y la lista de apps de acceso/apps.js
+          mkdir -p _site/acceso
+          cp acceso/* _site/acceso/
+          cp novedades-app/web/config.js _site/acceso/config.js
           # DelBen Domótica: página con la descarga de la APK e instrucciones (https://ferchu17.github.io/Delben/domotica/)
           cp -R domotica _site/domotica
           sed -i '0,/<head[^>]*>/s##&\n<link rel="icon" type="image/png" sizes="64x64" href="/Delben/iconos/sgi-64.png">\n<link rel="apple-touch-icon" href="/Delben/iconos/sgi-192.png">#' _site/sgi/index.html

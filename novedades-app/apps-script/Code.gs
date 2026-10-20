@@ -223,7 +223,7 @@ function doPost(e) {
   try {
     var req = JSON.parse((e && e.postData && e.postData.contents) || '{}');
     var fn = String(req.fn || ''), args = Array.isArray(req.args) ? req.args : [];
-    var permitidas = { api: api, login: login };
+    var permitidas = { api: api, login: login, portalLogin: portalLogin, portalSesion: portalSesion };
     if (!permitidas[fn]) throw new Error('Función no permitida: ' + fn);
     out = { ok: true, result: permitidas[fn].apply(null, args) };
   } catch (err) {
@@ -661,6 +661,30 @@ function login(usuario, clave) {
   } catch (e) {
     return { ok: false, error: e.message };
   }
+}
+
+/* ============================================================
+   v1.26.0 · PORTAL DE ACCESO (GitHub: https://ferchu17.github.io/Delben/acceso/)
+   Cada persona entra con su usuario y clave del SGI y ve las apps de su perfil, con su instructivo.
+   La sesión es la misma que la de Novedades del Personal: desde el portal se entra a Novedades
+   y al SGI sin volver a poner la clave.
+   ============================================================ */
+function portalLogin(usuario, clave) {
+  try {
+    usuario = String(usuario || '').trim().toLowerCase();
+    var u = usuariosSGI_().filter(function (x) { return x.Usuario.toLowerCase() === usuario; })[0];
+    if (!u || u.Clave.trim() !== String(clave || '').trim()) return { ok: false, error: 'Usuario o clave incorrectos.' };
+    var pub = publico_(u), token = Utilities.getUuid();
+    CacheService.getScriptCache().put('S_' + token, JSON.stringify(pub), APP.SESION_SEG);
+    return { ok: true, data: datosPortal_(pub, token) };
+  } catch (e) { return { ok: false, error: e.message }; }
+}
+function portalSesion(token) {
+  try { return { ok: true, data: datosPortal_(sesion_(token), token) }; }
+  catch (e) { return { ok: false, error: String(e.message || e) }; }
+}
+function datosPortal_(u, token) {
+  return { token: token, usuario: u.usuario, nombre: u.nombre, perfil: u.perfil || '', rol: u.rol || '', novedades: !!u.rol, permisos: u.permisos || {} };
 }
 
 function sesion_(token) {

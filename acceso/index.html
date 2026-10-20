@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Portal DELBEN</title>
+<link rel="icon" type="image/png" sizes="64x64" href="/Delben/iconos/sgi-64.png">
+<link rel="apple-touch-icon" href="/Delben/iconos/sgi-192.png">
+<link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@500;600;700&family=Source+Sans+3:wght@400;600;700&display=swap" rel="stylesheet">
+<link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" rel="stylesheet">
+<style>
+/* =====================================================================
+   PORTAL DE ACCESO DELBEN
+   Cada persona entra con su usuario del SGI y ve las apps de su perfil con su instructivo.
+   La lista de apps y quién ve cada una está en apps.js (al lado de este archivo).
+   ===================================================================== */
+:root{ --font-head:'Rajdhani',sans-serif; --font-body:'Source Sans 3',sans-serif; --text:#111827; --text2:#4b5563; --azul:#0c3078; }
+*{box-sizing:border-box;margin:0;padding:0;}
+html{min-height:100%;background:linear-gradient(180deg,#bcd9f7 0%,#8ec4f5 40%,#63aeff 100%) #63aeff;}
+body{font-family:var(--font-body);color:var(--text);min-height:100vh;padding:0 16px 40px;display:flex;flex-direction:column;align-items:center;}
+.logo{width:300px;max-width:70vw;height:auto;display:block;margin:18px auto 0;mix-blend-mode:multiply;}
+.titulo{font-family:var(--font-head);font-weight:700;font-size:1.5rem;letter-spacing:3px;text-transform:uppercase;color:var(--azul);text-align:center;margin-top:4px;}
+.subtitulo{color:#1f3b63;font-size:.95rem;text-align:center;margin-top:2px;}
+[hidden]{display:none !important;}
+
+/* Ingreso */
+.login{width:100%;max-width:380px;margin-top:22px;background:rgba(255,255,255,.95);border-radius:16px;padding:24px 22px;box-shadow:0 10px 30px rgba(0,0,0,.2);}
+.login h2{font-family:var(--font-head);font-size:1.3rem;color:var(--azul);letter-spacing:1px;margin-bottom:4px;}
+.login p{color:var(--text2);font-size:.9rem;margin-bottom:14px;}
+.campo{display:block;margin-bottom:12px;font-weight:600;font-size:.88rem;color:#1f2937;}
+.campo input{display:block;width:100%;margin-top:5px;padding:11px 12px;border:1px solid #cbd5e1;border-radius:10px;font:inherit;font-size:1rem;}
+.campo input:focus{outline:2px solid #1e6fc8;border-color:#1e6fc8;}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;border:none;border-radius:50px;padding:11px 20px;font:inherit;font-weight:700;cursor:pointer;}
+.btn-prim{width:100%;background:linear-gradient(135deg,#1040a0,#1e6fc8);color:#fff;font-size:1rem;}
+.btn-prim:disabled{opacity:.6;cursor:wait;}
+.error{color:#b91c1c;font-weight:600;font-size:.9rem;margin-top:10px;min-height:1.2em;}
+.ojo{position:relative;} .ojo button{position:absolute;right:10px;bottom:9px;background:none;border:none;color:#64748b;cursor:pointer;font-size:1rem;}
+
+/* Portal */
+.barra{width:100%;max-width:1100px;display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-top:16px;background:rgba(255,255,255,.92);border-radius:14px;padding:12px 16px;box-shadow:0 4px 16px rgba(0,0,0,.12);}
+.barra .hola{flex:1;min-width:200px;}
+.barra .hola b{font-family:var(--font-head);font-size:1.25rem;color:var(--azul);letter-spacing:.5px;}
+.chip{display:inline-block;margin-left:6px;padding:2px 10px;border-radius:50px;background:#e0ecff;color:#1040a0;font-weight:700;font-size:.8rem;vertical-align:middle;}
+.btn-sec{background:#fff;border:1px solid #cbd5e1;color:#1f2937;padding:8px 14px;font-size:.9rem;}
+.btn-sec:hover{background:#f1f5f9;}
+.seccion{width:100%;max-width:1100px;margin-top:20px;}
+.seccion h3{font-family:var(--font-head);font-size:1.2rem;letter-spacing:2px;text-transform:uppercase;color:var(--azul);margin:0 0 10px 4px;}
+.grid{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;}
+.app{display:flex;flex-direction:column;border-radius:14px;overflow:hidden;background:linear-gradient(135deg,var(--a),var(--b));box-shadow:0 8px 24px rgba(0,0,0,.3);transition:transform .15s,box-shadow .15s,filter .15s;}
+.app:hover{transform:translateY(-4px);box-shadow:0 14px 34px rgba(0,0,0,.42);filter:brightness(1.06);}
+.app-main{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;padding:22px 14px 14px;text-align:center;color:#fff;cursor:pointer;background:none;border:none;font:inherit;}
+.app-img{width:76px;height:76px;border-radius:18px;background:#fff;display:flex;align-items:center;justify-content:center;box-shadow:0 4px 12px rgba(0,0,0,.3);overflow:hidden;flex-shrink:0;}
+.app-img img{width:100%;height:100%;object-fit:cover;}
+.app-img i{font-size:2.2rem;color:var(--a);}
+.app-main h2{font-family:var(--font-head);font-size:1.15rem;font-weight:700;letter-spacing:1.2px;text-transform:uppercase;text-shadow:0 2px 6px rgba(0,0,0,.45);}
+.app-main p{font-size:.88rem;line-height:1.3;opacity:.94;}
+.app-actions{display:flex;gap:6px;padding:10px;background:rgba(0,0,0,.18);border-top:1px solid rgba(255,255,255,.18);flex-wrap:wrap;justify-content:center;}
+.accion{display:inline-flex;align-items:center;gap:6px;padding:6px 12px;border-radius:50px;cursor:pointer;background:rgba(255,255,255,.18);border:2px solid rgba(255,255,255,.8);color:#fff;font:inherit;font-weight:700;font-size:.82rem;text-decoration:none;white-space:nowrap;}
+.accion:hover{background:rgba(255,255,255,.32);}
+.accion.guia{background:#ffd60a;border-color:#ffd60a;color:#3a2a00;}
+.guias{background:rgba(255,255,255,.94);border-radius:14px;padding:6px;box-shadow:0 4px 16px rgba(0,0,0,.12);}
+.guias a{display:flex;align-items:center;gap:12px;padding:10px 12px;border-radius:10px;color:var(--text);text-decoration:none;}
+.guias a:hover{background:#eef6ff;}
+.guias .g-ic{width:38px;height:38px;border-radius:10px;display:flex;align-items:center;justify-content:center;color:#fff;background:linear-gradient(135deg,var(--a),var(--b));flex-shrink:0;}
+.guias b{display:block;} .guias small{color:var(--text2);}
+.guias .fa-chevron-right{margin-left:auto;color:#94a3b8;}
+.vacio{background:rgba(255,255,255,.92);border-radius:14px;padding:18px;color:var(--text2);text-align:center;}
+.footer{margin-top:34px;color:#1f3b63;font-size:.82rem;letter-spacing:1px;text-align:center;}
+.toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%) translateY(120px);background:#111827;color:#fff;padding:10px 20px;border-radius:50px;font-weight:600;font-size:.92rem;box-shadow:0 6px 20px rgba(0,0,0,.35);transition:transform .25s,opacity .25s;z-index:50;opacity:0;pointer-events:none;max-width:92vw;text-align:center;}
+.toast.ver{transform:translateX(-50%) translateY(0);opacity:1;}
+.cargando{margin-top:40px;color:var(--azul);font-weight:700;}
+@media (max-width:1000px){.grid{grid-template-columns:repeat(3,1fr);}}
+@media (max-width:720px){.grid{grid-template-columns:repeat(2,1fr);gap:10px;}.logo{width:220px;}}
+@media (max-width:440px){
+  .grid{grid-template-columns:1fr;}
+  .app-main{flex-direction:row;justify-content:flex-start;text-align:left;padding:14px;gap:14px;}
+  .app-img{width:56px;height:56px;border-radius:14px;}
+  .logo{width:180px;} .titulo{font-size:1.2rem;}
+}
+</style>
+</head>
+<body>
+<img class="logo" src="logo.webp" alt="Delben - Sistema de Gestión Integral">
+<div class="titulo">Portal DELBEN</div>
+<div class="subtitulo" id="sub">Tus aplicaciones e instructivos en un solo lugar</div>
+
+<div class="cargando" id="vCargando">Abriendo…</div>
+
+<!-- Ingreso -->
+<form class="login" id="vLogin" hidden autocomplete="on">
+  <h2>Ingresar</h2>
+  <p>Con tu usuario y contraseña del SGI.</p>
+  <label class="campo">Usuario<input id="lUsuario" name="username" autocomplete="username" autocapitalize="none" required></label>
+  <label class="campo ojo">Contraseña<input id="lClave" name="password" type="password" autocomplete="current-password" required>
+    <button type="button" id="lVer" title="Mostrar la contraseña"><i class="fa-regular fa-eye"></i></button></label>
+  <button class="btn btn-prim" id="lOk" type="submit"><i class="fa-solid fa-right-to-bracket"></i>Ingresar</button>
+  <div class="error" id="lError"></div>
+</form>
+
+<!-- Portal -->
+<div id="vPortal" hidden style="width:100%;display:flex;flex-direction:column;align-items:center">
+  <div class="barra">
+    <div class="hola">Hola, <b id="pNombre"></b><span class="chip" id="pPerfil"></span></div>
+    <button class="btn btn-sec" id="pActualizar" title="Volver a cargar tus aplicaciones"><i class="fa-solid fa-rotate"></i>Actualizar</button>
+    <button class="btn btn-sec" id="pSalir"><i class="fa-solid fa-right-from-bracket"></i>Salir</button>
+  </div>
+  <section class="seccion"><h3>Mis aplicaciones</h3><div class="grid" id="pApps"></div></section>
+  <section class="seccion"><h3>Mis instructivos</h3><div class="guias" id="pGuias"></div></section>
+</div>
+
+<footer class="footer">DELBEN · Sistema de Gestión Integral</footer>
+<div class="toast" id="toast"></div>
+
+<script src="config.js"></script>
+<script src="apps.js"></script>
+<script>
+(function () {
+  'use strict';
+  const $ = id => document.getElementById(id);
+  const CLAVE = 'delben_portal_token';
+  const esc = t => String(t == null ? '' : t).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  const norm = t => String(t || '').normalize('NFD').replace(/[̀-ͯ]/g, '').trim().toLowerCase();
+  const conMouse = window.matchMedia('(pointer:fine)').matches;
+  let SES = null;
+
+  function backend() {
+    let u = '';
+    try { u = localStorage.getItem('delben_novedades_backend') || ''; } catch (e) { }
+    return String(window.NOVEDADES_BACKEND || u || '').trim();
+  }
+  // Llama a una función del servidor (Apps Script de Novedades del Personal)
+  async function servidor(fn, args) {
+    const url = backend();
+    if (!url) throw new Error('Falta configurar la dirección del servidor.');
+    const r = await fetch(url, { method: 'POST', redirect: 'follow', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify({ fn, args: args || [] }) });
+    const t = await r.text();
+    let p; try { p = JSON.parse(t); } catch (e) { throw new Error('El servidor no respondió bien. Probá de nuevo en un momento.'); }
+    if (!p || p.ok !== true) throw new Error((p && p.error) || 'Error del servidor.');
+    const res = p.result;
+    if (res && res.ok === false) throw new Error(res.error || 'Error.');
+    return res && res.data !== undefined ? res.data : res;
+  }
+  function guardar(t) { try { t ? localStorage.setItem(CLAVE, t) : localStorage.removeItem(CLAVE); } catch (e) { } }
+  function leer() { try { return localStorage.getItem(CLAVE) || ''; } catch (e) { return ''; } }
+  let tAv;
+  function avisar(t) { const el = $('toast'); el.textContent = t; el.classList.add('ver'); clearTimeout(tAv); tAv = setTimeout(() => el.classList.remove('ver'), 3200); }
+  function ver(v) { ['vCargando', 'vLogin', 'vPortal'].forEach(id => { $(id).hidden = id !== v; }); }
+
+  // ¿La app la ve este perfil?
+  function laVe(a, s) {
+    if (a.acceso === 'novedades' && !s.novedades) return false;
+    const p = norm(s.perfil);
+    if (p === 'administrador') return true;
+    if (a.perfiles === '*') return true;
+    return (a.perfiles || []).some(x => norm(x) === p);
+  }
+  function guiaDe(a, s) {
+    if (!a.guia) return '';
+    if (!a.guiaRol) return a.guia;
+    const r = Object.keys(a.guiaRol).find(k => norm(k) === norm(s.perfil));
+    return a.guia + '#' + (r ? a.guiaRol[r] : (a.guiaRol['*'] || ''));
+  }
+
+  function dibujar() {
+    const s = SES, apps = (window.PORTAL_APPS || []).filter(a => laVe(a, s));
+    $('pNombre').textContent = s.nombre || s.usuario;
+    $('pPerfil').textContent = s.perfil || 'Sin perfil';
+    $('sub').textContent = 'Estas son las aplicaciones de tu perfil';
+    const destino = conMouse ? ' target="_blank" rel="noopener"' : '';
+    const imagen = a => '<div class="app-img">' + (a.img ? '<img src="' + esc(a.img) + '" alt="" onerror="this.replaceWith(Object.assign(document.createElement(\'i\'),{className:\'' + esc(a.icono) + '\'}))">' : '<i class="' + esc(a.icono) + '"></i>') + '</div>';
+    $('pApps').innerHTML = apps.length ? apps.map(a => {
+      const g = guiaDe(a, s);
+      return '<article class="app" style="--a:' + esc(a.color1) + ';--b:' + esc(a.color2) + '">' +
+        '<button class="app-main" type="button" data-abrir="' + esc(a.id) + '">' + imagen(a) + '<div><h2>' + esc(a.nombre) + '</h2><p>' + esc(a.desc) + '</p></div></button>' +
+        '<div class="app-actions"><button class="accion" type="button" data-abrir="' + esc(a.id) + '"><i class="fa-solid fa-arrow-up-right-from-square"></i>Abrir</button>' +
+        (g ? '<a class="accion guia" href="' + esc(g) + '"' + destino + '><i class="fa-solid fa-book-open"></i>Instructivo</a>' : '') + '</div></article>';
+    }).join('') : '<div class="vacio" style="grid-column:1/-1">Tu perfil todavía no tiene aplicaciones habilitadas. Consultá con administración.</div>';
+    $('pGuias').innerHTML = apps.filter(a => a.guia).map(a =>
+      '<a href="' + esc(guiaDe(a, s)) + '"' + destino + ' style="--a:' + esc(a.color1) + ';--b:' + esc(a.color2) + '"><span class="g-ic"><i class="' + esc(a.icono) + '"></i></span>' +
+      '<span><b>' + esc(a.nombre) + '</b><small>' + esc(a.nota || 'Paso a paso, con lo que podés hacer con tu perfil') + '</small></span><i class="fa-solid fa-chevron-right"></i></a>').join('') ||
+      '<div class="vacio">No hay instructivos para tu perfil.</div>';
+    document.querySelectorAll('[data-abrir]').forEach(b => b.onclick = () => abrir((window.PORTAL_APPS || []).find(x => x.id === b.dataset.abrir)));
+    ver('vPortal');
+  }
+
+  // Abre una app. SGI y Novedades entran directo, sin volver a poner la clave.
+  async function abrir(a) {
+    if (!a) return;
+    const enOtra = conMouse;
+    if (a.acceso === 'novedades') { ir(a.link + '#tk=' + encodeURIComponent(SES.token), enOtra); return; }
+    if (a.acceso === 'sgi' && (SES.permisos && SES.permisos.sgi || norm(SES.perfil) === 'administrador')) {
+      const w = enOtra ? window.open('', '_blank') : null;
+      try {
+        const r = await servidor('api', [SES.token, 'sgiLink', {}]);
+        if (r && r.url) { if (w) w.location.href = r.url; else location.href = r.url; return; }
+      } catch (e) { avisar('Se abre el SGI: poné tu usuario y clave.'); }
+      if (w) w.location.href = a.link; else location.href = a.link;
+      return;
+    }
+    ir(a.link, enOtra);
+  }
+  function ir(url, enOtra) { if (enOtra) window.open(url, '_blank', 'noopener'); else location.href = url; }
+
+  async function entrar(ev) {
+    ev.preventDefault();
+    const u = $('lUsuario').value.trim(), c = $('lClave').value;
+    if (!u || !c) { $('lError').textContent = 'Completá usuario y contraseña.'; return; }
+    $('lOk').disabled = true; $('lError').textContent = '';
+    try {
+      SES = await servidor('portalLogin', [u, c]);
+      guardar(SES.token); $('lClave').value = '';
+      dibujar();
+    } catch (e) { $('lError').textContent = e.message; }
+    finally { $('lOk').disabled = false; }
+  }
+  async function retomar() {
+    const t = leer();
+    if (!t) { ver('vLogin'); return; }
+    try { SES = await servidor('portalSesion', [t]); dibujar(); }
+    catch (e) { guardar(''); ver('vLogin'); if (!/SESION_VENCIDA/.test(e.message)) $('lError').textContent = e.message; }
+  }
+
+  $('vLogin').addEventListener('submit', entrar);
+  $('lVer').onclick = () => { const i = $('lClave'); i.type = i.type === 'password' ? 'text' : 'password'; };
+  $('pSalir').onclick = () => { guardar(''); SES = null; $('sub').textContent = 'Tus aplicaciones e instructivos en un solo lugar'; ver('vLogin'); };
+  $('pActualizar').onclick = () => { ver('vCargando'); retomar(); };
+  retomar();
+})();
+</script>
+</body>
+</html>
