@@ -1064,14 +1064,14 @@ async function vPlanilla(params) {
   armarPlanilla(r, servicioId, params);
   S.sucio = false;
   // Si hay una versión guardada sin internet que todavía no se mandó, se muestra esa.
-  const pend = pendientes().find(x => x.periodo === per && x.servicioId === servicioId && S.u && x.usuario === S.u.usuario);
+  const pend = pendientes().find(x => x.periodo === per && x.servicioId === servicioId && S.u && x.usuario === S.u.usuario && !!x.soloProyeccion === !!S.pl.proyAparte);
   if (pend) {
     S.pl.filas = pend.filas.map(f => prepararFila(Object.assign({}, f, { Dias: f.Dias.slice() })));
     S.pl.plus = (pend.plus || []).slice();
   }
   // v1.25.0: cambios de esta pestaña que quedaron pendientes al pasar a otra (se guardan todos juntos)
   const tp = (S.tabsPend || {})[per + '|' + servicioId];
-  if (tp && !pend) {
+  if (tp && !pend && !!tp.soloProy === !!S.pl.proyAparte) {
     S.pl.filas = tp.filas; S.pl.plus = tp.plus;
     prepararProyectado(r.proyectado || []);
     delete S.tabsPend[per + '|' + servicioId];
@@ -1123,11 +1123,20 @@ async function lotePlanillas(periodo, ids) {
     S.cachePl[periodo + '|' + id] = Object.assign({}, x, { ocupacion: x.ocupacion || (r.ocupacion || []).filter(o => o.ServicioId !== id) });
   });
 }
+// v1.30: Proyección de un período que ya empezó: se modifica aparte (lo guardado queda en la proyección y no cambia las Novedades semanales)
+function proyeccionAparte(periodo, params) {
+  if ((params && params.diagrama) || S.modo !== 'proy') return false;
+  const h = new Date(), hoy = h.getFullYear() + '-' + pad(h.getMonth() + 1) + '-' + pad(h.getDate());
+  return isoDiaUTC(fechaDia(periodo, 0)) <= hoy;
+}
 function armarPlanilla(r, servicioId, params) {
+  const aparte = proyeccionAparte(S.periodo, params);
+  const filasOrigen = aparte && (r.proyectado || []).length ? r.proyectado.slice().sort((a, b) => (Number(a.Orden) || 0) - (Number(b.Orden) || 0)) : r.filas;
   S.pl = {
     servicioId, periodo: S.periodo, serv: r.servicio,
     info: periodoInfo(S.periodo), sems: semanasPeriodo(S.periodo),
-    filas: r.filas.map(f => prepararFila({
+    proyAparte: aparte,
+    filas: filasOrigen.map(f => prepararFila({
       Seccion: f.Seccion, Legajo: f.Legajo, Nombre: f.Nombre, Empresa: f.Empresa,
       Puesto: f.Puesto, Turno: f.Turno || '',
       Dias: Array.from({ length: 31 }, (_, i) => f['D' + pad(i + 1)] || '')
@@ -1146,7 +1155,7 @@ function armarPlanilla(r, servicioId, params) {
     // v1.22.9: el supervisor que ya envió la proyección no la puede cambiar: los cambios van por Novedades semanales.
     // v1.25.0: tampoco si ya está cargada y el período empezó (los cambios van por Novedades semanales, desde la semana que informa)
     // v1.30: del 18 al 26 el supervisor puede modificar la proyección del período siguiente aunque ya la haya enviado
-    proyCerrada: !params.diagrama && S.modo !== 'nov' && !esAdmin() && ((!!r.programacion && !(S.periodo > periodoTrabajo() && enVentanaProy())) || (S.periodo <= periodoTrabajo() && (r.proyectado || []).length > 0)),
+    proyCerrada: !aparte && !params.diagrama && S.modo !== 'nov' && !esAdmin() && ((!!r.programacion && !(S.periodo > periodoTrabajo() && enVentanaProy())) || (S.periodo <= periodoTrabajo() && (r.proyectado || []).length > 0)),
     // v1.30: fuera del 18 al 26, el período siguiente es solo para ver
     fueraVentana: !params.diagrama && !esAdmin() && S.periodo > periodoActual() && !enVentanaProy(),
     // v1.25.0: servicio que carga Administración: el supervisor solo lo consulta
@@ -1244,6 +1253,7 @@ function renderPlanilla(conservarScroll) {
 
   $('#main').innerHTML =
     (pl.diagrama ? htmlDiagramaTabs(pl) : '') +
+    (pl.proyAparte && !pl.soloVer ? '<div class="solo-ver solo-proy">Estás modificando la <b>proyección</b> de ' + esc(nombrePeriodo(pl.periodo)) + ': lo que guardes queda en la proyección y <b>no cambia las Novedades semanales</b>. Después la podés enviar con <b>Enviar proyección</b>.</div>' : '') +
     (pl.fueraVentana ? '<div class="solo-ver">La proyección de <b>' + esc(nombrePeriodo(pl.periodo)) + '</b> se puede modificar del <b>' + PROY_DESDE + ' al ' + PROY_HASTA + '</b> de cada mes. Ahora la podés ver, pero no modificar.</div>'
       : pl.cargaAdminSup ? '<div class="solo-ver solo-adm">Este servicio lo carga <b>Administración</b>: no hace falta que lo completes. Lo podés ver, pero no modificar.</div>'
       : pl.proyCerrada ? (pl.progEnviada ? '<div class="solo-ver">La proyección ya se envió' + (pl.progEnviada.FechaEnvio ? ' (' + esc(pl.progEnviada.FechaEnvio) + ')' : '') + ': no se puede modificar.'
@@ -1423,7 +1433,8 @@ function guardarEnPendientes() {
   S.tabsPend[pl.periodo + '|' + pl.servicioId] = {
     key: pl.periodo + '|' + pl.servicioId, periodo: pl.periodo, servicioId: pl.servicioId, nombre: (pl.serv && pl.serv.Servicio) || pl.servicioId,
     filas: pl.filas.map(f => Object.assign({}, f, { Dias: f.Dias.slice(), Col: (f.Col || []).slice() })),
-    plus: pl.plus.map(x => Object.assign({}, x))
+    plus: pl.plus.map(x => Object.assign({}, x)),
+    soloProy: !!pl.proyAparte
   };
   S.sucio = false;
 }
@@ -1438,6 +1449,16 @@ function datosParaGuardar(periodo, servicioId, filas, plus, forzar) {
 function actualizarCachePl(pl, filas) {
   const c = S.cachePl && S.cachePl[pl.periodo + '|' + pl.servicioId]; if (!c) return;
   const h = new Date(), ahora = h.getFullYear() + '-' + pad(h.getMonth() + 1) + '-' + pad(h.getDate()) + ' ' + pad(h.getHours()) + ':' + pad(h.getMinutes());
+  // v1.30: la proyección guardada aparte va a lo proyectado (las Novedades semanales no cambian)
+  if (pl.proyAparte) {
+    c.proyectado = filas.map((f, i) => {
+      const o = { Periodo: pl.periodo, ServicioId: pl.servicioId, Seccion: f.Seccion, Orden: String(i + 1), Legajo: f.Legajo || '', Nombre: String(f.Nombre || '').trim().toUpperCase(),
+        Empresa: f.Empresa || '', Puesto: f.Puesto || '', Turno: f.Turno || '', Proyectado: ahora };
+      f.Dias.forEach((v, j) => { o['D' + pad(j + 1)] = v || ''; });
+      return o;
+    });
+    return;
+  }
   c.filas = filas.map((f, i) => {
     const o = { Periodo: pl.periodo, ServicioId: pl.servicioId, Seccion: f.Seccion, Orden: String(i + 1), Legajo: f.Legajo || '', Nombre: String(f.Nombre || '').trim().toUpperCase(),
       Empresa: f.Empresa || '', Puesto: f.Puesto || '', Turno: f.Turno || '', ActualizadoPor: S.u.usuario, Actualizado: ahora };
@@ -1456,6 +1477,7 @@ async function guardarPestanasPend(forzar) {
     const filas = p.filas.filter(f => String(f.Nombre || '').trim() || f.Dias.some(Boolean));
     if (faltaTurnoPuesto(filas)) { conProblema.push(p); continue; }
     const datos = datosParaGuardar(p.periodo, p.servicioId, filas, p.plus, forzar);
+    if (p.soloProy) datos.soloProyeccion = true;
     if (navigator.onLine === false) { guardarSinConexion(datos, filas); delete S.tabsPend[p.key]; n++; continue; }
     let res;
     try { res = await api('guardarPlanilla', datos); }
@@ -2395,7 +2417,8 @@ async function guardarPlanilla(silencioso, forzar) {
         Seccion: f.Seccion, Legajo: f.Legajo, Nombre: f.Nombre.trim().toUpperCase(),
         Empresa: f.Empresa, Puesto: f.Puesto, Turno: f.Turno, Dias: f.Dias
       })),
-      plus: pl.plus.filter(p => p.Nombre)
+      plus: pl.plus.filter(p => p.Nombre),
+      soloProyeccion: !!pl.proyAparte
     };
     // Sin internet: queda guardado en esta computadora y se manda solo cuando vuelve la conexión.
     if (navigator.onLine === false) { guardarSinConexion(datosGuardar, filas); return true; }
@@ -2657,7 +2680,7 @@ async function enviarProgramacion(forzar, correo) {
   }
   if (hayCambiosPl() && !(await guardarPlanilla(true))) return;
   try {
-    const r = await api('enviarProgramacion', { periodo: pl.periodo, servicioId: pl.servicioId, forzar: !!forzar, correo });
+    const r = await api('enviarProgramacion', { periodo: pl.periodo, servicioId: pl.servicioId, forzar: !!forzar, correo, soloProyeccion: !!pl.proyAparte });
     if (r.faltan && r.faltan.length) { mostrarFaltantes(r.faltan, null, () => enviarProgramacion(true, correo)); return; }
     pl.progEnviada = r.programacion;
     renderPlanilla(true);
@@ -8441,8 +8464,10 @@ const INSTR = [
       { m: '.pincel', t: '<b>Pinceles</b>: Blanco, Celeste o Gris pintan las celdas elegidas (día, noche, sin servicio).' },
       { m: '#btnNota', t: '<b>Comentario</b>: deja una nota en la celda. Si escribís un horario (ej. "05.30 a 14") las horas se ajustan solas (8.5).' },
       { m: '#btnGuardar', t: '<b>Guardar</b>: guarda sin enviar. Podés seguir otro día.' },
-      { m: '#btnEnviarProg', t: '<b>Enviar proyección</b>: le llega a administración. Una vez enviada (o cuando el período ya empezó y la proyección está cargada), el supervisor ya no la puede cambiar: lo que cambie después se carga en Novedades semanales, desde la semana que está informando en adelante.' },
-      { m: '#btnExcel', t: '<b>Excel</b>: baja la planilla con el formato de la empresa.' },
+      { m: '#btnEnviarProg', t: '<b>Enviar proyección</b>: le llega a administración. Se puede volver a modificar y enviar: del <b>18 al 26</b> de cada mes el período siguiente, y cuando el período ya empezó, lo que se guarda en Proyección queda en la proyección y <b>no cambia las Novedades semanales</b>.' },
+      { m: '#btnExcel', t: '<b>Excel</b>: <b>Descargar</b> baja el archivo directo a la computadora (o se envía al servicio o a tu correo).' },
+      { m: 'text=STD', t: '<b>STD</b>: el STD del sector con los colores de las planillas (gris la noche, celeste la tarde y cada código con su color). Las nocturnas van solo con el número.' },
+      { m: '.x-hsp', t: '<b>Hs. período</b> y <b>Hs. extras</b>: al final de cada fila, las horas de la persona en el período sumando todos los servicios y sus horas extras (más de 208, descontando el ausentismo).' },
       { m: '#btnVac', t: '<b>Vacaciones</b>: quién sale de vacaciones en el período y quién lo cubre.' },
       { m: '#btnOtrosSup', t: '<b>Otros supervisores</b>: ver (sin modificar) las planillas de otras zonas.' },
       { m: '#btnBorrarServ', t: '<b>Borrar servicio</b>: lo quita; si ya tiene datos, lo pasa a baja.', solo: 'ADMIN' }
@@ -8451,7 +8476,9 @@ const INSTR = [
       { t: 'El 25 de abril (Día del Vigilador) el que trabaja lleva "!" en la columna DV de los informes.' },
       { t: 'Una persona nueva en la empresa que está en instrucción figura como YNG (nuevo ingreso). Si ya trabajaba en otro servicio, no.' },
       { t: 'Administración puede modificar todo, aun después del envío. Lo que cambia en la Proyección se ve también en Novedades semanales, aunque la semana esté abierta (desbloqueada).', solo: 'NOSUP' },
-      { t: 'Cuando la proyección ya está cargada y el período empezó, la Proyección queda solo para consultar: los cambios van por Novedades semanales.', solo: 'SUP' },
+      { t: 'Del 18 al 26 de cada mes la Proyección abre sola el período siguiente (desde el 18 de octubre se proyecta Octubre - Noviembre). Fuera de esos días, el período siguiente solo se puede ver.', solo: 'SUP' },
+      { t: 'Cuando el período ya empezó, podés seguir modificando la Proyección: queda guardada aparte y no cambia las Novedades semanales. Lo que pasó de verdad cada semana se carga en Novedades semanales.', solo: 'SUP' },
+      { t: 'Si al guardar se llega al tope de vacaciones de todas las zonas (500 días), aparece un aviso con el botón para ver las vacaciones proyectadas e informadas de todas las zonas por sector. El tope se cambia en Datos, clave TopeVacaciones.' },
       { t: 'Los servicios en gris (por ejemplo RAIZEN Dock Sud Supervisores y los RAZ) los carga Administración: no hace falta que los completes.', solo: 'SUP' }
     ] },
 
@@ -8472,7 +8499,7 @@ const INSTR = [
     ],
     tips: [
       { t: 'Solo se modifican los días desde la semana que estás informando en adelante. Las semanas anteriores quedan cerradas: si hay que corregir algo, pedíselo a administración.', solo: 'SUP' },
-      { t: 'La Proyección no se toca: una vez cargada, todo lo que cambie se informa acá.', solo: 'SUP' },
+      { t: 'Lo que cambie de verdad se informa acá. Lo que guardes en la Proyección de un período que ya empezó no modifica esta planilla.', solo: 'SUP' },
       { t: 'Si salís de la pantalla con pestañas sin guardar, la app te avisa antes.', solo: 'SUP' },
       { t: 'Los servicios en gris (por ejemplo RAIZEN Dock Sud Supervisores y los RAZ) los carga Administración: no hace falta completarlos y no frenan el envío de la semana.', solo: 'SUP' },
       { t: 'Administración puede modificar acá o en la Proyección. Lo que se cambia en la Proyección se ve también acá, aunque la semana esté abierta.', solo: 'NOSUP' }
@@ -8573,7 +8600,9 @@ const INSTR = [
     ],
     tips: [
       { t: 'Preguntas que entiende: fecha de ingreso, fecha de nacimiento, domicilio, teléfono, DNI, CUIL, categoría, supervisor, qué servicios trabajó, cuántas ausencias tuvo, si las ausencias se repiten año tras año, horas y extras, otro período, otra persona.' },
-      { t: 'También busca servicios: escribí el nombre del objetivo y el mes.' }
+      { t: 'También busca servicios: escribí el nombre del objetivo y el mes.' },
+      { t: 'Busca en todos los registros: flota y su documentación, ubicación de los móviles, inventarios de servicios, trabajos realizados, cargos del personal, ropa, combustible y demás (no el inventario de oficina). Ej.: "flota de Raizen", "cargos de Gómez", "trabajos realizados AB123CD" o una patente.' },
+      { t: 'Con una persona elegida, tocá "Cargos y otros registros".' }
     ] },
 
   { k: 'diagrama', perm: 'diagrama', ir: ['diagrama'], t: 'Planificación de servicios', ic: 'diagrama', c: '#0a8f8f', img: 'diagrama',

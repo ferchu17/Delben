@@ -863,23 +863,31 @@ var ACCIONES_ = {
     var info = periodoInfo_(d.periodo);
     var servs = serviciosZona_(serv.Supervisor, serv.Id);
     var todo = { numero: 0, desdeIdx: 0, hastaIdx: info.n - 1 };
-    if (!(d.forzar && esAdmin_(u))) {
+    // v1.30: proyección de un período que ya empezó: se manda lo proyectado (la planilla de Novedades semanales no se toca)
+    var soloProy = !!d.soloProyeccion;
+    if (!soloProy && !(d.forzar && esAdmin_(u))) {
       var faltan = faltantesZona_(servs.filter(function (s) { return !cargaAdmin_(s); }), d.periodo, todo, periodoAnterior_(d.periodo));
       if (faltan.length) return { faltan: faltan };
     }
     var reg = { Periodo: d.periodo, Supervisor: serv.Supervisor, EnviadoPor: u.usuario, FechaEnvio: ahora_(), Servicios: servs.map(function (s) { return s.Servicio; }).join(', ') };
     agregar_('Programaciones', [reg]);
-    // Lo enviado queda como lo proyectado de cada servicio de la zona.
     var plP = planillaPeriodo_(d.periodo);
-    servs.forEach(function (s) { guardarProyectado_(d.periodo, s.Id, plP.filter(function (f) { return f.ServicioId === s.Id; }), true); });
+    var proyP = soloProy ? leer_('Proyectado').filter(function (f) { return f.Periodo === d.periodo; }) : null;
+    // Si un servicio no tiene proyección guardada aparte, se usa su planilla
+    var fuente = soloProy ? servs.reduce(function (a, s) {
+      var x = proyP.filter(function (f) { return f.ServicioId === s.Id; });
+      return a.concat(x.length ? x : plP.filter(function (f) { return f.ServicioId === s.Id; }));
+    }, []) : plP;
+    // Lo enviado queda como lo proyectado de cada servicio de la zona.
+    if (!soloProy) servs.forEach(function (s) { guardarProyectado_(d.periodo, s.Id, plP.filter(function (f) { return f.ServicioId === s.Id; }), true); });
     var aviso = '';
     try {
       var dest = destinoAvisos_();
       if (d.correo && d.correo.para) {
-        var plE = planillaPeriodo_(d.periodo), plusE = leer_('Plus');
+        var plE = fuente, plusE = leer_('Plus');
         mandarCorreoArmado_(u, d.correo, servs.map(function (s) { return seccionSemana_(s, d.periodo, todo, plE, plusE); }).join(''));
       } else if (dest) {
-        var planilla = planillaPeriodo_(d.periodo), plus = leer_('Plus');
+        var planilla = fuente, plus = leer_('Plus');
         var html = cuerpoMail_('Programación ' + nombrePeriodo_(d.periodo) + ' de ' + u.nombre,
           servs.map(function (s) { return seccionSemana_(s, d.periodo, todo, planilla, plus); }).join(''));
         enviarMail_(dest, u, 'Programación ' + nombrePeriodo_(d.periodo), html);
@@ -1260,7 +1268,9 @@ var ACCIONES_ = {
     var servG = servicioPermitido_(u, d.servicioId);
     // v1.25.0: los servicios que carga Administración (ej.: RAIZEN Dock Sud Supervisores y los RAZ) el supervisor solo los consulta
     if (!esAdmin_(u) && cargaAdmin_(servG)) throw new Error('El servicio ' + servG.Servicio + ' lo carga Administración: no hace falta que lo completes.');
-    exigir_(u, d.periodo > periodoActualServidor_() ? 'programacion' : 'planillas', true);
+    // v1.30: la proyección de un período que ya empezó se guarda aparte (no cambia las Novedades semanales)
+    if (d.soloProyeccion) { if (!puede_(u, 'programacion', true) && !puede_(u, 'planillas', true)) exigir_(u, 'programacion', true); }
+    else exigir_(u, d.periodo > periodoActualServidor_() ? 'programacion' : 'planillas', true);
     // v1.30: el supervisor proyecta el período siguiente solo del 18 al 26 de cada mes
     if (!esAdmin_(u)) ventanaProyeccion_(d.periodo);
     var lock = LockService.getScriptLock();
@@ -1289,6 +1299,17 @@ var ACCIONES_ = {
         });
         return o;
       });
+
+      // v1.30: solo la proyección: queda en Proyectado y la planilla (Novedades semanales) no se toca
+      if (d.soloProyeccion) {
+        guardarProyectado_(d.periodo, d.servicioId, nuevas, true);
+        var resP = { guardado: ahora_(), proyeccion: true };
+        try {
+          var conVacP = nuevas.some(function (f) { return DIAS_COL.some(function (c) { var x = leerCelda_(f[c]); return x.tipo === 'codigo' && x.cod === 'VAC'; }); });
+          if (conVacP) { var tvP = topeVacaciones_(d.periodo); if (tvP.excedido) resP.vacaciones = tvP; }
+        } catch (e) { Logger.log('Tope de vacaciones: ' + e.message); }
+        return resP;
+      }
 
       // Un supervisor no puede cambiar días de semanas ya enviadas.
       if (!esAdmin_(u)) protegerSemanasEnviadas_(d.periodo, d.servicioId, viejas, nuevas);
