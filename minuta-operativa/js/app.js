@@ -428,6 +428,8 @@
     on("#fHoraFin", "change", (v) => { m.horaFin = v; });
     on("#fEntregaA", "input", (v) => { m.entregaA = v; m.entregaALeg = ""; m.entregaAEmp = ""; $("#fEntChip").innerHTML = ""; });
     on("#fObsFin", "input", (v) => { m.observacionesFinales = v; });
+    // Micrófono para dictar (Inicio de turno · Detalle y Cierre de turno · Observaciones finales)
+    ponerMic($("#fDetInicio")); ponerMic($("#fObsFin"));
     autocompletar($("#fEncargado"), (p) => {
       m.encargado = { nombre: p.n, legajo: p.l, empresa: p.e };
       $("#fEncChip").innerHTML = chipPersona(m.encargado);
@@ -589,6 +591,43 @@
     ligar(cont, arr, pintarEquipos);
   }
 
+  /* Dictado por voz: un botón 🎤 dentro del cuadro de texto. Se toca para hablar y otra vez para terminar;
+     lo dicho se agrega al final de lo que ya está escrito. */
+  const VOZ = window.SpeechRecognition || window.webkitSpeechRecognition;
+  let dictando = null;
+  function ponerMic(ta) {
+    if (!ta || ta.dataset.mic) return;
+    ta.dataset.mic = "1";
+    const w = document.createElement("div"); w.className = "dict";
+    ta.parentNode.insertBefore(w, ta); w.appendChild(ta);
+    const b = document.createElement("button"); b.type = "button"; b.className = "mic"; b.title = "Dictar con el micrófono"; b.textContent = "🎤";
+    w.appendChild(b);
+    b.addEventListener("click", (e) => {
+      e.preventDefault(); e.stopPropagation();
+      if (!VOZ) { toast("Este navegador no permite dictar. Usá Chrome (en el celular o en la PC).", true); return; }
+      if (dictando && dictando.ta === ta) { dictando.rec.stop(); return; }
+      if (dictando) dictando.rec.stop();
+      const rec = new VOZ(); rec.lang = "es-AR"; rec.continuous = true; rec.interimResults = false;
+      rec.onresult = (ev) => {
+        for (let i = ev.resultIndex; i < ev.results.length; i++) {
+          if (!ev.results[i].isFinal) continue;
+          let t = String(ev.results[i][0].transcript || "").trim(); if (!t) continue;
+          const v = ta.value, inicio = !v.trim() || /[.!?]\s*$/.test(v);
+          if (inicio) t = t.charAt(0).toUpperCase() + t.slice(1);
+          ta.value = v + (v && !/\s$/.test(v) ? " " : "") + t;
+          ta.dispatchEvent(new Event("input", { bubbles: true }));
+        }
+      };
+      rec.onerror = (ev) => {
+        if (ev.error === "not-allowed" || ev.error === "service-not-allowed") toast("Permití el uso del micrófono para poder dictar.", true);
+        else if (ev.error !== "no-speech" && ev.error !== "aborted") toast("No se pudo escuchar (" + ev.error + ").", true);
+      };
+      rec.onend = () => { b.classList.remove("on"); b.textContent = "🎤"; if (dictando && dictando.rec === rec) dictando = null; };
+      try { rec.start(); dictando = { ta, rec }; b.classList.add("on"); b.textContent = "⏹"; toast("Hablá: lo que digas se escribe. Tocá ⏹ para terminar."); }
+      catch (err) { toast("No se pudo usar el micrófono.", true); }
+    });
+  }
+
   function pintarNovedades() {
     const cont = $("#lNovedades"), arr = S.m.novedades, secs = (S.serv.secciones || []).concat(["Otra"]);
     cont.innerHTML = arr.length ? arr.map((n, i) => `<div class="rowc" data-i="${i}">${cabFila(i + 1, n.hora ? n.hora + " hs" : "")}
@@ -601,6 +640,7 @@
         <label class="f">Resultado<input data-k="resultado" value="${esc(n.resultado)}"></label>
       </div></div>`).join("") : `<div class="hint">Todavía no hay novedades. Tocá “Agregar novedad” (la hora se completa sola).</div>`;
     ligar(cont, arr, pintarNovedades, (i, k, el) => { if (k === "hora") el.closest(".rowc").querySelector(".rowh b").textContent = el.value ? el.value + " hs" : ""; });
+    $$('textarea[data-k="detalle"]', cont).forEach(ponerMic);
     personasFila(cont, arr);
   }
 

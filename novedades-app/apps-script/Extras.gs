@@ -328,9 +328,11 @@ function vacacionesPeriodo_(periodo) {
   return { periodo: periodo, nombre: nombrePeriodo_(periodo), zonas: lista };
 }
 function accionVacaciones_(u, d) {
-  exigir_(u, 'vacaciones', false);
+  // v1.30: desde el aviso del tope de vacaciones, el supervisor también ve todas las zonas
+  if (!(d.tope && u.rol === 'SUPERVISOR')) exigir_(u, 'vacaciones', false);
   var r = vacacionesPeriodo_(d.periodo || periodoActual_());
   r.miZona = String(u.usuario || '').toLowerCase();
+  try { var tv = topeVacaciones_(r.periodo); r.totalDias = tv.total; r.tope = tv.tope; } catch (e) { }
   return r;
 }
 
@@ -468,9 +470,127 @@ function accionConsultaPersona_(u, d) {
   return out;
 }
 
+/* ============================================================
+   v1.30 · CONSULTAS EN TODOS LOS REGISTROS
+   Además del personal y los servicios, se busca en las pestañas de Stock Manager (flota y su documentación,
+   ubicación de los móviles, inventarios de servicios, trabajos realizados, ropa, combustible, ausencias, etc.)
+   y en la planilla de Cargos del Personal. No se muestran el inventario de oficina ni las pestañas de claves.
+   ============================================================ */
+var REG_EXCLUIR_ = ['INVENTARIO', 'USUARIOS Y CONTRASENAS', 'SSO_NOVEDADES', 'DICCIONARIO', 'ULTIMACONEXION', 'PERSONAL'];
+var REG_CARGOS_ = { SS_ID: '1ssAnwYukpM1RFD3LQP4nYZ8YzOyw-X6fJEg36NObEU4', HOJAS: ['CargosFirmados', 'devolucion'] };
+var REG_TITULOS_ = { flota: 'Flota', documentacion: 'Documentación de flota', polizasid: 'Pólizas', statusflota: 'Estado y ubicación de los móviles', objetivos: 'Servicios (objetivos)',
+  inventariosservicios: 'Inventarios de servicios', mantenimiento: 'Mantenimiento (trabajos realizados)', reparaciones: 'Reparaciones (trabajos realizados)', salidas: 'Salidas',
+  solicitudropa: 'Solicitudes de ropa', pedidoropa: 'Pedidos de ropa', combustible: 'Combustible', carroelectrico: 'Carro eléctrico', bicicleta: 'Bicicletas', ausencias: 'Ausencias',
+  vacaciones: 'Vacaciones', agenda: 'Agenda', anotaciones: 'Anotaciones', lineas: 'Líneas', familia: 'Familia', cargosfirmados: 'Cargos del personal (entregas)', devolucion: 'Cargos del personal (devoluciones)' };
+// Palabras que eligen pestañas ("flota de Raizen", "cargos de Pérez", "trabajos realizados del AB123CD")
+var REG_TEMAS_ = [
+  [/^(FLOTA|MOVIL|MOVILES|VEHICULO|VEHICULOS|PATENTE|PATENTES|DOMINIO|CAMIONETA|AUTO|AUTOS)$/, ['flota', 'documentacion', 'polizasid', 'statusflota']],
+  [/^(UBICACION|UBICACIONES|UBICADO|UBICADOS)$/, ['flota', 'statusflota']],
+  [/^(DOCUMENTACION|DOCUMENTOS|VTV|POLIZA|POLIZAS|SEGURO|SEGUROS|CEDULA|TARJETA)$/, ['documentacion', 'polizasid', 'flota']],
+  [/^(INVENTARIO|INVENTARIOS)$/, ['inventariosservicios']],
+  [/^(CARGO|CARGOS|ENTREGA|ENTREGAS|DEVOLUCION|DEVOLUCIONES|UNIFORME|UNIFORMES|ROPA|PRENDA|PRENDAS)$/, ['cargosfirmados', 'devolucion', 'solicitudropa', 'pedidoropa']],
+  [/^(TRABAJOS|REALIZADOS|MANTENIMIENTO|MANTENIMIENTOS|REPARACION|REPARACIONES|TALLER|SERVICE|ARREGLO|ARREGLOS)$/, ['mantenimiento', 'reparaciones']],
+  [/^(COMBUSTIBLE|NAFTA|GASOIL|CARGA|CARGAS)$/, ['combustible']],
+  [/^(LINEA|LINEAS|CELULAR|CELULARES|CHIP)$/, ['lineas']],
+  [/^(SALIDA|SALIDAS)$/, ['salidas']],
+  [/^(AGENDA)$/, ['agenda']], [/^(ANOTACION|ANOTACIONES|NOTAS)$/, ['anotaciones']],
+  [/^(BICICLETA|BICICLETAS)$/, ['bicicleta']], [/^(CARRO|CARROS|ELECTRICO)$/, ['carroelectrico']]
+];
+function claveHoja_(n) { return normT_(n).toLowerCase().replace(/\s+/g, ''); }
+
+// Todas las pestañas con datos de Stock Manager (menos las excluidas) + Cargos, leídas de una sola vez con la API de Sheets
+function leerRegistros_(soloClaves) {
+  var tok = ScriptApp.getOAuthToken(), out = [];
+  var leerLibro = function (ssId, nombres) {
+    if (!nombres.length) return;
+    var url = 'https://sheets.googleapis.com/v4/spreadsheets/' + ssId + '/values:batchGet?valueRenderOption=FORMATTED_VALUE&majorDimension=ROWS&' +
+      nombres.map(function (n) { return 'ranges=' + encodeURIComponent("'" + n.replace(/'/g, "''") + "'"); }).join('&');
+    var r = UrlFetchApp.fetch(url, { headers: { Authorization: 'Bearer ' + tok }, muteHttpExceptions: true });
+    if (r.getResponseCode() !== 200) { Logger.log('Registros (' + ssId + '): ' + r.getResponseCode() + ' ' + r.getContentText().slice(0, 200)); return; }
+    (JSON.parse(r.getContentText()).valueRanges || []).forEach(function (vr, i) { out.push({ hoja: nombres[i], valores: vr.values || [] }); });
+  };
+  var hojasDe = function (ssId) {
+    var r = UrlFetchApp.fetch('https://sheets.googleapis.com/v4/spreadsheets/' + ssId + '?fields=sheets.properties(title,hidden)', { headers: { Authorization: 'Bearer ' + tok }, muteHttpExceptions: true });
+    if (r.getResponseCode() !== 200) return [];
+    return (JSON.parse(r.getContentText()).sheets || []).map(function (h) { return h.properties; }).filter(function (p) { return !p.hidden; }).map(function (p) { return p.title; });
+  };
+  var sm = hojasDe(USUARIOS_SGI.SS_ID).filter(function (n) {
+    var k = normT_(n);
+    if (REG_EXCLUIR_.indexOf(k) >= 0 || /CONTRASE|PASSWORD|CLAVE|SSO/.test(k)) return false;
+    return !soloClaves || soloClaves.indexOf(claveHoja_(n)) >= 0;
+  });
+  try { leerLibro(USUARIOS_SGI.SS_ID, sm); } catch (e) { Logger.log('Registros SM: ' + e.message); }
+  var cg = REG_CARGOS_.HOJAS.filter(function (n) { return !soloClaves || soloClaves.indexOf(claveHoja_(n)) >= 0; });
+  try { leerLibro(REG_CARGOS_.SS_ID, cg); } catch (e) { Logger.log('Registros Cargos: ' + e.message); }
+  return out;
+}
+
+/**
+ * Busca las palabras en todos los registros. Cada fila tiene que tener TODAS las palabras.
+ * Devuelve [{hoja, titulo, cols, filas, total}] con hasta 60 filas por pestaña (si no hay palabras, se trae la pestaña entera hasta 60).
+ */
+function buscarRegistros_(palabras, soloClaves) {
+  palabras = (palabras || []).filter(function (x) { return x && x.length > 1; });
+  if (!palabras.length && !soloClaves) return [];
+  var res = [];
+  leerRegistros_(soloClaves).forEach(function (h) {
+    var v = h.valores; if (!v || v.length < 2) return;
+    var enc = v[0].map(function (x) { return String(x || '').trim(); });
+    // Columnas que no se muestran: claves, firmas o imágenes
+    var ok = enc.map(function (t, i) { return !/PASS|CONTRASE|CLAVE|TOKEN|FIRMA$|IMAGEN|FOTO/.test(normT_(t)); });
+    var filas = [], total = 0;
+    for (var i = 1; i < v.length; i++) {
+      var f = v[i]; if (!f || !f.some(function (x) { return String(x || '').trim(); })) continue;
+      var k = normT_(f.join(' '));
+      if (!palabras.every(function (p) { return k.indexOf(p) >= 0; })) continue;
+      total++;
+      if (filas.length < 60) filas.push(enc.map(function (t, c) {
+        var x = String(f[c] === undefined || f[c] === null ? '' : f[c]);
+        return ok[c] && !/^data:/.test(x) ? (x.length > 300 ? x.slice(0, 300) + '…' : x) : '';
+      }));
+    }
+    if (!total) return;
+    // Se sacan las columnas vacías en todas las filas encontradas
+    var usar = enc.map(function (t, c) { return ok[c] && (t || filas.some(function (f) { return f[c]; })) && filas.some(function (f) { return f[c]; }); });
+    var cl = claveHoja_(h.hoja);
+    res.push({ hoja: h.hoja, titulo: REG_TITULOS_[cl] || h.hoja, cols: enc.filter(function (t, c) { return usar[c]; }),
+      filas: filas.map(function (f) { return f.filter(function (x, c) { return usar[c]; }); }), total: total });
+  });
+  res.sort(function (a, b) { return b.total - a.total; });
+  return res;
+}
+
+// Separa la pregunta en pestañas elegidas (por tema) y palabras a buscar
+function temaRegistros_(texto) {
+  var t = normT_(texto).replace(/[^A-Z0-9Ñ ]/g, ' ').split(' ').filter(Boolean), claves = [], resto = [];
+  var VAC = ['QUE', 'QUIEN', 'DONDE', 'CUANDO', 'COMO', 'CUAL', 'CUALES', 'TIENE', 'TIENEN', 'TUVO', 'ESTA', 'ESTAN', 'DE', 'DEL', 'LA', 'EL', 'LOS', 'LAS', 'EN', 'A', 'AL', 'Y', 'O', 'POR', 'PARA',
+    'CON', 'ME', 'MI', 'SE', 'SU', 'SUS', 'UN', 'UNA', 'HAY', 'ES', 'SON', 'FUE', 'DECIME', 'DAME', 'MOSTRAME', 'BUSCAR', 'BUSCA', 'VER', 'QUIERO', 'SABER', 'TODO', 'TODOS', 'TODAS', 'SOBRE', 'LISTADO', 'LISTA', 'DATOS', 'PERSONAL', 'VIGILADOR', 'VIGILADORA', 'REGISTRO', 'REGISTROS'];
+  t.forEach(function (x) {
+    var tema = REG_TEMAS_.filter(function (m) { return m[0].test(x); })[0];
+    if (tema) tema[1].forEach(function (c) { claves.indexOf(c) < 0 && claves.push(c); });
+    else if (VAC.indexOf(x) < 0) resto.push(x);
+  });
+  return { claves: claves.length ? claves : null, palabras: resto };
+}
+
+// Acción aparte: registros de una persona elegida en Consultas (por apellido y nombre, y por legajo en las columnas de legajo)
+function accionConsultaRegistros_(u, d) {
+  exigir_(u, 'consultas', false);
+  var tm = temaRegistros_(d.texto || '');
+  var pal = d.nombre ? normT_(d.nombre).split(' ').filter(function (x) { return x.length > 2; }).slice(0, 2) : tm.palabras;
+  return { registros: buscarRegistros_(pal, tm.claves) };
+}
+
 function accionConsulta_(u, d) {
   exigir_(u, 'consultas', false);
   var texto = String(d.texto || ''), t = normT_(texto);
+  // v1.30: si la pregunta nombra un tema (flota, cargos, inventarios, trabajos realizados…) se responde con esos registros
+  var tema = temaRegistros_(texto);
+  if (tema.claves) {
+    var regs = buscarRegistros_(tema.palabras, tema.claves);
+    return { tipo: regs.length ? 'registros' : 'nada', texto: texto, registros: regs,
+      mensaje: 'No encontré registros' + (tema.palabras.length ? ' con "' + tema.palabras.join(' ').toLowerCase() + '"' : '') + ' en ' + tema.claves.map(function (c) { return REG_TITULOS_[c] || c; }).join(', ') + '.' };
+  }
   var periodo = d.periodo || periodoDesdeTexto_(texto) || periodoActual_();
   var toks = t.replace(/[^A-Z0-9Ñ ]/g, ' ').split(' ').filter(function (x) { return x && CONS_VACIAS_.indexOf(x) < 0 && !/^\d{4}$/.test(x); });
   var personal = personalSGI_(), servicios = leer_('Servicios');
@@ -504,7 +624,12 @@ function accionConsulta_(u, d) {
       servicios.filter(function (s) { return mios[s.Id] && (mismoNombre_(s.Cliente, texto) || mismoNombre_(s.Servicio, texto)); })[0] || null;
   }
   if (!cand.length && serv) return { tipo: 'servicio', periodo: periodo, nombrePeriodo: nombrePeriodo_(periodo), servicio: resumenServicioConsulta_(serv, periodo) };
-  if (!cand.length) return { tipo: 'nada', periodo: periodo, mensaje: 'No encontré a nadie ni ningún servicio con "' + texto + '". Probá con el apellido, el legajo o el nombre del cliente.' };
+  if (!cand.length) {
+    // v1.30: no es una persona ni un servicio → se busca en todos los registros (patente, número de inventario, prenda, lugar…)
+    var regs2 = []; try { regs2 = buscarRegistros_(tema.palabras, null); } catch (e) { Logger.log('Registros: ' + e.message); }
+    if (regs2.length) return { tipo: 'registros', periodo: periodo, texto: texto, registros: regs2 };
+    return { tipo: 'nada', periodo: periodo, mensaje: 'No encontré a nadie, ningún servicio ni ningún registro con "' + texto + '". Probá con el apellido, el legajo, el nombre del cliente, una patente o un tema (flota, cargos, inventarios, trabajos realizados…).' };
+  }
   if (cand.length > 1) {
     return { tipo: 'opciones', periodo: periodo, nombrePeriodo: nombrePeriodo_(periodo), texto: texto,
       opciones: cand.slice(0, 40).map(function (p) { return { Legajo: p.Legajo, Nombre: p.Nombre, Empresa: p.Empresa, Estado: p.Estado, Clientes: (dondeEsta[String(p.Legajo)] || []).join(', ') }; }) };

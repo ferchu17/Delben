@@ -417,6 +417,9 @@ table.g.xl input.cel {
 table.g.xl td.sin-legajo { box-shadow: none; }
 table.g.xl td.sin-legajo .nom-in { color: #c00000; }
 table.g.xl td.x-tot { font-weight: 400; }
+table.g.xl .x-hsp { text-align: right; padding: 0 4px; background: #f3f6fa; }
+table.g.xl th.x-hsp { background: #dde6f1; font-size: 11px; line-height: 1.1; }
+table.g.xl td.x-ext.pos { color: #0070c0; font-weight: 700; }
 
 /* turnos pintados */
 table.g.xl td.noche { background: #a6a6a6; }
@@ -991,6 +994,10 @@ table.g.xl td.fijo.xe, table.g.xl th.fijo.xe { border-left: 1px solid #000 !impo
 /* v1.22.10: Consultas paso a paso */
 .chat-cons { display: flex; flex-direction: column; gap: 10px; max-width: 980px; }
 .chat-log { min-height: 300px; max-height: 62vh; overflow: auto; display: flex; flex-direction: column; gap: 8px; padding: 6px; background: linear-gradient(180deg, #f8fbff, #f2f6fb); border-radius: 10px; }
+.cons-reg { margin-top: 8px; background: #fff; border: 1px solid #dfe6ef; border-radius: 8px; padding: 6px 8px; }
+.cons-reg summary { cursor: pointer; }
+.cons-reg .tabla-wrap { max-height: 320px; overflow: auto; margin-top: 6px; }
+.cons-reg td, .cons-reg th { font-size: 12px; white-space: nowrap; }
 .chat-m { max-width: 85%; padding: 9px 12px; border-radius: 14px; line-height: 1.45; font-size: 14.5px; box-shadow: 0 1px 3px rgba(16,40,80,.08); }
 .chat-m.bot { align-self: flex-start; background: #fff; border: 1px solid #dbe4ef; border-bottom-left-radius: 4px; }
 .chat-m.yo { align-self: flex-end; background: linear-gradient(180deg, #2f80ed, #1660c9); color: #fff; border-bottom-right-radius: 4px; }

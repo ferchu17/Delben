@@ -113,6 +113,9 @@ function periodoActual() {
 function periodoTrabajo() {
   return new Date().getDate() === 26 ? sumarMes(periodoActual(), -1) : periodoActual();
 }
+// v1.30: ventana para proyectar el período siguiente: del 18 al 26 de cada mes
+const PROY_DESDE = 18, PROY_HASTA = 26;
+function enVentanaProy() { const d = new Date().getDate(); return d >= PROY_DESDE && d <= PROY_HASTA; }
 function sumarMes(p, k) {
   const [y, m] = p.split('-').map(Number);
   const d = new Date(Date.UTC(y, m - 1 + k, 1));
@@ -1049,7 +1052,8 @@ async function vPlanilla(params) {
   if (params.modo) { S.modo = params.modo; S.perTab = {}; }
   S.modo = S.modo || 'proy'; S.perTab = S.perTab || {};
   if (params.periodo) S.perTab[servicioId] = params.periodo;
-  S.periodo = S.perTab[servicioId] || (window.MODO_DEMO ? '2026-08' : periodoTrabajo());
+  // v1.30: del 18 al 26 la Proyección abre el período siguiente (el que se está proyectando)
+  S.periodo = S.perTab[servicioId] || (window.MODO_DEMO ? '2026-08' : S.modo === 'proy' && enVentanaProy() ? sumarMes(periodoTrabajo(), 1) : periodoTrabajo());
   const per = S.periodo, key = per + '|' + servicioId;
   S.cachePl = S.cachePl || {};
   const enMemoria = S.cachePl[key];
@@ -1141,7 +1145,10 @@ function armarPlanilla(r, servicioId, params) {
     soloVer: params.diagrama ? !puede('diagrama', true) : !puede(S.periodo > periodoTrabajo() ? 'programacion' : 'planillas', true),
     // v1.22.9: el supervisor que ya envió la proyección no la puede cambiar: los cambios van por Novedades semanales.
     // v1.25.0: tampoco si ya está cargada y el período empezó (los cambios van por Novedades semanales, desde la semana que informa)
-    proyCerrada: !params.diagrama && S.modo !== 'nov' && !esAdmin() && (!!r.programacion || (S.periodo <= periodoTrabajo() && (r.proyectado || []).length > 0)),
+    // v1.30: del 18 al 26 el supervisor puede modificar la proyección del período siguiente aunque ya la haya enviado
+    proyCerrada: !params.diagrama && S.modo !== 'nov' && !esAdmin() && ((!!r.programacion && !(S.periodo > periodoTrabajo() && enVentanaProy())) || (S.periodo <= periodoTrabajo() && (r.proyectado || []).length > 0)),
+    // v1.30: fuera del 18 al 26, el período siguiente es solo para ver
+    fueraVentana: !params.diagrama && !esAdmin() && S.periodo > periodoActual() && !enVentanaProy(),
     // v1.25.0: servicio que carga Administración: el supervisor solo lo consulta
     cargaAdminSup: !esAdmin() && cargaAdmin(r.servicio),
     // Lo cargado en los otros servicios en el mismo período, para avisar si alguien queda en dos lugares a la vez.
@@ -1150,7 +1157,7 @@ function armarPlanilla(r, servicioId, params) {
       Dias: Array.from({ length: 31 }, (_, i) => o['D' + pad(i + 1)] || '')
     }))
   };
-  if (S.pl.proyCerrada || S.pl.cargaAdminSup) S.pl.soloVer = true;
+  if (S.pl.proyCerrada || S.pl.cargaAdminSup || S.pl.fueraVentana) S.pl.soloVer = true;
   prepararProyectado(r.proyectado || []);
   // v1.22.8: Ctrl+Z / Ctrl+Y
   S.undoPl = []; S.redoPl = []; S.fotoPl = fotoPl(); SEL.extra = [];
@@ -1237,7 +1244,8 @@ function renderPlanilla(conservarScroll) {
 
   $('#main').innerHTML =
     (pl.diagrama ? htmlDiagramaTabs(pl) : '') +
-    (pl.cargaAdminSup ? '<div class="solo-ver solo-adm">Este servicio lo carga <b>Administración</b>: no hace falta que lo completes. Lo podés ver, pero no modificar.</div>'
+    (pl.fueraVentana ? '<div class="solo-ver">La proyección de <b>' + esc(nombrePeriodo(pl.periodo)) + '</b> se puede modificar del <b>' + PROY_DESDE + ' al ' + PROY_HASTA + '</b> de cada mes. Ahora la podés ver, pero no modificar.</div>'
+      : pl.cargaAdminSup ? '<div class="solo-ver solo-adm">Este servicio lo carga <b>Administración</b>: no hace falta que lo completes. Lo podés ver, pero no modificar.</div>'
       : pl.proyCerrada ? (pl.progEnviada ? '<div class="solo-ver">La proyección ya se envió' + (pl.progEnviada.FechaEnvio ? ' (' + esc(pl.progEnviada.FechaEnvio) + ')' : '') + ': no se puede modificar.'
         : '<div class="solo-ver">La proyección de este período ya está cargada y el período empezó: no se puede modificar.') +
         ' Los cambios se cargan en <b>Novedades semanales</b>, desde la semana que estás informando en adelante.</div>'
@@ -1460,6 +1468,7 @@ async function guardarPestanasPend(forzar) {
       mostrarConflictos(res.conflictos, { alGuardar: esAdmin() ? () => guardarPlanilla(false, true) : null });
       return false;
     }
+    if (res && res.vacaciones) avisoTopeVacaciones(res.vacaciones);
     delete S.tabsPend[p.key];
     if (S.cachePl) delete S.cachePl[p.key];
     S.cargadaSem = S.cargadaSem || {}; S.cargadaSem[p.key] = lunesSemana();
@@ -1702,9 +1711,25 @@ const DIAS_XL = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sab', 'Dom'];
  * "Cobertura de Servicios", filas de cobertura, Total por día, Contratado x día,
  * Diferencia diurno, sección de Instrucción o Retén y la tabla de códigos.
  */
+// v1.30: al final de cada fila, las horas de la persona en el período (este servicio + los otros) y sus horas extras
+// (Total - horas normales; normales = 208 menos los días de ausentismo x 208 / días del período, como en el STD)
+const TH_HS_EXTRAS = '<th class="x-hsp x-calibri" rowspan="2" title="Horas de la persona en el período, sumando todos los servicios">Hs.<br>período</th>' +
+  '<th class="x-hsp x-calibri" rowspan="2" title="Horas extras del período (más de 208, descontando el ausentismo)">Hs.<br>extras</th>';
+const HS_BASE = 208, COD_AUS = ['INJ', 'LSG', 'ENF', 'ART', 'VAC', 'SUS', 'NAC', 'MAT', 'FALL', 'RES', 'CAS', 'BAJA'];
+function horasYExtras(f, n, horasDia) {
+  const hs = horasDia[clavePersona(f)] || [];
+  let tot = 0, aqui = 0, aus = 0;
+  for (let i = 0; i < n; i++) {
+    (hs[i] || []).forEach(x => { tot += x.h; if (x.id === S.pl.servicioId) aqui += x.h; });
+    const p = parseCelda(f.Dias[i]);
+    if (p.t === 'codigo' && COD_AUS.indexOf(valorBase(f.Dias[i])) >= 0) aus++;
+  }
+  const normales = HS_BASE - (n ? aus * HS_BASE / n : 0), tvn = tot - normales;
+  return { tot: Math.round(tot * 100) / 100, otros: Math.round((tot - aqui) * 100) / 100, aus, extras: tvn > 0 && tvn < HS_BASE ? Math.round(tvn * 100) / 100 : 0 };
+}
 function htmlGrilla() {
   const pl = S.pl, n = pl.info.n, serv = pl.serv;
-  const ancho = n + 6; // A..E + días + Total
+  const ancho = n + 8; // A..E + días + Total + Hs. del período + Extras (v1.30)
   // Fila de días (número) y fila de días de la semana.
   const filaNumeros = () => {
     let t = '';
@@ -1724,7 +1749,7 @@ function htmlGrilla() {
   // v1.21: el ancho del nombre y del turno se ajusta al texto más largo (el texto nunca pasa a otra línea)
   const largo = k => Math.max(0, ...pl.filas.map(f => String(f[k] || '').length));
   const wNom = Math.max(291, Math.ceil(largo('Nombre') * 8.6) + 16), wTur = Math.max(125, Math.ceil(largo('Turno') * 8) + 14);
-  const anchos = [30, 79, 83, wNom, wTur].concat(new Array(n).fill(38)).concat([58, 24]);
+  const anchos = [30, 79, 83, wNom, wTur].concat(new Array(n).fill(38)).concat([58, 64, 58, 24]);
   let h = '<table class="g xl" style="--xe-left:' + (192 + wNom) + 'px;width:' + anchos.reduce((a, b) => a + b, 0) + 'px"><colgroup>' +
     anchos.map(w => '<col style="width:' + w + 'px">').join('') + '</colgroup><tbody>';
   // Fila 1: empresa, cliente, código
@@ -1732,18 +1757,18 @@ function htmlGrilla() {
     '<td class="fijo xc x-emp1">' + esc(serv.Empresa || '') + (serv.Empresa ? '.' : '') + '</td>' +
     '<td class="fijo xdn x-cli1">' + esc(serv.Cliente || serv.Servicio) + '</td>' +
     '<td class="fijo xe x-cod1">' + esc(serv.Codigo || '') + '</td>' +
-    '<td colspan="' + (n + 2) + '" class="x-nota1">' + esc(serv.Nota || '') + '</td></tr>';
+    '<td colspan="' + (n + 4) + '" class="x-nota1">' + esc(serv.Nota || '') + '</td></tr>';
   // Fila 2: Personal y STD
   h += '<tr class="x-r2"><td class="fijo xa"></td><td class="fijo xb"></td><td class="fijo xc"></td>' +
     '<td class="fijo xdn x-btn"><a href="#" data-xl="personal">Personal</a></td>' +
     '<td class="fijo xe x-btn"><a href="#" data-xl="std">STD</a></td>' +
-    '<td colspan="' + (n + 2) + '"></td></tr>';
+    '<td colspan="' + (n + 4) + '"></td></tr>';
   // Fila 3: barra amarilla
   h += '<tr class="x-r3"><td class="fijo xa"></td><td colspan="' + (ancho - 1) + '" class="x-barra"><span>Cobertura de Servicios</span></td><td></td></tr>';
   // Encabezado de cobertura
   h += '<tr class="x-hd1"><th class="fijo xa" rowspan="2"></th><th class="fijo xb x-calibri" rowspan="2">Empresa</th>' +
     '<th class="fijo xc" rowspan="2">LP</th><th class="fijo xdn" rowspan="2">APELLIDO Y NOMBRE' + btnBorrarPers('COBERTURA') + '</th>' +
-    '<th class="fijo xe" rowspan="2">Turno</th>' + filaNumeros() + '<th class="x-tot x-calibri" rowspan="2">Total</th><th class="x-acc" rowspan="2"></th></tr>' +
+    '<th class="fijo xe" rowspan="2">Turno</th>' + filaNumeros() + '<th class="x-tot x-calibri" rowspan="2">Total</th>' + TH_HS_EXTRAS + '<th class="x-acc" rowspan="2"></th></tr>' +
     '<tr class="x-hd2">' + filaSemana() + '</tr>';
 
   let nro = 0;
@@ -1753,45 +1778,45 @@ function htmlGrilla() {
     let t = '<tr class="x-res ' + clase + '"><td class="fijo xa x-vacia"></td><td class="fijo xb x-vacia"></td><td class="fijo xc x-vacia"></td>' +
       '<td class="fijo xdn x-etq">' + etq + '</td><td class="fijo xe"></td>';
     for (let i = 0; i < n; i++) t += '<td id="' + id + '-' + i + '" class="' + bordeSemanaInformada(i, ult ? 'B' : '').trim() + '"></td>';
-    return t + '<td class="x-tot" id="' + id + '-T"></td><td class="x-acc"></td></tr>';
+    return t + '<td class="x-tot" id="' + id + '-T"></td><td class="x-hsp"></td><td class="x-hsp"></td><td class="x-acc"></td></tr>';
   };
   h += resumen('rsT', 'TOTAL POR DIA', 'x-verde') +
        resumen('rsC', 'CONTRATADO X DÍA', 'x-amarilla') +
        resumen('rsD', 'DIFERENCIA DIURNO', 'x-verde x-dif', true);
   // Etiqueta TOTAL azul debajo de la columna Total
   h += '<tr class="x-blanca"><td class="fijo xa x-vacia"></td><td class="fijo xb x-vacia"></td><td class="fijo xc x-vacia"></td><td class="fijo xdn x-vacia"></td><td class="fijo xe x-vacia"></td>' +
-    '<td colspan="' + n + '" class="x-vacia"></td><td class="x-total-azul">TOTAL</td><td class="x-acc"></td></tr>';
+    '<td colspan="' + n + '" class="x-vacia"></td><td class="x-total-azul">TOTAL</td><td class="x-vacia"></td><td class="x-vacia"></td><td class="x-acc"></td></tr>';
 
   // Sección de Instrucción o Retén
   h += '<tr class="x-r3"><td class="fijo xa x-vacia"></td><td class="fijo xb x-vacia"></td><td class="fijo xc x-vacia"></td>' +
-    '<td colspan="' + (n + 3) + '" class="x-barra x-barra2"><span>RETEN / INSTRUCCIÓN</span></td><td></td></tr>';
+    '<td colspan="' + (n + 5) + '" class="x-barra x-barra2"><span>RETEN / INSTRUCCIÓN</span></td><td></td></tr>';
   h += '<tr class="x-hd1"><th class="fijo xa" rowspan="2"></th><th class="fijo xb x-calibri" rowspan="2">Empresa</th>' +
     '<th class="fijo xc" rowspan="2">LP</th><th class="fijo xdn" rowspan="2">APELLIDO Y NOMBRE' + btnBorrarPers('RETEN') + '</th>' +
-    '<th class="fijo xe" rowspan="2">Instrucción<br>o Reten</th>' + filaNumeros() + '<th class="x-tot x-calibri" rowspan="2">Total</th><th class="x-acc" rowspan="2"></th></tr>' +
+    '<th class="fijo xe" rowspan="2">Instrucción<br>o Reten</th>' + filaNumeros() + '<th class="x-tot x-calibri" rowspan="2">Total</th>' + TH_HS_EXTRAS + '<th class="x-acc" rowspan="2"></th></tr>' +
     '<tr class="x-hd2">' + filaSemana() + '</tr>';
   let nr = 0;
   pl.filas.forEach((f, r) => { if (f.Seccion === 'RETEN') h += htmlFila(f, r, ++nr); });
   let t = '<tr class="x-res x-verde2"><td class="fijo xa x-vacia"></td><td class="fijo xb x-vacia"></td>' +
     '<td class="fijo xc x-etq2" colspan="1"></td><td class="fijo xdn x-etq2 x-centro">Total por dia Instrucción / Reten</td><td class="fijo xe x-etq2"></td>';
   for (let i = 0; i < n; i++) t += '<td id="rsR-' + i + '" class="' + bordeSemanaInformada(i, 'B').trim() + '"></td>';
-  h += t + '<td class="x-vacia" id="rsR-T"></td><td class="x-acc"></td></tr>';
+  h += t + '<td class="x-vacia" id="rsR-T"></td><td class="x-vacia"></td><td class="x-vacia"></td><td class="x-acc"></td></tr>';
 
   // v1.22.3: Eventuales / Adicional ya no se usa (las horas de más de Cobertura de Servicios salen como adicionales en la conformación).
   // Solo se muestra si la planilla tiene filas viejas de eventuales con datos, para no perderlas.
   if (!pl.filas.some(f => f.Seccion === 'EVENTO' && (f.Nombre || f.Dias.some(v => valorBase(v))))) return h + '</tbody></table>';
-  h += '<tr class="x-blanca"><td colspan="' + (n + 7) + '" class="x-vacia" style="height:14px"></td></tr>' +
+  h += '<tr class="x-blanca"><td colspan="' + (n + 9) + '" class="x-vacia" style="height:14px"></td></tr>' +
     '<tr class="x-r3"><td class="fijo xa x-vacia"></td><td class="fijo xb x-vacia"></td><td class="fijo xc x-vacia"></td>' +
-    '<td colspan="' + (n + 3) + '" class="x-barra x-barra2 x-barra-ev"><span>EVENTUALES / ADICIONAL</span></td><td></td></tr>';
+    '<td colspan="' + (n + 5) + '" class="x-barra x-barra2 x-barra-ev"><span>EVENTUALES / ADICIONAL</span></td><td></td></tr>';
   h += '<tr class="x-hd1"><th class="fijo xa" rowspan="2"></th><th class="fijo xb x-calibri" rowspan="2">Empresa</th>' +
     '<th class="fijo xc" rowspan="2">LP</th><th class="fijo xdn" rowspan="2">APELLIDO Y NOMBRE</th>' +
-    '<th class="fijo xe" rowspan="2">Evento / Puesto</th>' + filaNumeros() + '<th class="x-tot x-calibri" rowspan="2">Total</th><th class="x-acc" rowspan="2"></th></tr>' +
+    '<th class="fijo xe" rowspan="2">Evento / Puesto</th>' + filaNumeros() + '<th class="x-tot x-calibri" rowspan="2">Total</th>' + TH_HS_EXTRAS + '<th class="x-acc" rowspan="2"></th></tr>' +
     '<tr class="x-hd2">' + filaSemana() + '</tr>';
   let ne = 0;
   pl.filas.forEach((f, r) => { if (f.Seccion === 'EVENTO') h += htmlFila(f, r, ++ne); });
   let te = '<tr class="x-res x-ev"><td class="fijo xa x-vacia"></td><td class="fijo xb x-vacia"></td>' +
     '<td class="fijo xc x-etq2"></td><td class="fijo xdn x-etq2 x-centro">Total por dia Eventuales / Adicional</td><td class="fijo xe x-etq2"></td>';
   for (let i = 0; i < n; i++) te += '<td id="rsE-' + i + '" class="' + bordeSemanaInformada(i, 'B').trim() + '"></td>';
-  h += te + '<td class="x-tot" id="rsE-T"></td><td class="x-acc"></td></tr>';
+  h += te + '<td class="x-tot" id="rsE-T"></td><td class="x-hsp"></td><td class="x-hsp"></td><td class="x-acc"></td></tr>';
   return h + '</tbody></table>';
 }
 
@@ -1942,7 +1967,7 @@ function htmlFila(f, r, nro) {
       '" value="' + esc(soloNumero(f.Dias[i])) + '" maxlength="13" autocomplete="off"' + (b ? ' readonly' : '') + '></td>';
   }
   const vacia = !f.Nombre && !f.Dias.some(Boolean);
-  h += '<td class="x-tot" id="tot-' + r + '"></td><td class="x-acc">' +
+  h += '<td class="x-tot" id="tot-' + r + '"></td><td class="x-hsp" id="hsp-' + r + '"></td><td class="x-hsp x-ext" id="ext-' + r + '"></td><td class="x-acc">' +
     (tieneBloq || vacia ? '' : '<button title="Quitar fila" data-quitar="' + r + '">×</button>') + '</td></tr>';
   return h;
 }
@@ -2045,6 +2070,7 @@ function recalcular() {
   if (!pl || !$('#rsT-0')) return;
   const n = pl.info.n;
   const T = new Array(n).fill(0), R = new Array(n).fill(0), E = new Array(n).fill(0);
+  let HD = null;
   pl.filas.forEach((f, r) => {
     let tot = 0;
     for (let i = 0; i < n; i++) {
@@ -2055,6 +2081,17 @@ function recalcular() {
     }
     const el = $('#tot-' + r);
     if (el) el.textContent = f.Nombre || tot ? fmtN(tot) : '';
+    const eh = $('#hsp-' + r), ee = $('#ext-' + r);
+    if (eh && ee) {
+      if (!(f.Nombre || f.Legajo)) { eh.textContent = ''; ee.textContent = ''; eh.removeAttribute('title'); }
+      else {
+        const x = horasYExtras(f, n, HD || (HD = horasPorPersonaDia(pl.periodo)));
+        eh.textContent = fmtN(x.tot);
+        eh.title = 'Este servicio: ' + fmtN(Math.round((x.tot - x.otros) * 100) / 100) + ' hs' + (x.otros ? ' · otros servicios: ' + fmtN(x.otros) + ' hs' : '') + (x.aus ? ' · ' + x.aus + ' días de ausentismo' : '');
+        ee.textContent = x.extras ? fmtN(x.extras) : '';
+        ee.classList.toggle('pos', !!x.extras);
+      }
+    }
   });
   let sT = 0, sC = 0;
   const colorDif = (el, v) => { el.classList.remove('neg', 'pos'); if (v < 0) el.classList.add('neg'); else if (v > 1) el.classList.add('pos'); };
@@ -2374,6 +2411,7 @@ async function guardarPlanilla(silencioso, forzar) {
     pl.filas = filas;
     actualizarCachePl(pl, filas);
     marcarSucio(false);
+    if (res && res.vacaciones) setTimeout(() => avisoTopeVacaciones(res.vacaciones), 400);
     if (pl.modoNov) { S.cargadaSem = S.cargadaSem || {}; S.cargadaSem[pl.periodo + '|' + pl.servicioId] = lunesSemana(); }
     if (!silencioso) toast(nOtras ? 'Se guardaron ' + (nOtras + 1) + ' pestañas.' : 'Planilla guardada.');
     renderPlanilla(true);
@@ -2465,7 +2503,13 @@ function ventanaExcel() {
     $('#xlEstado').textContent = 'Armando el Excel…';
     try {
       const r = await api('excel', { periodo: pl.periodo, servicioId: pl.servicioId, alcance, modo, para });
-      if (r.url) {
+      if (r.b64) {
+        // v1.30: se baja directo (el enlace de Google pedía permiso a los supervisores)
+        descargarBase64(r.b64, r.nombre || 'Delben.xlsx');
+        $('#xlEstado').innerHTML = 'Listo: se descargó <b>' + esc(r.nombre || 'el Excel') + '</b>. <a href="#" id="xlOtraVez">Descargar de nuevo</a>' +
+          (r.avisos && r.avisos.length ? '<br><span style="color:#8a5a00">' + r.avisos.map(esc).join('<br>') + '</span>' : '');
+        $('#xlOtraVez').onclick = ev => { ev.preventDefault(); descargarBase64(r.b64, r.nombre || 'Delben.xlsx'); };
+      } else if (r.url) {
         $('#xlEstado').innerHTML = 'Listo: <a target="_blank" rel="noopener" href="' + esc(r.url) + '">Abrir la planilla</a> · <a target="_blank" rel="noopener" href="' + esc(r.xlsx) + '">Descargar en Excel</a>' +
           (r.avisos && r.avisos.length ? '<br><span style="color:#8a5a00">' + r.avisos.map(esc).join('<br>') + '</span>' : '');
       } else if (r.enviado) {
@@ -5078,6 +5122,9 @@ function htmlTablaSTDXL(r, inf, clave) {
 /* ---------- v1.21.2 · STD del sector con el formato que mandan los supervisores (pestaña STD de su planilla) ----------
  * armarSTDSup arma la grilla (valores, estilos, colores de los estados, celdas combinadas, alturas) y de ahí salen
  * la tabla de la pantalla (htmlSTDSup, con autofiltros) y el Excel (bajarSTDSup), así los dos son iguales. */
+// Colores de los códigos en el STD (los mismos del formato condicional de las planillas): [fondo, letra]
+const STD_COD_COL = { F: ['#92d050', '#000000'], INJ: ['#ff0000', '#ffff00'], SUS: ['#7030a0', '#ffffff'], ENF: ['#cc9900', '#000000'], ART: ['#ff7c80', '#000000'],
+  RES: ['#ffff00', '#000000'], VAC: ['#8497b0', '#ffffff'], DV: ['#8497b0', '#ffff00'], BAJA: ['#0d0d0d', '#ffffff'] };
 function armarSTDSup(r) {
   const F = window.FORMATO_STD.stdsup, W = F.W, n = r.n, D0 = F.diasCol0, K0 = F.codCol0;
   const ver = c => !F.ocultas[c] && !(c >= D0 + n && c < D0 + 31);
@@ -5106,16 +5153,32 @@ function armarSTDSup(r) {
   });
   // Personas
   const SD = expRLE(F.fila.s), M = [];
-  const valorDia = v => { const b = valorBase(String(v || '')); if (!b) return ''; return /^\d+([.,]\d+)?$/.test(b) ? Number(b.replace(',', '.')) : b; };
-  r.filas.forEach(f => {
+  // v1.30: "12N" / "12T" van como número (sin la letra) y con el color de la planilla: gris la noche, celeste la tarde;
+  // los códigos (F, INJ, VAC, ENF, ART...) con sus colores, como en las planillas Excel.
+  const COL_DIA = {};
+  const valorDia = (v, fi, i) => {
+    const b = valorBase(String(v || '')); if (!b) return '';
+    const m = b.replace(',', '.').match(/^(\d{1,2}(?:\.5)?)([NDT])?$/);
+    if (m) { if (m[2] === 'N') COL_DIA[fi + ',' + i] = { bg: '#a6a6a6' }; else if (m[2] === 'T') COL_DIA[fi + ',' + i] = { bg: '#9dc3e6' }; return Number(m[1]); }
+    if (/^\d+([.,]\d+)?$/.test(b)) return Number(b.replace(',', '.'));
+    const cx = STD_COD_COL[b] || (b.indexOf('F') >= 0 && !/^\d/.test(b) ? STD_COD_COL.F : null);
+    if (cx) COL_DIA[fi + ',' + i] = { bg: cx[0], fc: cx[1], b: 1 };
+    return b;
+  };
+  r.filas.forEach((f, fi) => {
     const row = new Array(W).fill('');
     row[0] = Number(f.ord) || f.ord; row[1] = f.emp || ''; row[2] = f.leg ? (Number(f.leg) || f.leg) : ''; row[3] = f.nom || ''; row[4] = String(f.cli || '').toUpperCase(); row[5] = f.turno || '';
     const raw = f.raw || (f.dias || []).map(d => (typeof d[0] === 'number' ? (d[0] || 0) + (d[1] || 0) : d[0]) || '');
-    for (let i = 0; i < n; i++) row[D0 + i] = valorDia(raw[i]);
+    for (let i = 0; i < n; i++) row[D0 + i] = valorDia(raw[i], fi, i);
     F.cods.forEach((cod, k) => { let c = 0; for (let i = 0; i < n; i++) if (String(row[D0 + i]) === cod) c++; row[K0 + k] = c; });
     M.push(row);
     const fila = { h: F.fila.h, celdas: [] };
-    for (let c = 0; c < W; c++) { const x = celda(row[c], SD[c], 9, c); if (c === 4 && f.sid) x.sid = f.sid; fila.celdas.push(x); }
+    for (let c = 0; c < W; c++) {
+      const x = celda(row[c], SD[c], 9, c); if (c === 4 && f.sid) x.sid = f.sid;
+      const cd = c >= D0 && c < D0 + n ? COL_DIA[fi + ',' + (c - D0)] : null;
+      if (cd) x.x = Object.assign({}, x.x || {}, cd);
+      fila.celdas.push(x);
+    }
     filas.push(fila);
   });
   // Filas en blanco y Totales (como el archivo)
@@ -6090,18 +6153,32 @@ async function ventanaSTDSector(periodo) {
   } catch (e) { toast(e.message, true); }
 }
 
+/* ---------- v1.30 · Tope de vacaciones de todas las zonas ---------- */
+function avisoTopeVacaciones(v) {
+  if (!v || !v.excedido || $('#vacTopeVer')) return;
+  const m = modal('<div class="aviso-doble"><div class="aviso-icono">!</div><h3>Estamos excedidos en vacaciones</h3>' +
+    '<p>Entre todas las zonas hay <b>' + fmtN(v.total) + ' días</b> de vacaciones proyectadas e informadas en <b>' + esc(v.nombre || nombrePeriodo(v.periodo)) + '</b>. ' +
+    'El tope es de <b>' + fmtN(v.tope) + ' días</b>.</p><p class="sub">Lo que guardaste quedó guardado. Revisá con tu jefe antes de dar más vacaciones.</p></div>' +
+    '<div class="pie"><button class="btn" id="vacTopeCerrar">Cerrar</button><button class="btn prim" id="vacTopeVer">Ver vacaciones proyectadas e informadas en todas las zonas por sector</button></div>');
+  m.classList.add('modal-aviso');
+  $('#vacTopeCerrar').onclick = cerrarModal;
+  $('#vacTopeVer').onclick = () => { cerrarModal(); ventanaVacaciones(v.periodo, true); };
+}
+
 /* ---------- Vacaciones por zona ---------- */
-async function ventanaVacaciones(periodo) {
+async function ventanaVacaciones(periodo, desdeTope) {
   periodo = periodo || (S.pl && S.pl.periodo) || periodoActual();
   const fs = ventanaGrande('Vacaciones por zona', '<div class="barra"><label class="campo">Período<select id="vacPer">' + selPeriodos(periodo, [periodo]) + '</select></label>' +
     '<p class="sub" style="margin:0">Diagramadas = lo de la proyección · Informadas = lo cargado en la planilla. Tocá una zona para ver los vigiladores.</p></div><div id="vacCuerpo"><div class="cargando">Buscando…</div></div>');
   const cargar = async p => {
     $('#vacCuerpo', fs).innerHTML = '<div class="cargando">Buscando…</div>';
     let r;
-    try { r = await api('vacaciones', { periodo: p }); } catch (e) { $('#vacCuerpo', fs).innerHTML = htmlError(e); return; }
+    try { r = await api('vacaciones', { periodo: p, tope: desdeTope ? 1 : 0 }); } catch (e) { $('#vacCuerpo', fs).innerHTML = htmlError(e); return; }
     if (r.demo) { $('#vacCuerpo', fs).innerHTML = '<div class="vacio-msg">' + esc(r.demo) + '</div>'; return; }
     const tot = k => r.zonas.reduce((s, z) => s + z[k], 0);
-    $('#vacCuerpo', fs).innerHTML = '<div class="tabla-wrap" style="max-width:900px"><table class="t"><thead><tr><th>Zona (supervisor)</th><th class="n">Vigiladores diagramados</th><th class="n">Días diagramados</th><th class="n">Vigiladores informados</th><th class="n">Días informados</th></tr></thead><tbody>' +
+    $('#vacCuerpo', fs).innerHTML = (r.tope ? '<p class="' + (r.totalDias >= r.tope ? 'solo-ver' : 'sub') + '" style="max-width:900px">Total de todas las zonas (proyectadas e informadas, cada vigilador una vez): <b>' + fmtN(r.totalDias) + ' días</b> · tope <b>' + fmtN(r.tope) + ' días</b>' +
+      (r.totalDias >= r.tope ? ' · <b>excedido</b>' : '') + '</p>' : '') +
+      '<div class="tabla-wrap" style="max-width:900px"><table class="t"><thead><tr><th>Zona (supervisor)</th><th class="n">Vigiladores diagramados</th><th class="n">Días diagramados</th><th class="n">Vigiladores informados</th><th class="n">Días informados</th></tr></thead><tbody>' +
       (r.zonas.length ? r.zonas.map((z, k) => '<tr' + (z.zona === r.miZona ? ' class="mi-zona"' : '') + '><td><a href="#" data-vz="' + k + '"><b>' + esc(z.nombre) + '</b></a>' + (z.zona === r.miZona ? ' <span class="pill ok">tu zona</span>' : '') + '</td>' +
         '<td class="n">' + nz(z.cantDiag) + '</td><td class="n">' + nz(z.diasDiag) + '</td><td class="n">' + nz(z.cantInf) + '</td><td class="n">' + nz(z.diasInf) + '</td></tr>').join('')
         : '<tr><td colspan="5" class="vacio-msg">Nadie tiene vacaciones en ' + esc(r.nombre) + '.</td></tr>') + '</tbody>' +
@@ -6267,7 +6344,7 @@ function vConsultas() {
   const voz = window.SpeechRecognition || window.webkitSpeechRecognition;
   CONS.persona = null; CONS.datos = null; CONS.periodo = '';
   $('#main').innerHTML = '<div class="barra"><div><h1>Consultas</h1><p class="sub" style="margin:0">Preguntá como le preguntarías a una persona, escrito o por audio. ' +
-    'Ej.: <i>"¿cómo trabajó el vigilador Martínez?"</i>, <i>"legajo 2192"</i>, <i>"Ailinco septiembre"</i>.</p></div></div>' +
+    'Ej.: <i>"¿cómo trabajó el vigilador Martínez?"</i>, <i>"legajo 2192"</i>, <i>"Ailinco septiembre"</i>, <i>"flota de Raizen"</i>, <i>"cargos de Gómez"</i>, <i>"trabajos realizados AB123CD"</i>.</p></div></div>' +
     '<div class="chat-cons panel"><div id="chatLog" class="chat-log"></div>' +
     '<div class="chat-in"><input id="consTxt" placeholder="Escribí tu pregunta…" autocomplete="off">' +
     (voz ? '<button class="btn" id="consMic" title="Dictar">🎤</button>' : '') +
@@ -6281,7 +6358,7 @@ function vConsultas() {
   const pensando = () => decir('<span class="chat-pens">Buscando…</span>');
   const f2 = v => fmtN(Math.round((Number(v) || 0) * 100) / 100);
   const fechaL = iso0 => { const m = String(iso0 || '').match(/^(\d{4})-(\d{2})-(\d{2})/); return m ? m[3] + '/' + m[2] + '/' + m[1] : fechaDMA(iso0); };
-  const AYUDA = ['Fecha de ingreso', 'Fecha de nacimiento', 'Domicilio', '¿Qué servicios trabajó?', '¿Cuántas ausencias tuvo?', '¿Las ausencias se repiten año tras año?', 'Horas del período', 'Otro período', 'Otra persona'];
+  const AYUDA = ['Fecha de ingreso', 'Fecha de nacimiento', 'Domicilio', '¿Qué servicios trabajó?', '¿Cuántas ausencias tuvo?', '¿Las ausencias se repiten año tras año?', 'Horas del período', 'Cargos y otros registros', 'Otro período', 'Otra persona'];
   const ofrecer = () => chips(AYUDA.map(t => ({ t })), x => responder(x.t));
 
   // 1) ¿quién?
@@ -6291,6 +6368,7 @@ function vConsultas() {
     try { r = await api('consulta', { texto, periodo: '' }); } catch (e) { w.innerHTML = esc(e.message); return; }
     if (r.demo) { w.innerHTML = esc(r.demo); return; }
     if (r.tipo === 'nada') { w.innerHTML = esc(r.mensaje); return; }
+    if (r.tipo === 'registros') { w.innerHTML = 'Encontré esto en los registros:' + htmlRegistros(r.registros); return; }
     if (r.tipo === 'servicio') { w.innerHTML = 'Encontré el servicio <b>' + esc(String(r.servicio.Servicio).toUpperCase()) + '</b> (' + esc(r.nombrePeriodo) + '):'; const c = decir('<div id="consRes"></div>'); mostrarConsulta(r, () => { }); c.appendChild($('#consRes')); return; }
     const conMes = !!periodoDeTexto(texto);
     if (r.tipo === 'opciones') {
@@ -6346,6 +6424,14 @@ function vConsultas() {
     }
     if (!r) { buscar(texto); return; }
     const fi = r.ficha || {};
+    if (/CARGO|ROPA|UNIFORME|PRENDA|REGISTRO|ENTREGA|DEVOLUC/.test(t)) {
+      const w = pensando();
+      try {
+        const x = await api('consultaRegistros', { nombre: r.persona.Nombre, legajo: r.persona.Legajo, texto: /REGISTRO/.test(t) ? '' : texto });
+        w.innerHTML = x.registros.length ? 'Registros de <b>' + esc(r.persona.Nombre) + '</b>:' + htmlRegistros(x.registros) : 'No encontré registros de ' + esc(r.persona.Nombre) + '.';
+      } catch (e) { w.innerHTML = esc(e.message); }
+      return;
+    }
     const dato = (etq, v) => decir(etq + ': <b>' + esc(v || 'no figura en SGI') + '</b>');
     if (/INGRES|ANTIGUEDAD/.test(t)) return dato('Fecha de ingreso', fechaDMA(fi.Ingreso) + (fi.Antiguedad ? ' (antigüedad ' + fi.Antiguedad + ')' : ''));
     if (/NACI|EDAD|CUMPLE/.test(t)) return dato('Fecha de nacimiento', fechaDMA(fi.Nacimiento) + (fi.Edad ? ' (' + fi.Edad + ' años)' : ''));
@@ -6387,7 +6473,7 @@ function vConsultas() {
     $('#consTxt').value = '';
     if (CONS.datos) responder(txt); else { decir(esc(txt), 'yo'); buscar(txt); }
   };
-  decir('¡Hola! ¿Qué querés consultar? Puede ser una persona (apellido o legajo) o un servicio.');
+  decir('¡Hola! ¿Qué querés consultar? Puede ser una persona (apellido o legajo), un servicio, una patente o un tema: flota, documentación, ubicación de los móviles, inventarios, cargos, trabajos realizados…');
   $('#consIr').onclick = enviar;
   $('#consNueva').onclick = () => vConsultas();
   $('#consTxt').addEventListener('keydown', e => { if (e.key === 'Enter') enviar(); });
@@ -6400,6 +6486,12 @@ function vConsultas() {
     try { rec.start(); } catch (e) { toast(e.message, true); }
   };
   $('#consTxt').focus();
+}
+// v1.30: registros de Stock Manager y Cargos encontrados en Consultas (una tabla desplegable por pestaña)
+function htmlRegistros(regs) {
+  return (regs || []).map((g, k) => '<details class="cons-reg"' + (k < 2 ? ' open' : '') + '><summary><b>' + esc(g.titulo) + '</b> · ' + g.total + (g.total === 1 ? ' registro' : ' registros') +
+    (g.total > g.filas.length ? ' (se muestran ' + g.filas.length + ')' : '') + '</summary><div class="tabla-wrap"><table class="t"><thead><tr>' + g.cols.map(c => '<th>' + esc(c) + '</th>').join('') +
+    '</tr></thead><tbody>' + g.filas.map(f => '<tr>' + f.map(x => '<td>' + esc(x) + '</td>').join('') + '</tr>').join('') + '</tbody></table></div></details>').join('');
 }
 // Período nombrado en un texto ("agosto", "septiembre 2026"): el que termina ese mes
 function periodoDeTexto(t) {

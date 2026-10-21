@@ -635,7 +635,9 @@ function accionExcel_(u, d) {
       mandarInforme_(para1, u, que, blob, 'Te enviamos el ' + que.toLowerCase() + '.');
       return { enviado: true, para: para1 };
     }
-    var o = salida_(blob); o.avisos = avisos; return o;
+    var o = salida_(blob); o.avisos = avisos;
+    try { o.b64 = Utilities.base64Encode(blob.adjunto().getBytes()); } catch (e) { Logger.log('Excel en base64: ' + e.message); }
+    return o;
   }
   if (d.alcance === 'zona') {
     var sup = (usuariosSGI_().filter(function (x) { return x.Usuario.toLowerCase() === String(serv.Supervisor).toLowerCase(); })[0] || {});
@@ -651,7 +653,10 @@ function accionExcel_(u, d) {
     mandarInforme_(para, u, que, blob, 'Te enviamos el ' + que.toLowerCase() + '.');
     return { enviado: true, para: para };
   }
-  return salida_(blob);
+  // v1.30: el archivo va en el resultado (base64) para bajarlo directo: el enlace de Google pide permiso a quien no es dueño de la planilla
+  var out = salida_(blob);
+  try { out.b64 = Utilities.base64Encode(blob.adjunto().getBytes()); } catch (e) { Logger.log('Excel en base64: ' + e.message); }
+  return out;
 }
 
 
