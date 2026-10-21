@@ -429,6 +429,28 @@ function config_() {
   return c;
 }
 
+/* v1.30 · Ventana de la proyección: del 18 al 26 de cada mes el supervisor puede modificar el período siguiente
+   (ej.: desde el 18 de octubre proyecta Octubre - Noviembre). Fuera de esa ventana, el período siguiente queda solo para ver. */
+var PROY_DESDE_DIA = 18, PROY_HASTA_DIA = 26;
+function ventanaProyeccion_(periodo) {
+  var actual = periodoActualServidor_();
+  if (periodo <= actual) return;
+  var dd = Number(Utilities.formatDate(new Date(), APP.TZ, 'd'));
+  var y = Number(actual.slice(0, 4)), m = Number(actual.slice(5, 7)) + 1; if (m > 12) { m = 1; y++; }
+  var siguiente = y + '-' + ('0' + m).slice(-2);
+  if (periodo > siguiente) throw new Error('Todavía no se puede proyectar ' + nombrePeriodo_(periodo) + '.');
+  if (dd < PROY_DESDE_DIA || dd > PROY_HASTA_DIA) throw new Error('La proyección de ' + nombrePeriodo_(periodo) + ' se puede modificar del ' + PROY_DESDE_DIA + ' al ' + PROY_HASTA_DIA + ' de cada mes.');
+}
+
+/* v1.30 · Tope de vacaciones: días de vacaciones (proyectadas e informadas) de todas las zonas en el período.
+   El tope se cambia en Datos (Config, clave TopeVacaciones); si no está, 500 días. */
+function topeVacaciones_(periodo) {
+  var tope = Number(String(config_().TopeVacaciones || '').replace(',', '.')) || 500;
+  var r = vacacionesPeriodo_(periodo), total = 0;
+  r.zonas.forEach(function (z) { z.personas.forEach(function (p) { total += Math.max(p.diagramadas || 0, p.informadas || 0); }); });
+  return { periodo: periodo, nombre: r.nombre, total: total, tope: tope, excedido: total >= tope };
+}
+
 function periodoActualServidor_() {
   var h = new Date();
   var y = Number(Utilities.formatDate(h, APP.TZ, 'yyyy')), m = Number(Utilities.formatDate(h, APP.TZ, 'M')), dd = Number(Utilities.formatDate(h, APP.TZ, 'd'));
@@ -1239,6 +1261,8 @@ var ACCIONES_ = {
     // v1.25.0: los servicios que carga Administración (ej.: RAIZEN Dock Sud Supervisores y los RAZ) el supervisor solo los consulta
     if (!esAdmin_(u) && cargaAdmin_(servG)) throw new Error('El servicio ' + servG.Servicio + ' lo carga Administración: no hace falta que lo completes.');
     exigir_(u, d.periodo > periodoActualServidor_() ? 'programacion' : 'planillas', true);
+    // v1.30: el supervisor proyecta el período siguiente solo del 18 al 26 de cada mes
+    if (!esAdmin_(u)) ventanaProyeccion_(d.periodo);
     var lock = LockService.getScriptLock();
     lock.waitLock(20000);
     try {
@@ -1291,7 +1315,13 @@ var ACCIONES_ = {
       });
       reescribir_('Plus', plusResto.concat(plusNuevo));
 
-      return { guardado: ahora_() };
+      var resG = { guardado: ahora_() };
+      // v1.30: tope de vacaciones de todas las zonas (si lo guardado tiene vacaciones)
+      try {
+        var conVac = nuevas.some(function (f) { return DIAS_COL.some(function (c) { var x = leerCelda_(f[c]); return x.tipo === 'codigo' && x.cod === 'VAC'; }); });
+        if (conVac) { var tv = topeVacaciones_(d.periodo); if (tv.excedido) resG.vacaciones = tv; }
+      } catch (e) { Logger.log('Tope de vacaciones: ' + e.message); }
+      return resG;
     } finally {
       lock.releaseLock();
     }
@@ -1464,6 +1494,7 @@ var ACCIONES_ = {
   stdSector: function (u, d) { exigir_(u, 'stdsector', false); return accionSTDSector_(u, d); },
   consulta: function (u, d) { return accionConsulta_(u, d); },
   consultaPersona: function (u, d) { return accionConsultaPersona_(u, d); },
+  consultaRegistros: function (u, d) { return accionConsultaRegistros_(u, d); },
   // v1.22.11: imágenes del Instructivo (se piden solo al abrirlo, para no hacer más lenta la entrada)
   estadisticas: function (u, d) { return accionEstadisticas_(u, d); },
   simulaciones: function (u, d) { return accionSimulaciones_(u, d); },
