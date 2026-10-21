@@ -339,10 +339,25 @@ tr.dev td{background:#d3d7dc;font-weight:700}
         if(!d || d.__delbenCargosRpc!==true || String(d.id)!==String(id))return;
         finishGet(d.ok===true,d.ok===true?d.result:d.error);
       };
-      script.onerror=function(){finishGet(false,'No se pudo comunicar con el backend de Cargos.');};
-      script.src=BACKEND+'?rpc=1&fn='+encodeURIComponent(fn)+
+      var url=BACKEND+'?rpc=1&fn='+encodeURIComponent(fn)+
         '&args='+encodeURIComponent(JSON.stringify(args||[]))+
         '&id='+encodeURIComponent(id)+'&callback='+encodeURIComponent(cb);
+      /* Se pide sin las cuentas de Google del navegador (crossorigin="anonymous"):
+         con varias cuentas abiertas en Chrome, Google redirigía a /u/N/ y mostraba
+         "No se pudo abrir el archivo". Si el navegador no lo permite, se reintenta como antes. */
+      script.crossOrigin='anonymous';
+      script.onerror=function(){
+        if(script.crossOrigin){
+          if(script.parentNode)script.parentNode.removeChild(script);
+          script=document.createElement('script');
+          script.onerror=function(){finishGet(false,'No se pudo comunicar con el backend de Cargos.');};
+          script.src=url; script.async=true;
+          document.head.appendChild(script);
+          return;
+        }
+        finishGet(false,'No se pudo comunicar con el backend de Cargos.');
+      };
+      script.src=url;
       script.async=true;
       document.head.appendChild(script);
       return;
