@@ -128,6 +128,17 @@ td.c,th.c{text-align:center}
 #pvPages{flex:1;overflow:auto;-webkit-overflow-scrolling:touch;padding:10px 8px}
 #pvPages canvas,#pvPages img{display:block;width:100%;max-width:900px;height:auto;background:#fff;margin:0 auto 10px;box-shadow:0 2px 10px rgba(0,0,0,.25)}
 #pvMsg{padding:10px 14px}
+/* destinatarios del correo */
+.destBox{background:var(--soft);border-radius:16px;padding:12px;margin-top:6px}
+.destList{display:flex;flex-wrap:wrap;gap:8px}
+.dest{display:inline-flex;align-items:center;gap:8px;background:#fff;border:1.5px solid var(--line);border-radius:14px;padding:6px 6px 6px 12px;font-size:13px;max-width:100%;min-width:0}
+.dest .dt{min-width:0;line-height:1.25}
+.dest b{display:block;color:var(--blue);font-weight:800;overflow-wrap:anywhere}
+.dest span{display:block;color:var(--muted);font-size:12px;overflow-wrap:anywhere}
+.dest.para{border-color:var(--green);background:#FFF8EA}
+.dest button{border:0;background:var(--soft);color:var(--red);width:26px;height:26px;border-radius:50%;padding:0;font-size:14px;line-height:26px;flex:0 0 26px}
+.destAdd{display:grid;grid-template-columns:1fr auto;gap:8px;margin-top:10px}
+.destAdd button{margin:0;padding:0 16px}
 </style>
 </head>
 <body>
@@ -232,6 +243,17 @@ td.c,th.c{text-align:center}
       <input id="inFile" type="file" accept="image/*,application/pdf" multiple class="hidden">
       <div class="adjList" id="adjList"></div>
       <div class="muted" id="adjNota" style="margin-top:6px"></div>
+    </div>
+
+    <h3>Destinatarios del correo</h3>
+    <div class="destBox">
+      <div class="destList" id="destList"></div>
+      <div class="destAdd">
+        <input id="destQ" autocomplete="off" autocapitalize="none" placeholder="Agregar: escribí nombre o email">
+        <button class="btn sm" type="button" onclick="destAgregarEscrito()">Agregar</button>
+      </div>
+      <div class="muted" style="margin-top:6px">Tocá ✕ para quitar a alguien. El vigilador recibe el mail si tiene email cargado.</div>
+      <div class="muted prueba hidden" style="margin-top:4px;color:#8a5a00"><b>Modo prueba:</b> por ahora el mail te llega solo a vos.</div>
     </div>
 
     <button class="btn" id="btnGenerar" onclick="generar()">Generar formulario</button>
@@ -421,7 +443,8 @@ const MAX_ADJ = 6;
 const S = {
   token: '', user: null, emp: [], obj: [], tipos: [], loaded: false, loading: false,
   selEmp: null, adj: [], draft: null, firmas: { sup: '', emp: '' }, reqId: '', last: null,
-  lic: [], personas: [], fPersona: null, deepDni: ''
+  lic: [], personas: [], fPersona: null, deepDni: '',
+  destDef: [], agenda: [], dest: []
 };
 
 const nrm = s => String(s == null ? '' : s).normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/\s+/g, ' ').trim();
@@ -521,6 +544,9 @@ async function cargarCatalogos(){
     S.obj = (r.objetivos || []).map(x => ({ t: x, _n: nrm(x) }));
     S.tipos = r.tipos || [];
     S.prueba = r.modoPrueba !== false;
+    S.destDef = r.destinatarios || [];
+    S.agenda = (r.agenda || []).map(c => Object.assign(c, { _n: nrm(c.nombre + ' ' + c.email) }));
+    destReset();
     document.querySelectorAll('.prueba').forEach(el => el.classList.toggle('hidden', !S.prueba));
     $('tipo').innerHTML = '<option value="">Elegí el tipo…</option>' + S.tipos.map(t => '<option value="' + esc(t.codigo) + '">' + esc(t.nombre) + '</option>').join('');
     $('fTipo').innerHTML = '<option value="">Todos</option>' + S.tipos.map(t => '<option value="' + esc(t.codigo) + '">' + esc(t.nombre) + '</option>').join('');
@@ -577,7 +603,7 @@ function resetForm(){
   ['emp','lp','dni','empresa','mailEmp','obj','desde','hasta','objNuevo','motivo','obs'].forEach(id => { if ($(id)) $(id).value = ''; });
   if ($('tipo')) $('tipo').value = '';
   $('fecha').value = hoyIso();
-  aplicarTipo(); renderAdj(); setMsg('nErr', '');
+  aplicarTipo(); renderAdj(); setMsg('nErr', ''); destReset();
 }
 
 $('emp').addEventListener('input', () => {
@@ -586,6 +612,7 @@ $('emp').addEventListener('input', () => {
   popShow($('emp'), filtrar(S.emp, q, 40).map(x => ({ label: x.nombre + ' · Leg. ' + x.lp + ' · DNI ' + x.dni + (x.empresa ? ' · ' + x.empresa : ''), data: x })), x => {
     S.selEmp = x; $('emp').value = x.nombre; $('lp').value = x.lp; $('dni').value = x.dni; $('empresa').value = x.empresa || '';
     $('mailEmp').value = x.email || '';
+    renderDest();
   });
 });
 onBlurHide($('emp'));
@@ -669,6 +696,54 @@ function renderAdj(){
   });
 }
 
+/* ---------- destinatarios del correo ---------- */
+function destReset(){
+  S.dest = [];
+  if (S.user && RE_MAIL.test(S.user.email || '')) S.dest.push({ nombre: (S.user.nombre || S.user.usuario) + ' (supervisor)', email: S.user.email.toLowerCase() });
+  (S.destDef || []).forEach(c => destAdd(c, true));
+  renderDest();
+}
+function destAdd(c, silencio){
+  const e = String(c.email || '').trim().toLowerCase();
+  if (!RE_MAIL.test(e)) { if (!silencio) toast('El email no es válido.'); return false; }
+  if (S.dest.some(x => x.email === e)) { if (!silencio) toast('Ya está en la lista.'); return false; }
+  if (S.dest.length >= 25) { if (!silencio) toast('Máximo 25 destinatarios.'); return false; }
+  S.dest.push({ nombre: c.nombre || e, email: e });
+  return true;
+}
+function renderDest(){
+  const L = $('destList'); if (!L) return;
+  L.innerHTML = '';
+  const vig = $('mailEmp').value.trim();
+  if (RE_MAIL.test(vig)) {
+    const d = document.createElement('div'); d.className = 'dest para';
+    d.innerHTML = '<div class="dt"><b>Para: vigilador</b><span>' + esc(vig) + '</span></div>';
+    L.appendChild(d);
+  }
+  S.dest.forEach((c, i) => {
+    const d = document.createElement('div'); d.className = 'dest'; d.title = c.email;
+    d.innerHTML = '<div class="dt"><b>' + esc(c.nombre) + '</b>' + (c.nombre !== c.email ? '<span>' + esc(c.email) + '</span>' : '') + '</div><button type="button" title="Quitar">✕</button>';
+    d.querySelector('button').addEventListener('click', () => { S.dest.splice(i, 1); renderDest(); });
+    L.appendChild(d);
+  });
+  if (!S.dest.length && !RE_MAIL.test(vig)) L.innerHTML = '<span class="muted">No hay destinatarios. Agregá al menos uno.</span>';
+}
+$('destQ').addEventListener('input', () => {
+  const q = $('destQ').value.trim(); if (!q) return popHide();
+  const lista = filtrar(S.agenda, q, 40).filter(c => !S.dest.some(x => x.email === c.email));
+  popShow($('destQ'), lista.map(c => ({ label: c.nombre + ' · ' + c.email, data: c })), c => { if (destAdd(c)) { $('destQ').value = ''; renderDest(); } });
+});
+$('destQ').addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); destAgregarEscrito(); } });
+onBlurHide($('destQ'));
+function destAgregarEscrito(){
+  const q = $('destQ').value.trim(); if (!q) return;
+  const m = q.match(/[^\s<>"']+@[^\s<>"']+\.[^\s<>"']+/);
+  const c = m ? (S.agenda.find(x => x.email === m[0].toLowerCase()) || { nombre: m[0], email: m[0] }) : filtrar(S.agenda, q, 1)[0];
+  if (!c) return toast('Elegí un contacto de la lista o escribí un email completo.');
+  if (destAdd(c)) { $('destQ').value = ''; popHide(); renderDest(); }
+}
+$('mailEmp').addEventListener('input', renderDest);
+
 /* ---------- validar y armar el formulario ---------- */
 function generar(){
   const E = m => { setMsg('nErr', m); window.scrollTo(0, 0); };
@@ -690,6 +765,7 @@ function generar(){
   }
   if (t.objetivoNuevo) { const on = S.obj.find(o => nrm(o.t) === nrm($('objNuevo').value)); if (!on) return E('Elegí el objetivo nuevo de la lista.'); d.objetivoNuevo = on.t; }
   if (t.motivo) { d.motivo = $('motivo').value.trim(); if (!d.motivo) return E('Completá ' + $('lblMotivo').textContent.toLowerCase() + '.'); }
+  if (!S.dest.length && !mail) return E('Agregá al menos un destinatario para el correo.');
   if (t.certificado === 'OBLIGATORIO' && !S.adj.length) return E('Para ' + t.nombre.toLowerCase() + ' hay que sacar foto o adjuntar el certificado.');
 
   S.draft = Object.assign(d, {
@@ -731,7 +807,7 @@ function renderActa(){
   $('lblAusente').classList.toggle('hidden', fe !== 'OPCIONAL');
   $('ausente').checked = false;
   $('aclEmp').value = d.nombre; $('dniEmpF').value = digits(d.dni);
-  const dest = [d.emailEmpleado ? 'el vigilador' : null, 'vos', 'administración', 'RRHH'].filter(Boolean);
+  const dest = [d.emailEmpleado ? 'el vigilador' : null].concat(S.dest.map(c => c.nombre.replace(/ \(supervisor\)$/, ''))).filter(Boolean);
   $('destinos').textContent = S.prueba ? 'Al enviar, el PDF se guarda y se manda solo al administrador (modo prueba).' : 'Al enviar, el PDF se guarda y se manda por mail a ' + dest.join(', ').replace(/, ([^,]*)$/, ' y $1') + '.';
   setMsg('aErr', '');
   renderFirmas();
@@ -778,7 +854,7 @@ async function enviar(){
       observaciones: d.observaciones, emailEmpleado: d.emailEmpleado,
       firmaSup: S.firmas.sup, aclaracionSup: $('aclSup').value.trim(),
       firmaEmp: aus ? '' : S.firmas.emp, aclaracionEmp: $('aclEmp').value.trim(), dniFirmaEmp: digits($('dniEmpF').value),
-      empleadoAusente: aus, adjuntos: S.adj.map(a => ({ nombre: a.nombre, data: a.data })), reqId: S.reqId
+      empleadoAusente: aus, destinatarios: S.dest.map(c => c.email), adjuntos: S.adj.map(a => ({ nombre: a.nombre, data: a.data })), reqId: S.reqId
     });
     S.last = { id: r.id, pdf: r.pdf, nombre: r.nombre, tipo: r.tipo };
     $('exTitulo').textContent = r.tipo + ' N° ' + r.id + ' – ' + r.nombre;

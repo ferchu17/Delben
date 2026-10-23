@@ -39,6 +39,9 @@ const CFG = {
   SHEET_TIPOS: 'TiposLicencia',
   SHEET_EMPRESAS: 'Empresas',
   SHEET_CONFIG: 'Config',
+  SHEET_DESTINATARIOS: 'Destinatarios',   // los que salen marcados por defecto en cada licencia
+  SHEET_CONTACTOS: 'Contactos',           // libreta de direcciones (se puede importar el CSV de Outlook tal cual)
+  MAX_DESTINATARIOS: 25,
 
   // Stock Manager (SGI): Personal, objetivos y Usuarios y contraseñas (solo lectura, salvo el email del personal)
   SOURCE_SPREADSHEET_ID: '1Z06eLpbng51tYcycQlr0fLNI1OYmOpnmQp94YHY_coY',
@@ -129,6 +132,17 @@ const EMPRESAS_DEFAULT = [
   ['PPQ', 'P.P.Q S.A.'],
   ['LEG', 'LEG']
 ];
+
+// Destinatarios que salen por defecto (además del supervisor que inició sesión). Editable en la hoja Destinatarios.
+const DESTINATARIOS_DEFAULT = [
+  ['nombre', 'email'],
+  ['Fernando Jacyno', 'fjacyno@ktl-seguridad.com'],
+  ['Anabella Mancilla', 'amancilla@ktl-seguridad.com'],
+  ['Paula Moldes', 'pmoldes@ktl-seguridad.com'],
+  ['Silvia Ventemilla', 'sventemilla@ktl-seguridad.com']
+];
+
+const CONTACTOS_DEFAULT = [['nombre', 'email']];
 
 const CONFIG_DEFAULT = [
   ['clave', 'valor', 'detalle'],
@@ -378,6 +392,8 @@ function instalar() {
   hojaOCrear_(ss, CFG.SHEET_TIPOS, [TIPOS_HEADERS].concat(TIPOS_DEFAULT));
   hojaOCrear_(ss, CFG.SHEET_EMPRESAS, EMPRESAS_DEFAULT);
   hojaOCrear_(ss, CFG.SHEET_CONFIG, CONFIG_DEFAULT);
+  hojaOCrear_(ss, CFG.SHEET_DESTINATARIOS, DESTINATARIOS_DEFAULT);
+  hojaOCrear_(ss, CFG.SHEET_CONTACTOS, CONTACTOS_DEFAULT);
   carpeta_(); carpetaAdj_();
   diagnosticoSistema();
 }
@@ -639,13 +655,72 @@ function objetivos_() {
   return lista;
 }
 
+/* ---------- destinatarios y libreta de direcciones ---------- */
+
+/**
+ * Lee una hoja de contactos con cualquier formato de encabezados: nombre/email propios, o el CSV
+ * que exporta Outlook (en castellano o en inglés: Nombre, Apellidos, Dirección de correo electrónico,
+ * First Name, Last Name, E-mail Address, E-mail 2 Address, etc.).
+ */
+function leerContactos_(sh) {
+  if (!sh || sh.getLastRow() < 2) return [];
+  const v = sh.getDataRange().getDisplayValues();
+  const h = v[0].map(norm_);
+  const idx = function (lista) { for (let i = 0; i < lista.length; i++) { const k = h.indexOf(norm_(lista[i])); if (k >= 0) return k; } return -1; };
+  const cNombre = idx(['nombre y apellido', 'nombre completo', 'nombre para mostrar', 'display name', 'nombre', 'first name', 'name']);
+  const cApe = idx(['apellidos', 'apellido', 'last name']);
+  const cMid = idx(['segundo nombre', 'middle name']);
+  const cMails = [];
+  h.forEach(function (x, i) {
+    if (/(^| )(e ?mail|correo)/.test(x) && !/tipo|type|nombre para mostrar|display/.test(x)) cMails.push(i);
+  });
+  const out = [];
+  for (let r = 1; r < v.length; r++) {
+    const row = v[r];
+    let nombre = [cNombre, cMid, cApe].filter(function (c) { return c >= 0; }).map(function (c) { return String(row[c] || '').trim(); })
+      .filter(String).join(' ');
+    cMails.forEach(function (c) {
+      // Outlook a veces guarda "Nombre <correo>" o varios separados por ;
+      String(row[c] || '').split(/[;,]/).forEach(function (pieza) {
+        const m = pieza.match(/[^\s<>"']+@[^\s<>"']+\.[^\s<>"']+/);
+        if (m && RE_MAIL_.test(m[0])) out.push({ nombre: nombre || m[0], email: m[0].toLowerCase() });
+      });
+    });
+  }
+  return out;
+}
+
+function destinatariosDefault_() {
+  const ss = licSs_();
+  const sh = hojaOCrear_(ss, CFG.SHEET_DESTINATARIOS, DESTINATARIOS_DEFAULT);
+  return leerContactos_(sh);
+}
+
+/** Libreta: hoja Contactos + Destinatarios + usuarios de SGI con email (sin repetidos). */
+function agenda_() {
+  const vistos = {}, out = [];
+  const add = function (c) { const k = c.email.toLowerCase(); if (!vistos[k]) { vistos[k] = true; out.push(c); } };
+  destinatariosDefault_().forEach(add);
+  try { leerContactos_(hojaOCrear_(licSs_(), CFG.SHEET_CONTACTOS, CONTACTOS_DEFAULT)).forEach(add); } catch (e) { Logger.log('Contactos: ' + e.message); }
+  try {
+    const t = leerTabla_(hoja_(fuenteSs_(), CFG.AUTH_SHEET), authDefs_());
+    t.rows.forEach(function (r) {
+      const m = t.map.email >= 0 ? String(r[t.map.email] || '').trim() : '';
+      if (RE_MAIL_.test(m)) add({ nombre: String(r[t.map.nombre] || '').trim() || m, email: m.toLowerCase() });
+    });
+  } catch (e) { Logger.log('Usuarios (agenda): ' + e.message); }
+  out.sort(function (a, b) { return a.nombre.localeCompare(b.nombre, 'es'); });
+  return out;
+}
+
 /** Modo prueba: SI (por defecto) hasta que en la hoja Config se ponga MODO_PRUEBA = NO. */
 function modoPrueba_(cfg) { return sino_((cfg || config_()).MODO_PRUEBA, 'SI') !== 'NO'; }
 
 function getCatalogos(token) {
   validarSesion_(token);
   const hoy = Utilities.formatDate(new Date(), CFG.TZ, 'yyyy-MM-dd');
-  return { empleados: empleados_(), objetivos: objetivos_(), tipos: tipos_(), hoy: hoy, modoPrueba: modoPrueba_() };
+  return { empleados: empleados_(), objetivos: objetivos_(), tipos: tipos_(), hoy: hoy, modoPrueba: modoPrueba_(),
+    destinatarios: destinatariosDefault_(), agenda: agenda_() };
 }
 
 /* =========================================================
@@ -697,6 +772,9 @@ function guardarLicencia(token, d) {
     motivo: tipo.motivo ? limpiar_(d.motivo, 600) : '',
     observaciones: limpiar_(d.observaciones, 600),
     emailEmpleado: limpiar_(d.emailEmpleado, 150),
+    // Destinatarios elegidos en pantalla (null = pantalla vieja: se usa la lista de siempre)
+    destinatarios: Array.isArray(d.destinatarios) ? d.destinatarios.map(function (m) { return limpiar_(m, 150); })
+      .filter(function (m) { return RE_MAIL_.test(m); }).slice(0, CFG.MAX_DESTINATARIOS) : null,
     supervisor: limpiar_(usuario.nombre || usuario.usuario, 150),
     aclSup: limpiar_(d.aclaracionSup, 150) || limpiar_(usuario.nombre || usuario.usuario, 150),
     aclEmp: limpiar_(d.aclaracionEmp, 150),
@@ -844,6 +922,13 @@ function enviarLicenciaMail_(lic, pdfBlob, adjuntos, usuario, soloA) {
   if (prueba) {
     // MODO PRUEBA: solo al administrador, sin copias a nadie más
     para = unico(cfg.EMAIL_ADMIN) || unico(usuario.email);
+  } else if (!soloA && Array.isArray(lic.destinatarios)) {
+    // Lista elegida en "Nueva licencia": Para = vigilador (si tiene email); copia a los elegidos
+    const vig = unico(lic.emailEmpleado);
+    const elegidos = lic.destinatarios.map(unico).filter(String);
+    para = vig || elegidos.shift() || '';
+    cc = elegidos;
+    if (!para) throw new Error('No elegiste ningún destinatario para el correo.');
   } else if (soloA) {
     para = unico(soloA);
     if (!para) throw new Error('El email no es válido: ' + soloA);
@@ -1076,7 +1161,8 @@ function diagnosticoSistema() {
   paso('Planilla de Licencias', function () { return licSs_().getName(); });
   paso('Hoja Licencias', function () { const sh = licSheet_(); return (sh.getLastRow() - 1) + ' registros, próximo N° ' + siguienteId_(sh, licCols_(sh)['id']); });
   paso('Tipos de licencia', function () { return tipos_().map(function (t) { return t.codigo; }).join(', '); });
-  paso('Config / destinatarios', function () { const c = config_(); return [c.EMAIL_ADMIN, c.RRHH_1, c.RRHH_2, c.RRHH_3].filter(String).join(', ') || '(sin emails)'; });
+  paso('Destinatarios por defecto', function () { return destinatariosDefault_().map(function (c) { return c.email; }).join(', ') || '(ninguno)'; });
+  paso('Libreta de contactos', function () { return agenda_().length + ' contactos'; });
   paso('Personal (Stock Manager)', function () { return empleados_().length + ' empleados (sin BAJA)'; });
   paso('Objetivos', function () { return objetivos_().length + ' objetivos'; });
   paso('Usuarios', function () { return leerTabla_(hoja_(fuenteSs_(), CFG.AUTH_SHEET), authDefs_()).rows.length + ' filas'; });
