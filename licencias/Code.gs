@@ -151,6 +151,7 @@ const CONFIG_DEFAULT = [
   ['RRHH_2', 'pmoldes@ktl-seguridad.com', 'Contacto 2 de Recursos Humanos'],
   ['RRHH_3', 'sventemilla@ktl-seguridad.com', 'Contacto 3 de Recursos Humanos'],
   ['CIUDAD', 'Buenos Aires', 'Ciudad que va en la fecha del formulario'],
+  ['CONTACTOS_EXCLUIR', 'ex, zanardi', 'Palabras: los contactos que las tengan en el nombre o el email no aparecen en la lista'],
   ['MODO_PRUEBA', 'SI', 'SI = los mails llegan solo a EMAIL_ADMIN y el PDF sale marcado PRUEBA. Poner NO para usarla de verdad']
 ];
 
@@ -672,7 +673,7 @@ function leerContactos_(sh) {
   const cMid = idx(['segundo nombre', 'middle name']);
   const cMails = [];
   h.forEach(function (x, i) {
-    if (/(^| )(e ?mail|correo)/.test(x) && !/tipo|type|nombre para mostrar|display/.test(x)) cMails.push(i);
+    if (/(^| )(e ?mail|correo)/.test(x) && !/tipo|type|nombre para mostrar|pantalla|display/.test(x)) cMails.push(i);
   });
   const out = [];
   for (let r = 1; r < v.length; r++) {
@@ -682,12 +683,26 @@ function leerContactos_(sh) {
     cMails.forEach(function (c) {
       // Outlook a veces guarda "Nombre <correo>" o varios separados por ;
       String(row[c] || '').split(/[;,]/).forEach(function (pieza) {
-        const m = pieza.match(/[^\s<>"']+@[^\s<>"']+\.[^\s<>"']+/);
-        if (m && RE_MAIL_.test(m[0])) out.push({ nombre: nombre || m[0], email: m[0].toLowerCase() });
+        const m = pieza.match(/[^\s<>"'()\[\]]+@[^\s<>"'()\[\]]+\.[^\s<>"'()\[\]]+/);
+        if (m && RE_MAIL_.test(m[0]) && !contactoExcluido_(nombre + ' ' + m[0])) out.push({ nombre: nombre || m[0], email: m[0].toLowerCase() });
       });
     });
   }
   return out;
+}
+
+/**
+ * Contactos que no se muestran: Config CONTACTOS_EXCLUIR (por defecto "ex, zanardi").
+ * Una palabra corta (ex) tiene que estar suelta en el nombre o el email ("Juan Pérez (ex)", "EX - Juan");
+ * una larga (zanardi) alcanza con que aparezca en cualquier parte.
+ */
+function contactoExcluido_(texto) {
+  let lista = 'ex, zanardi';
+  try { const c = config_(); if (c.CONTACTOS_EXCLUIR) lista = c.CONTACTOS_EXCLUIR; } catch (e) { /* sin Config */ }
+  const n = norm_(texto), toks = n.split(' ');
+  return lista.split(/[,;]/).map(norm_).filter(String).some(function (w) {
+    return toks.indexOf(w) >= 0 || (w.length > 3 && n.indexOf(w) >= 0);
+  });
 }
 
 function destinatariosDefault_() {
