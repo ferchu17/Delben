@@ -424,7 +424,8 @@ function config_() {
   // Valores por defecto del código; lo que esté cargado en la hoja Config tiene prioridad.
   CONFIG_DEFAULT.slice(1).forEach(function (r) { c[r[0]] = r[1]; });
   for (let i = 1; i < v.length; i++) {
-    const k = String(v[i][0] || '').trim().toUpperCase();
+    // La clave se acepta escrita de cualquier forma: "MODO_PRUEBA", "Modo prueba", "modo-prueba"…
+    const k = norm_(v[i][0]).toUpperCase().replace(/ /g, '_');
     const val = String(v[i][1] || '').trim();
     if (k && val) c[k] = val;
   }
@@ -1210,6 +1211,7 @@ function diagnosticoSistema() {
   paso('Planilla de Licencias', function () { return licSs_().getName(); });
   paso('Hoja Licencias', function () { const sh = licSheet_(); return (sh.getLastRow() - 1) + ' registros, próximo N° ' + siguienteId_(sh, licCols_(sh)['id']); });
   paso('Tipos de licencia', function () { return tipos_().map(function (t) { return t.codigo; }).join(', '); });
+  paso('Modo prueba', function () { return modoPrueba_() ? 'ACTIVADO (los mails llegan solo a ' + config_().EMAIL_ADMIN + '). Para desactivarlo: hoja Config, MODO_PRUEBA = NO' : 'desactivado: los mails salen a todos los destinatarios'; });
   paso('Destinatarios por defecto', function () { return destinatariosDefault_().map(function (c) { return c.email; }).join(', ') || '(ninguno)'; });
   paso('Libreta de contactos', function () { return agenda_().length + ' contactos'; });
   paso('Personal (Stock Manager)', function () { return empleados_().length + ' empleados (sin BAJA)'; });
