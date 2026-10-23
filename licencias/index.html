@@ -854,12 +854,14 @@ async function enviar(){
       observaciones: d.observaciones, emailEmpleado: d.emailEmpleado,
       firmaSup: S.firmas.sup, aclaracionSup: $('aclSup').value.trim(),
       firmaEmp: aus ? '' : S.firmas.emp, aclaracionEmp: $('aclEmp').value.trim(), dniFirmaEmp: digits($('dniEmpF').value),
-      empleadoAusente: aus, destinatarios: S.dest.map(c => c.email), adjuntos: S.adj.map(a => ({ nombre: a.nombre, data: a.data })), reqId: S.reqId
+      empleadoAusente: aus, destinatarios: S.dest.map(c => c.email), destinatariosInfo: S.dest.map(c => ({ nombre: c.nombre, email: c.email })), adjuntos: S.adj.map(a => ({ nombre: a.nombre, data: a.data })), reqId: S.reqId
     });
     S.last = { id: r.id, pdf: r.pdf, nombre: r.nombre, tipo: r.tipo };
     $('exTitulo').textContent = r.tipo + ' N° ' + r.id + ' – ' + r.nombre;
     $('exMail').innerHTML = r.mail ? '<div class="' + (/no se pudo/i.test(r.mail) ? 'warn' : 'okmsg') + '">' + esc(r.mail) + '</div>' : '';
     S.lic = [];
+    // los correos agregados a mano ya quedan en la libreta para la próxima licencia
+    S.dest.forEach(c => { if (!S.agenda.some(x => x.email === c.email)) S.agenda.push({ nombre: c.nombre.replace(/ \(supervisor\)$/, ''), email: c.email, _n: nrm(c.nombre + ' ' + c.email) }); });
     resetForm(); show('exito');
   } catch (e) { manejarError(e, 'aErr'); }
   finally { b.textContent = 'GUARDAR Y ENVIAR'; if (!$('v-acta').classList.contains('hidden')) renderFirmas(); }

@@ -705,6 +705,36 @@ function contactoExcluido_(texto) {
   });
 }
 
+/**
+ * Guarda en la hoja Contactos los correos agregados a mano que todavía no están en la libreta.
+ * Respeta el formato de la hoja (propio "nombre/email" o el CSV de Outlook importado).
+ */
+function guardarContactosNuevos_(lista) {
+  if (!Array.isArray(lista) || !lista.length) return 0;
+  const conocidos = {};
+  agenda_().forEach(function (c) { conocidos[c.email.toLowerCase()] = true; });
+  const nuevos = [];
+  lista.forEach(function (c) {
+    const email = limpiar_(c && c.email, 150).toLowerCase();
+    const nombre = limpiar_(c && c.nombre, 150).replace(/\s*\(supervisor\)$/i, '');
+    if (!RE_MAIL_.test(email) || conocidos[email]) return;
+    conocidos[email] = true;
+    nuevos.push({ nombre: nombre && nombre.toLowerCase() !== email ? nombre : '', email: email });
+  });
+  if (!nuevos.length) return 0;
+  const sh = hojaOCrear_(licSs_(), CFG.SHEET_CONTACTOS, CONTACTOS_DEFAULT);
+  const ancho = Math.max(sh.getLastColumn(), 2);
+  const h = sh.getRange(1, 1, 1, ancho).getDisplayValues()[0].map(norm_);
+  const busca = function (nombres) { for (let i = 0; i < nombres.length; i++) { const k = h.indexOf(norm_(nombres[i])); if (k >= 0) return k; } return -1; };
+  let cNom = busca(['nombre', 'nombre y apellido', 'nombre completo', 'first name', 'name']);
+  let cMail = busca(['email', 'e-mail address', 'direccion de correo electronico', 'correo electronico', 'correo', 'mail']);
+  if (cNom < 0) cNom = 0;
+  if (cMail < 0) cMail = cNom === 0 ? 1 : 0;
+  const filas = nuevos.map(function (c) { const r = new Array(ancho).fill(''); r[cNom] = c.nombre || c.email; r[cMail] = c.email; return r; });
+  sh.getRange(sh.getLastRow() + 1, 1, filas.length, ancho).setValues(filas);
+  return filas.length;
+}
+
 function destinatariosDefault_() {
   const ss = licSs_();
   const sh = hojaOCrear_(ss, CFG.SHEET_DESTINATARIOS, DESTINATARIOS_DEFAULT);
@@ -899,6 +929,10 @@ function guardarLicencia(token, d) {
       mail = r.msg; enviadoA = r.lista;
     } catch (e) { mail = 'La licencia quedó guardada, pero no se pudo enviar el email: ' + e.message; }
     if (col['enviado a'] >= 0 && enviadoA) sh.getRange(fila, col['enviado a'] + 1).setValue(enviadoA);
+
+    // Correos agregados a mano: quedan guardados en la hoja Contactos para la próxima vez
+    try { const n = guardarContactosNuevos_(d.destinatariosInfo); if (n) mail += ' ' + (n === 1 ? 'Se guardó 1 contacto nuevo' : 'Se guardaron ' + n + ' contactos nuevos') + ' en la libreta.'; }
+    catch (e) { Logger.log('Contactos nuevos: ' + e.message); }
 
     if (lic.emailEmpleado && !lic.prueba) {   // en modo prueba no se toca la solapa Personal
       try { const a = actualizarEmailPersonal_(lic.dni, lic.emailEmpleado); if (a) mail += ' ' + a; }
