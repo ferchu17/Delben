@@ -1504,7 +1504,8 @@ mini.addEventListener('pointerdown',e=>{mini.setPointerCapture(e.pointerId);mini
 
 /* ================= entrada ================= */
 const pts=new Map();let gest=null,lastTile=null,spaceDown=false,mouseX=-1,mouseY=-1,mouseIn=false;
-addEventListener('mousemove',e=>{mouseX=e.clientX;mouseY=e.clientY;mouseIn=true});document.addEventListener('mouseleave',()=>{mouseIn=false});addEventListener('blur',()=>{mouseIn=false});
+addEventListener('pointermove',e=>{if(e.pointerType!=='mouse')return;mouseX=e.clientX;mouseY=e.clientY;mouseIn=true},true);document.addEventListener('mouseleave',()=>{mouseIn=false});document.addEventListener('mouseout',e=>{if(!e.relatedTarget)mouseIn=false});addEventListener('blur',()=>{mouseIn=false;keysHeld.clear()});
+const keysHeld=new Set();
 function tileAt(cx,cy){const[tx,ty]=toTile(cx,cy);return[Math.floor(tx),Math.floor(ty)]}
 function panBy(ax,ay,bx,by){const a=toTile(ax,ay),b=toTile(bx,by);cam.x+=a[0]-b[0];cam.y+=a[1]-b[1];clampCam()}
 function useLine(a,b){let[x0,y0]=a;const[x1,y1]=b;const dx=Math.abs(x1-x0),dy=-Math.abs(y1-y0),sx=x0<x1?1:-1,sy=y0<y1?1:-1;let e=dx+dy;
@@ -1537,9 +1538,9 @@ function endPtr(e){const p=pts.get(e.pointerId);pts.delete(e.pointerId);
 cv.addEventListener('pointerup',endPtr);cv.addEventListener('pointercancel',endPtr);
 cv.addEventListener('pointerleave',e=>{if(e.pointerType!=='touch')hover=null});
 cv.addEventListener('wheel',e=>{e.preventDefault();if(inMenu)return;const[bx,by]=toTile(e.clientX,e.clientY);cam.z*=Math.exp(-e.deltaY*.0015);clampCam();const[ax,ay]=toTile(e.clientX,e.clientY);cam.x+=bx-ax;cam.y+=by-ay;clampCam()},{passive:false});
-addEventListener('keydown',e=>{if(e.target.tagName==='INPUT'||inMenu)return;if(e.code==='Space'){spaceDown=true;e.preventDefault()}if(e.key==='Escape'){selectTool('pan')}
-  const st=80,c=[W/2,H/2];if(e.key==='ArrowLeft'||e.key==='a')panBy(c[0],c[1],c[0]+st,c[1]);if(e.key==='ArrowRight'||e.key==='d')panBy(c[0],c[1],c[0]-st,c[1]);if(e.key==='ArrowUp'||e.key==='w')panBy(c[0],c[1],c[0],c[1]+st);if(e.key==='ArrowDown'||e.key==='s')panBy(c[0],c[1],c[0],c[1]-st)});
-addEventListener('keyup',e=>{if(e.code==='Space')spaceDown=false});
+addEventListener('keydown',e=>{if(e.target.tagName==='INPUT'||e.target.tagName==='SELECT'||inMenu)return;if(e.code==='Space'){spaceDown=true;e.preventDefault()}if(e.key==='Escape'){selectTool('pan')}
+  const k=e.key.toLowerCase();if(['arrowleft','arrowright','arrowup','arrowdown','a','d','w','s'].includes(k)){keysHeld.add(k);if(k.startsWith('arrow'))e.preventDefault()}if(k==='q'||k==='-'){cam.z/=1.15;clampCam()}if(k==='e'||k==='+'){cam.z*=1.15;clampCam()}});
+addEventListener('keyup',e=>{if(e.code==='Space')spaceDown=false;keysHeld.delete(e.key.toLowerCase())});
 $('#zin').onclick=()=>{cam.z*=1.3;clampCam()};$('#zout').onclick=()=>{cam.z/=1.3;clampCam()};
 
 /* ================= interfaz del juego ================= */
@@ -1555,7 +1556,7 @@ function renderTools(){
   $('#tools').innerHTML=h;
 }
 function selectTool(k){tool=k;const t=TOOLMAP[k];if(t&&t.cat!==cat){cat=t.cat;renderCats()}renderTools();cv.style.cursor=k==='pan'?'grab':'crosshair';updateHint();if(k!=='inspect'){selTile=-1;renderCard()}}
-const HINTS={pan:'Arrastrá para moverte, tocá un edificio para ver su ficha. Rueda o dos dedos para zoom.',inspect:'Tocá un edificio o una calle para ver sus datos.',town:'Tocá el mapa para fundar un pueblo nuevo con su propio nombre.',road:'Arrastrá para trazar calles. En la montaña se hace un túnel y sobre agua un puente.',avenue:'Las avenidas llevan casi tres veces más autos.',hwy:'Las autopistas llevan muchísimos autos pero no dan acceso a los edificios. Conectalas al borde para comerciar con camiones.',rail:'Uní estaciones con vías. Llevá una vía al borde del mapa para los trenes de carga.',tram:'Pintá vías de tranvía sobre calles y poné paradas al costado.',mono:'El monorriel va elevado sobre calles o terreno libre. Uní dos estaciones.',metro:'Trazá túneles bajo tierra y uní dos estaciones de subte.',dozer:'Arrastrá para demoler. En vista subterránea borra túneles.',tst:'Tocá una vía para convertirla en estación.'};
+const HINTS={pan:'Llevá el mouse al borde o usá W A S D para moverte. Tocá un edificio para ver su ficha. Rueda, Q y E para zoom.',inspect:'Tocá un edificio o una calle para ver sus datos.',town:'Tocá el mapa para fundar un pueblo nuevo con su propio nombre.',road:'Arrastrá para trazar calles. En la montaña se hace un túnel y sobre agua un puente.',avenue:'Las avenidas llevan casi tres veces más autos.',hwy:'Las autopistas llevan muchísimos autos pero no dan acceso a los edificios. Conectalas al borde para comerciar con camiones.',rail:'Uní estaciones con vías. Llevá una vía al borde del mapa para los trenes de carga.',tram:'Pintá vías de tranvía sobre calles y poné paradas al costado.',mono:'El monorriel va elevado sobre calles o terreno libre. Uní dos estaciones.',metro:'Trazá túneles bajo tierra y uní dos estaciones de subte.',dozer:'Arrastrá para demoler. En vista subterránea borra túneles.',tst:'Tocá una vía para convertirla en estación.'};
 function updateHint(){const t=TOOLMAP[tool];let h=HINTS[tool];if(!h&&t){if(t.zone){const z=ZT[t.zone];h=`<b>${z.l}</b> · `+(z.g==='R'?'viven familias':z.out?'produce '+RESN[z.out].toLowerCase():'da empleo')+(z.need?` · solo sobre ${['','mineral','petróleo','','bosque'][z.need]}`:'')}
   else if(t.svc){const d=SV[t.svc];h=`<b>${d.n}</b>`+(d.r?` · alcance ${d.r} cuadras`:'')+(d.pw?` · ${d.pw} MW`:'')+(d.wt?` · ${d.wt} m³ de agua`:'')+(d.jobs?` · ${d.jobs} empleos`:'')+(d.fab?` · convierte ${RESN[d.fab.in].toLowerCase()} en ${RESN[d.fab.out].toLowerCase()}`:'')+(d.cov==='joy'?' · hace feliz a la gente':'')+` · mantenimiento $ ${fmt(d.u)}/mes`}}
   if(undergroundBuild&&['road','avenue','hwy','rail'].includes(tool))h+=' <b>Modo bajo tierra activado.</b>';$('#hint').innerHTML=h||'';$('#hint').hidden=!h}
@@ -1684,7 +1685,7 @@ function renderSheet(full){
     h+=`<h2>Ajustes</h2><label class="fld"><span>Nombre del estado</span><input type="text" id="cname" maxlength="32" value="${esc(G.name)}"></label>`;
     h+=`<h3>Calidad gráfica</h3><div class="seg">${[['alta','Alta'],['media','Media'],['baja','Baja']].map(([k,n])=>`<button class="${G.quality===k?'on':''}" data-q="${k}">${n}</button>`).join('')}</div><p>Alta suma nubes, flores y autos detallados. En celulares viejos usá Media o Baja.</p>`;
     const tg=(k,n,d)=>`<div class="tog"><span>${n}${d?`<br><span style="color:var(--muted);font-size:12px">${d}</span>`:''}</span><button class="sw2${G[k]?' on':''}" data-tog="${k}" aria-label="${n}"></button></div>`;
-    h+=tg('unlimited','Plata ilimitada','Construí todo sin límite de presupuesto')+tg('unlockAll','Desbloquear todo','Todas las construcciones desde el principio')+tg('daynight','Ciclo de día y noche','')+tg('cars','Mostrar autos y gente','')+tg('edgeScroll','Mover el mapa con el borde de la pantalla','Al llevar el mouse al borde, el mapa se desplaza');
+    h+=tg('unlimited','Plata ilimitada','Construí todo sin límite de presupuesto')+tg('unlockAll','Desbloquear todo','Todas las construcciones desde el principio')+tg('daynight','Ciclo de día y noche','')+tg('cars','Mostrar autos y gente','')+tg('edgeScroll','Mover el mapa con el borde de la pantalla','Al llevar el mouse al borde, el mapa se desplaza. También con las flechas o W A S D, y zoom con Q y E');
     const ec=250000*(G.expand+1);h+=`<h3>Ampliar el terreno</h3><p>Suma 32 cuadras de cada lado. Ahora el mapa mide ${N} × ${N}${N+64<=576?'':' (máximo)'}.</p><button class="bigbtn" data-act="expand"${N+64>576?' disabled':''}>Ampliar a ${N+64} × ${N+64} · ${G.unlimited?'gratis':'$ '+fmt(ec)}</button>`;
     h+='<button class="bigbtn" data-act="save">Guardar ahora</button><p>Se guarda solo cada 30 segundos. Para guardar en una ranura o empezar otra partida, abrí el Menú.</p>'}
   if(!full&&sheetP==='stats'){drawChart();return}
@@ -1876,7 +1877,11 @@ function frame(now){
     if(G.speed>0){accum+=dt*1000;const dayMs=650/G.speed;let n=0;while(accum>=dayMs&&n<2){accum-=dayMs;simDay();n++}if(n>=2)accum=Math.min(accum,dayMs)}
     dirtyT+=dt;if(dirtyT>.5&&(dirty.net||dirty.lines||dirty.cov||dirty.towns)){dirtyT=0;recalcAll();dailyStats()}
     if(G.speed>0)updVehicles(dt*Math.min(G.speed,3));
-    if(G.edgeScroll!==false&&mouseIn&&!gest&&matchMedia('(pointer:fine)').matches&&document.hasFocus()){const m=14;let dx=0,dy=0;if(mouseX<m)dx=1;else if(mouseX>W-m)dx=-1;if(mouseY<m)dy=1;else if(mouseY>H-m)dy=-1;if(dx||dy){const v=Math.min(W,H)*.9*dt;panBy(W/2,H/2,W/2+dx*v,H/2+dy*v)}}
+    {let dx=0,dy=0;const kh=keysHeld;if(kh.has('arrowleft')||kh.has('a'))dx=1;if(kh.has('arrowright')||kh.has('d'))dx=-1;if(kh.has('arrowup')||kh.has('w'))dy=1;if(kh.has('arrowdown')||kh.has('s'))dy=-1;
+     if(!dx&&!dy&&G.edgeScroll!==false&&mouseIn&&!gest){const m=Math.max(24,Math.min(W,H)*.035);let f=1;
+       if(mouseX<m){dx=1;f=1-mouseX/m}else if(mouseX>W-m){dx=-1;f=1-(W-mouseX)/m}if(mouseY<m){dy=1;f=Math.max(f,1-mouseY/m)}else if(mouseY>H-m){dy=-1;f=Math.max(f,1-(H-mouseY)/m)}
+       if(dx||dy){const el=document.elementFromPoint(mouseX,mouseY);if(el&&el.closest&&el.closest('#sheet,#card,#mini,#zoom,input,select'))dx=dy=0;else{dx*=.5+f;dy*=.5+f}}}
+     if(dx||dy){const v=Math.min(W,H)*.9*dt;panBy(W/2,H/2,W/2+dx*v,H/2+dy*v)}}
   }
   draw();
   if(!inMenu){uiT+=dt;sheetT+=dt;if(uiT>.3){uiT=0;updateHUD();drawMini();if(selTile>=0)renderCard();
