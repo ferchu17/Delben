@@ -16,7 +16,17 @@
     fetch(url, { method: 'POST', redirect: 'follow', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify({ fn: fn, args: args || [] }) })
       .then(function (r) {
         return r.text().then(function (t) {
-          var p; try { p = JSON.parse(t); } catch (e) { throw new Error(/<html/i.test(t) ? 'El servidor pidió iniciar sesión en Google: la implementación de Apps Script tiene que estar con acceso "Cualquier persona".' : 'Respuesta no válida del servidor.'); }
+          var p; try { p = JSON.parse(t); } catch (e) {
+            // Google devolvió una página en vez de la respuesta: se muestra qué dice, para saber la causa
+            var det = '';
+            try {
+              var d = new DOMParser().parseFromString(t, 'text/html');
+              det = ((d.title || '') + ' ' + ((d.body && d.body.innerText) || (d.body && d.body.textContent) || '')).replace(/\s+/g, ' ').trim().slice(0, 300);
+            } catch (e2) { }
+            console.error('Puente ' + fn + ' HTTP ' + r.status + ': ' + t.slice(0, 2000));
+            throw new Error((/<html/i.test(t) ? 'El servidor pidió iniciar sesión en Google' : 'Respuesta no válida del servidor') +
+              ' [' + fn + ', HTTP ' + r.status + ']' + (det ? ' Detalle: ' + det : ''));
+          }
           if (!p || p.ok !== true) throw new Error((p && p.error) || ('HTTP ' + r.status));
           return p.result;
         });

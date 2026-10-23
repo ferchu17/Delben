@@ -469,7 +469,7 @@ function run(fn, ...args){
       const m = String(e && e.message || e);
       if (m.indexOf('SESION_VENCIDA') >= 0){ sesionVencida(); return; }
       if (n < 2 && red(m)) { setTimeout(() => intento(n + 1).then(ok, ko), 1500 * (n + 1)); return; }
-      if (red(m)) { ko(new Error('Google no respondió (puede estar ocupado un momento). Esperá unos segundos y probá de nuevo; lo que no se guardó no se perdió de la pantalla.')); return; }
+      if (red(m)) { ko(new Error('Google no respondió (puede estar ocupado un momento). Esperá unos segundos y probá de nuevo; lo que no se guardó no se perdió de la pantalla.' + (m.indexOf('[') >= 0 ? '\n\n' + m.slice(m.indexOf('[')) : ''))); return; }
       ko(e);
     })[fn](...args);
   });
