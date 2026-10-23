@@ -34,6 +34,8 @@ App para que el supervisor cargue licencias (vacaciones, enfermedad, ART, fallec
 
   Variables que se pueden usar en el texto: `{dias} {desde} {hasta} {reintegro} {periodo} {tipo} {objetivo} {objetivoNuevo} {motivo} {empleado} {empresa}`.
 - **Empresas**: código de la solapa Personal → razón social que se imprime (LEGUYET → L.E. GUYET, KDE → KONTROL DEFENSA ELECTRONICA S.A., PPQ → P.P.Q S.A.).
+- **Destinatarios**: los que salen marcados por defecto en cada licencia (además del supervisor que inició sesión). En pantalla se pueden quitar o agregar otros.
+- **Contactos**: libreta de direcciones para la lista desplegable de destinatarios. Se puede importar tal cual el CSV que exporta Outlook (Nombre, Apellidos, Dirección de correo electrónico). También aparecen los usuarios de SGI que tienen email.
 - **Config**: `EMAIL_ADMIN` (copia de todo), `RRHH_1..3`, `CIUDAD`.
 
 ## Mails
