@@ -178,10 +178,21 @@ function doGet(e) {
       return ContentService.createTextOutput(callback + '(' + payload + ');').setMimeType(ContentService.MimeType.JAVASCRIPT);
     }
   }
-  return HtmlService.createHtmlOutputFromFile('index')
+  return paginaHtml_()
     .setTitle(CFG.APP_TITLE)
     .addMetaTag('viewport', 'width=device-width, initial-scale=1, viewport-fit=cover')
     .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
+}
+
+/** La pantalla: acepta el archivo HTML llamado index, Index, index.html o Admin (el que exista en el proyecto). */
+function paginaHtml_() {
+  const nombres = ['index', 'Index', 'INDEX', 'index.html', 'Index.html', 'Admin', 'admin'];
+  for (let i = 0; i < nombres.length; i++) {
+    try { return HtmlService.createHtmlOutputFromFile(nombres[i]); } catch (e) { /* prueba el siguiente nombre */ }
+  }
+  return HtmlService.createHtmlOutput('<!doctype html><html><body style="font-family:Arial;padding:30px;color:#B42318">' +
+    '<h2>Falta la pantalla de Licencias</h2><p>En el proyecto de Apps Script creá un archivo <b>HTML</b> (botón + &gt; HTML) llamado <b>index</b> ' +
+    'y pegá adentro el contenido de <b>index.html</b>.</p></body></html>');
 }
 
 /** Puente RPC por POST (iframe oculto) para el guardado con firmas y fotos desde GitHub Pages. */
