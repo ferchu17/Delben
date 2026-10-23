@@ -18,7 +18,7 @@
  * Los tipos de licencia (y sus textos) están en la hoja "TiposLicencia": para agregar uno nuevo
  * (cambio de objetivo, suspensión, sanción, etc.) se agrega una fila, sin tocar el código.
  *
- * INSTALAR (con la cuenta delbensgi@gmail.com):
+ * INSTALAR (con la cuenta delbensgii@gmail.com):
  *   1) Ejecutá una vez instalar() desde el editor: autoriza permisos y crea las hojas y carpetas.
  *   2) Implementar > Nueva implementación > Aplicación web
  *        Ejecutar como: Yo   |   Quién tiene acceso: Cualquier persona
