@@ -1,0 +1,39 @@
+name: APK Presentismo de Servicios
+
+# Arma la APK de Presentismo de Servicios (abre la página con el motor de Chrome)
+# y la publica siempre en el mismo link:
+# https://github.com/ferchu17/Delben/releases/download/presentismo-apk/Presentismo.apk
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths: ["android-presentismo/**", ".github/workflows/apk-presentismo.yml"]
+
+permissions:
+  contents: write
+
+jobs:
+  apk:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-java@v5
+        with: { distribution: temurin, java-version: "17" }
+      - name: SDK de Android (ya viene en el servidor de GitHub)
+        run: echo "sdk.dir=$ANDROID_HOME" > android-presentismo/local.properties && (yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses >/dev/null || true)
+      - uses: gradle/actions/setup-gradle@v4
+        with: { gradle-version: "8.7" }
+      - name: Compilar APK
+        env: { VERSION_CODE: "${{ github.run_number }}" }
+        run: gradle -p android-presentismo :app:assembleRelease --no-daemon --stacktrace
+      - name: Renombrar
+        run: cp android-presentismo/app/build/outputs/apk/release/app-release.apk Presentismo.apk
+      - uses: actions/upload-artifact@v4
+        with: { name: Presentismo.apk, path: Presentismo.apk }
+      - name: Publicar en el link fijo
+        env: { GH_TOKEN: "${{ github.token }}" }
+        run: |
+          gh release view presentismo-apk >/dev/null 2>&1 || \
+            gh release create presentismo-apk --title "Presentismo de Servicios (APK)" \
+              --notes "App de Android de Presentismo de Servicios. Descargar Presentismo.apk e instalar."
+          gh release upload presentismo-apk Presentismo.apk --clobber

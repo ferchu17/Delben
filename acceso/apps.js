@@ -50,6 +50,11 @@ window.PORTAL_APPS = [
     link: '../licencias/', guia: '../instructivos/licencias.html', guiaRol: { Administrador: 'admin', '*': 'supervisor' },
     perfiles: ['Supervisor', 'Coordinador', 'Administrativo'], color1: '#6B2D5C', color2: '#8E3B7A' },
 
+  { id: 'presentismo', nombre: 'Presentismo de Servicios', desc: 'Presentes con DNI, horas diurnas y nocturnas, traslados y correo al servicio', img: '../iconos/presentismo-192.png', icono: 'fa-solid fa-user-check',
+    link: '../presentismo/', guia: '../instructivos/presentismo.html',
+    guiaRol: { Administrador: 'admin', Supervisor: 'supervisor', Coordinador: 'supervisor', Administrativo: 'supervisor', Servicios: 'encargado', '*': 'vigilador' },
+    perfiles: '*', color1: '#2e9d3a', color2: '#1565c0' },
+
   { id: 'documentacion', nombre: 'Documentación', desc: 'Automotriz, ART y Seguro de vida', img: '../iconos/documentacion-192.png', icono: 'fa-solid fa-folder-open',
     link: '../documentacion/', guia: '../instructivos/documentacion.html',
     perfiles: ['Supervisor', 'Coordinador', 'Administrativo', 'Flota'], color1: '#6b4a1a', color2: '#a07030' },
