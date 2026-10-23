@@ -8,6 +8,8 @@
  * Cómo se instala (una sola vez):
  *  1. Crear una planilla de Google nueva (por ejemplo "Metrópolis Infinita - Servidor").
  *  2. Extensiones › Apps Script. Borrar lo que haya y pegar este archivo completo.
+ *     (También funciona como proyecto suelto en script.google.com: crea su propia planilla.)
+ *     Elegir la función prepararServidor y tocar Ejecutar una vez para autorizar los permisos.
  *  3. Implementar › Nueva implementación › Tipo: Aplicación web.
  *     Ejecutar como: Yo. Quién tiene acceso: Cualquier persona.
  *  4. Autorizar los permisos (planilla y Drive) y copiar el link que termina en /exec.
@@ -165,7 +167,33 @@ const ACCIONES = {
 
 /* ---------- ayudas ---------- */
 function salida(o) { return ContentService.createTextOutput(JSON.stringify(o)).setMimeType(ContentService.MimeType.JSON); }
-function libro() { return SpreadsheetApp.getActiveSpreadsheet(); }
+// Usa la planilla donde está pegado el script; si el script está suelto (sin planilla),
+// crea una planilla propia "Metrópolis Infinita - Servidor" en tu Drive y la recuerda.
+let LIBRO_CACHE = null;
+function libro() {
+  if (LIBRO_CACHE) return LIBRO_CACHE;
+  let ss = null;
+  try { ss = SpreadsheetApp.getActiveSpreadsheet(); } catch (e) { ss = null; }
+  if (!ss) {
+    const props = PropertiesService.getScriptProperties();
+    const id = props.getProperty('PLANILLA_ID');
+    if (id) { try { ss = SpreadsheetApp.openById(id); } catch (e) { ss = null; } }
+    if (!ss) {
+      ss = SpreadsheetApp.create('Metrópolis Infinita - Servidor');
+      props.setProperty('PLANILLA_ID', ss.getId());
+    }
+  }
+  LIBRO_CACHE = ss;
+  return ss;
+}
+
+// Ejecutá esta función una vez desde el editor (botón Ejecutar) para autorizar los permisos
+// y crear la planilla. En el registro aparece el link de la planilla.
+function prepararServidor() {
+  ['Usuarios', 'Ofertas', 'Buzon'].forEach(hoja);
+  carpeta();
+  Logger.log('Planilla del servidor: ' + libro().getUrl());
+}
 function hoja(nombre) {
   let sh = libro().getSheetByName(nombre);
   if (!sh) { sh = libro().insertSheet(nombre); sh.appendRow(HOJAS[nombre]); sh.setFrozenRows(1); sh.getRange(1, 1, 1, HOJAS[nombre].length).setFontWeight('bold'); }
