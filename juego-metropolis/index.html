@@ -1524,7 +1524,7 @@ function claim(k){const a=ACH.find(x=>x.k===k);if(!a||G.ach[k]!=='ready')return;
 
 /* ================= cuentas y juego en línea ================= */
 // Para que todos entren al mismo servidor sin configurarlo, pegá acá el link /exec del servidor de Apps Script.
-const SERVIDOR_POR_DEFECTO='';
+const SERVIDOR_POR_DEFECTO='https://script.google.com/macros/s/AKfycbz9prcugdiZCYWgzzIHE057-Y_O3UfrdYevlz8yEsUl4xHmRS-C_3p2rJZi9UqOWzRmrg/exec';
 let ACC={user:null,token:null,mode:'guest'};
 try{const s=JSON.parse(localStorage.getItem('metropolis-session')||'null');if(s&&s.user)ACC=s}catch(e){}
 function saveSession(){try{localStorage.setItem('metropolis-session',JSON.stringify(ACC))}catch(e){}}

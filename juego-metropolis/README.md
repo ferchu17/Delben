@@ -20,7 +20,7 @@ Realizado por Fernando Jacyno · 10/2026.
 3. Implementar › Nueva implementación › Aplicación web. Ejecutar como: Yo. Quién tiene acceso: Cualquier persona.
 4. Autorizar los permisos y copiar el link que termina en `/exec`.
 5. En el juego: Menú › Juego en línea › pegar el link › Guardar y probar.
-   Para que todos lo tengan sin configurar nada, pegar el link en `SERVIDOR_POR_DEFECTO` dentro de `index.html`.
+   El link ya está fijo en `SERVIDOR_POR_DEFECTO` dentro de `index.html`, así que todos se conectan solos.
 
 Las hojas Usuarios, Ofertas y Buzon se crean solas. Las partidas en la nube se guardan en la carpeta de Drive "Metrópolis Infinita - Partidas".
 Cada vez que se cambie `servidor.gs` hay que hacer Implementar › Gestionar implementaciones › Editar › Nueva versión.
