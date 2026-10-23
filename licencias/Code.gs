@@ -1015,9 +1015,15 @@ function enviarLicenciaMail_(lic, pdfBlob, adjuntos, usuario, soloA) {
   const opts = { htmlBody: html, attachments: attachments, name: CFG.APP_TITLE };
   if (cc.length) opts.cc = cc.join(',');
   try {
-    GmailApp.sendEmail(para, asunto, 'Se adjunta la notificación de ' + lic.tipo + ' N° ' + lic.id + ' de ' + lic.nombre + '.', opts);
+    // MailApp solo necesita el permiso "enviar correo en tu nombre" (no el acceso completo a Gmail).
+    // El correo sale de la cuenta que implementó la app (delbensgii) y queda en sus Enviados.
+    MailApp.sendEmail({
+      to: para, cc: opts.cc || '', subject: asunto,
+      body: 'Se adjunta la notificación de ' + lic.tipo + ' N° ' + lic.id + ' de ' + lic.nombre + '.',
+      htmlBody: opts.htmlBody, attachments: opts.attachments, name: opts.name
+    });
   } catch (e) {
-    throw new Error('Gmail no pudo enviar el PDF a ' + para + (cc.length ? ' (CC: ' + cc.join(', ') + ')' : '') + ': ' + (e && e.message || e));
+    throw new Error('No se pudo enviar el PDF a ' + para + (cc.length ? ' (CC: ' + cc.join(', ') + ')' : '') + ': ' + (e && e.message || e));
   }
   const lista = [para].concat(cc).join(', ');
   if (prueba) return { msg: 'MODO PRUEBA: el PDF se envió solo a ' + para + ' (no se mandó al vigilador, al supervisor ni a RRHH).', lista: lista + ' (prueba)' };
@@ -1223,7 +1229,7 @@ function diagnosticoSistema() {
       objetivo: 'PRUEBA', texto: 'Texto de prueba.', fecha: fechaAIso_(new Date()), tipo: 'Vacaciones', supervisor: 'Prueba', aclSup: 'Prueba' }, '', '', []);
     return b.getBytes().length + ' bytes';
   });
-  paso('Permiso de Gmail', function () { GmailApp.getAliases(); return 'autorizado (cuenta ' + Session.getEffectiveUser().getEmail() + ')'; });
+  paso('Permiso para enviar mails', function () { return 'autorizado (cuenta ' + Session.getEffectiveUser().getEmail() + '), quedan ' + MailApp.getRemainingDailyQuota() + ' envíos hoy'; });
   Logger.log(res.join('\n'));
   return res;
 }
