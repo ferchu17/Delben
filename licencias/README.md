@@ -6,15 +6,15 @@ App para que el supervisor cargue licencias (vacaciones, enfermedad, ART, fallec
 
 | Archivo | Dónde va |
 |---|---|
-| `Code.gs` | Proyecto de Apps Script (cuenta **delbensgi@gmail.com**) |
+| `Code.gs` | Proyecto de Apps Script (cuenta **delbensgii@gmail.com**) |
 | `index.html` | Proyecto de Apps Script, como archivo HTML llamado **index**. Es la misma pantalla que se publica en GitHub Pages |
 | `appsscript.json` | Manifiesto del proyecto de Apps Script |
 
 ## Instalación
 
-1. Con la cuenta delbensgi@gmail.com, abrí la planilla de Licencias y entrá en **Extensiones > Apps Script**.
+1. Con la cuenta delbensgii@gmail.com, abrí la planilla de Licencias y entrá en **Extensiones > Apps Script**.
 2. Pegá `Code.gs`, creá el archivo HTML `index` y pegá `index.html`. En Configuración del proyecto activá "Mostrar el archivo de manifiesto appsscript.json" y pegá `appsscript.json`.
-3. Compartí **Stock Manager** con delbensgi@gmail.com como **editor**. De ahí salen el personal, los objetivos y los usuarios, y la app guarda el email del vigilador en la columna O de Personal.
+3. Compartí **Stock Manager** con delbensgii@gmail.com como **editor**. De ahí salen el personal, los objetivos y los usuarios, y la app guarda el email del vigilador en la columna O de Personal.
 4. Ejecutá `instalar()` una vez y autorizá los permisos. Crea las hojas y la carpeta de Drive "Licencias del Personal" con su subcarpeta "Adjuntos", y en el Registro de ejecución muestra un diagnóstico.
 5. En la hoja **Config** cargá los tres correos de RRHH (`RRHH_1`, `RRHH_2`, `RRHH_3`).
 6. Implementá: **Implementar > Nueva implementación > Aplicación web**, con "Ejecutar como: Yo" y "Quién tiene acceso: Cualquier persona".
