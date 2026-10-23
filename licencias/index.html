@@ -160,6 +160,7 @@ td.c,th.c{text-align:center}
     <div class="logoSlot"></div>
     <h2 style="margin-top:6px">LICENCIAS DEL PERSONAL</h2>
     <div class="hoy" id="hoyTxt"></div>
+    <div class="warn prueba hidden" style="text-align:left"><b>MODO PRUEBA:</b> los mails te llegan solo a vos y el PDF sale marcado PRUEBA. Para usarla de verdad, en la hoja Config poné MODO_PRUEBA = NO.</div>
     <div class="menu">
       <button class="btn" onclick="abrirNueva()"><b>Nueva licencia</b><span>Vacaciones, enfermedad, fallecimiento, suspensión, cambio de objetivo…</span></button>
       <button class="btn ghost" onclick="abrirLista()"><b>Licencias registradas</b><span>Consultar por vigilador, tipo o fecha, ver PDF y reenviar</span></button>
@@ -257,6 +258,7 @@ td.c,th.c{text-align:center}
       </div>
     </div>
 
+    <div class="warn prueba hidden"><b>MODO PRUEBA:</b> el mail te llega solo a vos; no se manda al vigilador, al supervisor ni a RRHH.</div>
     <div id="aErr"></div>
     <button class="btn green" id="btnEnviar" disabled onclick="enviar()">GUARDAR Y ENVIAR</button>
     <div class="muted" style="text-align:center;margin-top:6px" id="destinos"></div>
@@ -518,6 +520,8 @@ async function cargarCatalogos(){
     S.emp = (r.empleados || []).map(x => Object.assign(x, { _n: nrm(x.nombre + ' ' + x.dni + ' ' + x.lp) }));
     S.obj = (r.objetivos || []).map(x => ({ t: x, _n: nrm(x) }));
     S.tipos = r.tipos || [];
+    S.prueba = r.modoPrueba !== false;
+    document.querySelectorAll('.prueba').forEach(el => el.classList.toggle('hidden', !S.prueba));
     $('tipo').innerHTML = '<option value="">Elegí el tipo…</option>' + S.tipos.map(t => '<option value="' + esc(t.codigo) + '">' + esc(t.nombre) + '</option>').join('');
     $('fTipo').innerHTML = '<option value="">Todos</option>' + S.tipos.map(t => '<option value="' + esc(t.codigo) + '">' + esc(t.nombre) + '</option>').join('');
     S.loaded = true;
@@ -728,7 +732,7 @@ function renderActa(){
   $('ausente').checked = false;
   $('aclEmp').value = d.nombre; $('dniEmpF').value = digits(d.dni);
   const dest = [d.emailEmpleado ? 'el vigilador' : null, 'vos', 'administración', 'RRHH'].filter(Boolean);
-  $('destinos').textContent = 'Al enviar, el PDF se guarda y se manda por mail a ' + dest.join(', ').replace(/, ([^,]*)$/, ' y $1') + '.';
+  $('destinos').textContent = S.prueba ? 'Al enviar, el PDF se guarda y se manda solo al administrador (modo prueba).' : 'Al enviar, el PDF se guarda y se manda por mail a ' + dest.join(', ').replace(/, ([^,]*)$/, ' y $1') + '.';
   setMsg('aErr', '');
   renderFirmas();
 }

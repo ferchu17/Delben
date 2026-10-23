@@ -136,7 +136,8 @@ const CONFIG_DEFAULT = [
   ['RRHH_1', 'amancilla@ktl-seguridad.com', 'Contacto 1 de Recursos Humanos'],
   ['RRHH_2', 'pmoldes@ktl-seguridad.com', 'Contacto 2 de Recursos Humanos'],
   ['RRHH_3', 'sventemilla@ktl-seguridad.com', 'Contacto 3 de Recursos Humanos'],
-  ['CIUDAD', 'Buenos Aires', 'Ciudad que va en la fecha del formulario']
+  ['CIUDAD', 'Buenos Aires', 'Ciudad que va en la fecha del formulario'],
+  ['MODO_PRUEBA', 'SI', 'SI = los mails llegan solo a EMAIL_ADMIN y el PDF sale marcado PRUEBA. Poner NO para usarla de verdad']
 ];
 
 /* =========================================================
@@ -627,10 +628,13 @@ function objetivos_() {
   return lista;
 }
 
+/** Modo prueba: SI (por defecto) hasta que en la hoja Config se ponga MODO_PRUEBA = NO. */
+function modoPrueba_(cfg) { return sino_((cfg || config_()).MODO_PRUEBA, 'SI') !== 'NO'; }
+
 function getCatalogos(token) {
   validarSesion_(token);
   const hoy = Utilities.formatDate(new Date(), CFG.TZ, 'yyyy-MM-dd');
-  return { empleados: empleados_(), objetivos: objetivos_(), tipos: tipos_(), hoy: hoy };
+  return { empleados: empleados_(), objetivos: objetivos_(), tipos: tipos_(), hoy: hoy, modoPrueba: modoPrueba_() };
 }
 
 /* =========================================================
@@ -755,6 +759,7 @@ function guardarLicencia(token, d) {
     });
 
     // PDF
+    lic.prueba = modoPrueba_();
     const pdfBlob = licenciaPdf_(lic, d.firmaSup, firmaEmp, adjuntos).setName(base + '.pdf');
     const pdfFile = carpeta_().createFile(pdfBlob);
     compartirLink_(pdfFile); creados.push(pdfFile);
@@ -775,7 +780,8 @@ function guardarLicencia(token, d) {
     set('reintegro', fechaCorta_(lic.reintegro)); set('objetivo nuevo', lic.objetivoNuevo); set('motivo', lic.motivo);
     set('observaciones', lic.observaciones); set('email empleado', lic.emailEmpleado);
     set('firma empleado', lic.firmaEmpleadoTxt); set('pdf', lic.pdf); set('adjuntos', adjLinks.join('\n'));
-    set('estado', 'VIGENTE');
+    lic.prueba = modoPrueba_();
+    set('estado', lic.prueba ? 'PRUEBA' : 'VIGENTE');
     ['legajo', 'dni', 'fecha documento', 'desde', 'hasta', 'reintegro', 'periodo'].forEach(function (h) {
       if (col[h] >= 0) sh.getRange(fila, col[h] + 1).setNumberFormat('@');
     });
@@ -790,7 +796,7 @@ function guardarLicencia(token, d) {
     } catch (e) { mail = 'La licencia quedó guardada, pero no se pudo enviar el email: ' + e.message; }
     if (col['enviado a'] >= 0 && enviadoA) sh.getRange(fila, col['enviado a'] + 1).setValue(enviadoA);
 
-    if (lic.emailEmpleado) {
+    if (lic.emailEmpleado && !lic.prueba) {   // en modo prueba no se toca la solapa Personal
       try { const a = actualizarEmailPersonal_(lic.dni, lic.emailEmpleado); if (a) mail += ' ' + a; }
       catch (e) { mail += ' No se pudo actualizar el email en Personal: ' + e.message; }
     }
@@ -823,7 +829,11 @@ function enviarLicenciaMail_(lic, pdfBlob, adjuntos, usuario, soloA) {
     if (!m || !RE_MAIL_.test(m) || usados[k]) return ''; usados[k] = true; return m;
   };
   let para, cc = [];
-  if (soloA) {
+  const prueba = modoPrueba_(cfg);
+  if (prueba) {
+    // MODO PRUEBA: solo al administrador, sin copias a nadie más
+    para = unico(cfg.EMAIL_ADMIN) || unico(usuario.email);
+  } else if (soloA) {
     para = unico(soloA);
     if (!para) throw new Error('El email no es válido: ' + soloA);
     [usuario.email].forEach(function (m) { const u = unico(m); if (u) cc.push(u); });
@@ -834,7 +844,7 @@ function enviarLicenciaMail_(lic, pdfBlob, adjuntos, usuario, soloA) {
   if (!para) throw new Error('No hay ningún destinatario de email válido.');
 
   const periodoTxt = lic.desde ? (lic.hasta ? fechaCorta_(lic.desde) + ' al ' + fechaCorta_(lic.hasta) + ' (' + lic.dias + ' días)' : 'desde ' + fechaCorta_(lic.desde)) : '';
-  const asunto = 'Delben - ' + lic.tipo + ' N° ' + lic.id + ' - ' + lic.nombre;
+  const asunto = (prueba ? '[PRUEBA] ' : '') + 'Delben - ' + lic.tipo + ' N° ' + lic.id + ' - ' + lic.nombre;
   const html =
     '<p>Se adjunta la notificación de <b>' + esc_(lic.tipo) + '</b> firmada.</p>' +
     '<p><b>N°:</b> ' + esc_(lic.id) +
@@ -864,6 +874,7 @@ function enviarLicenciaMail_(lic, pdfBlob, adjuntos, usuario, soloA) {
     throw new Error('Gmail no pudo enviar el PDF a ' + para + (cc.length ? ' (CC: ' + cc.join(', ') + ')' : '') + ': ' + (e && e.message || e));
   }
   const lista = [para].concat(cc).join(', ');
+  if (prueba) return { msg: 'MODO PRUEBA: el PDF se envió solo a ' + para + ' (no se mandó al vigilador, al supervisor ni a RRHH).', lista: lista + ' (prueba)' };
   return { msg: 'PDF enviado a ' + para + (cc.length ? ' con copia a ' + cc.join(', ') : '') + '.', lista: lista };
 }
 
@@ -915,6 +926,7 @@ function licenciaPdf_(lic, firmaSup, firmaEmp, adjuntos) {
       '<td style="vertical-align:bottom;text-align:right;font-weight:bold;font-size:15px">' + esc_(lic.razon) + '</td>' +
     '</tr></table>' +
 
+    (lic.prueba ? '<div style="text-align:center;margin-top:10px"><span style="border:3px solid #B42318;color:#B42318;font-weight:bold;font-size:18px;padding:3px 18px;letter-spacing:4px">PRUEBA - SIN VALIDEZ</span></div>' : '') +
     '<div style="text-align:center;margin:26px 0 6px"><span style="font-size:19px;font-weight:bold;text-decoration:underline">' + esc_(lic.titulo) + '</span></div>' +
 
     datos +
