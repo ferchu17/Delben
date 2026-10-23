@@ -55,6 +55,9 @@ jobs:
           # Juego Mansión Sombranegra (https://ferchu17.github.io/Delben/mansion/). Se arma con: python3 juego-mansion/build.py
           mkdir -p _site/mansion
           cp juego-mansion/index.html _site/mansion/index.html
+          # Juego Metrópolis Infinita (https://ferchu17.github.io/Delben/metropolis/). El servidor en línea (servidor.gs) va en Apps Script, no se publica
+          mkdir -p _site/metropolis
+          cp juego-metropolis/index.html _site/metropolis/index.html
           # Instructivos interactivos de todas las apps (https://ferchu17.github.io/Delben/instructivos/). Se arman con: python3 instructivos/src/armar.py
           mkdir -p _site/instructivos
           cp instructivos/*.html instructivos/motor.css instructivos/motor.js _site/instructivos/

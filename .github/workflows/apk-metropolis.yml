@@ -1,0 +1,39 @@
+name: APK Metrópolis Infinita
+
+# Arma la APK del juego Metrópolis Infinita (abre https://ferchu17.github.io/Delben/metropolis/
+# a pantalla completa) y la publica siempre en el mismo link:
+# https://github.com/ferchu17/Delben/releases/download/metropolis-apk/MetropolisInfinita.apk
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths: ["android-metropolis/**", ".github/workflows/apk-metropolis.yml"]
+
+permissions:
+  contents: write
+
+jobs:
+  apk:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-java@v5
+        with: { distribution: temurin, java-version: "17" }
+      - name: SDK de Android (ya viene en el servidor de GitHub)
+        run: echo "sdk.dir=$ANDROID_HOME" > android-metropolis/local.properties && (yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses >/dev/null || true)
+      - uses: gradle/actions/setup-gradle@v4
+        with: { gradle-version: "8.7" }
+      - name: Compilar APK
+        env: { VERSION_CODE: "${{ github.run_number }}" }
+        run: gradle -p android-metropolis :app:assembleRelease --no-daemon --stacktrace
+      - name: Renombrar
+        run: cp android-metropolis/app/build/outputs/apk/release/app-release.apk MetropolisInfinita.apk
+      - uses: actions/upload-artifact@v4
+        with: { name: MetropolisInfinita-apk, path: MetropolisInfinita.apk }
+      - name: Publicar en el link fijo
+        env: { GH_TOKEN: "${{ github.token }}" }
+        run: |
+          gh release view metropolis-apk >/dev/null 2>&1 || \
+            gh release create metropolis-apk --title "Metrópolis Infinita (APK)" \
+              --notes "Juego de ciudades Metrópolis Infinita para Android. Descargar MetropolisInfinita.apk e instalar."
+          gh release upload metropolis-apk MetropolisInfinita.apk --clobber
