@@ -112,7 +112,8 @@ body{font-family:var(--font-body);color:var(--text);min-height:100vh;padding:0 1
 <div class="toast" id="toast"></div>
 
 <script src="config.js"></script>
-<script src="apps.js"></script>
+<!-- La lista de apps se pide siempre actualizada (sin la copia guardada del navegador), así una app nueva aparece al instante -->
+<script>document.write('<script src="apps.js?v=' + Date.now() + '"><\/script>');</script>
 <script>
 (function () {
   'use strict';
