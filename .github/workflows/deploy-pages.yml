@@ -67,6 +67,9 @@ jobs:
           cp novedades-app/web/config.js _site/acceso/config.js
           # DelBen Domótica: página con la descarga de la APK e instrucciones (https://ferchu17.github.io/Delben/domotica/)
           cp -R domotica _site/domotica
+          # Licencias del Personal (https://ferchu17.github.io/Delben/licencias/): solo la pantalla; el backend está en Apps Script
+          mkdir -p _site/licencias
+          cp licencias/index.html _site/licencias/index.html
           sed -i '0,/<head[^>]*>/s##&\n<link rel="icon" type="image/png" sizes="64x64" href="/Delben/iconos/sgi-64.png">\n<link rel="apple-touch-icon" href="/Delben/iconos/sgi-192.png">#' _site/sgi/index.html
           sed -i '0,/<head[^>]*>/s##&\n<link rel="icon" type="image/png" sizes="64x64" href="/Delben/iconos/sgi-64.png">\n<link rel="apple-touch-icon" href="/Delben/iconos/sgi-192.png">#' _site/novedades/index.html
             
