@@ -78,7 +78,7 @@ function doPost(e) {
       actualizarTicket: actualizarTicket, regenerarRendicion: regenerarRendicion,
       cambiarEstadoRendicion: cambiarEstadoRendicion, guardarClaveGemini: guardarClaveGemini, responderPedido: responderPedido,
       agregarCorresponde: agregarCorresponde, eliminarCorresponde: eliminarCorresponde,
-      verSupervisor: verSupervisor
+      verSupervisor: verSupervisor, generarInforme: generarInforme
     };
     if (!permitidas[fn]) throw new Error('Función no permitida: ' + fn);
     out = { ok: true, result: permitidas[fn].apply(null, args) };
@@ -823,6 +823,131 @@ function generarArchivos_(nro, supervisor, tickets, fecha) {
  * hoja 1 = planilla en A4 HORIZONTAL; hojas de tickets en A4 VERTICAL, 2 tickets por hoja.
  * Si algo falla, se arma con el método anterior (todo vertical) para que la rendición salga igual.
  */
+/* ======================= INFORME DE RENDICIONES (para Finanzas) ======================= */
+
+/**
+ * Administrador: arma un PDF con las rendiciones elegidas. Una fila por supervisor con
+ * lo que solicitó en la semana elegida (pedidos de fondos), las rendiciones elegidas con su importe y el remanente de hoy.
+ * desde / hasta: 'aaaa-mm-dd' (por defecto la semana pasada, de lunes a domingo).
+ */
+function generarInforme(token, nros, desde, hasta) {
+  const s = ses_(token);
+  exigirAdmin_(s);
+  nros = (nros || []).map(n => String(n).trim()).filter(Boolean);
+  if (!nros.length) throw new Error('Tildá al menos una rendición.');
+  if (!desde || !hasta || desde > hasta) throw new Error('Revisá las fechas de la semana.');
+
+  const asig = readSheet_(regSheet_('Asignaciones')).rows;
+  const tks = readSheet_(regSheet_('Tickets')).rows;
+  const rend = readSheet_(regSheet_('Rendiciones')).rows;
+  const sal = calcularSaldos_(asig, tks, rend);
+  const pedidos = readSheet_(hojaPedidos_()).rows;
+  const isoDe = v => v instanceof Date ? Utilities.formatDate(v, CFG.TZ, 'yyyy-MM-dd') : isoFromAny_(v);
+  const corta = v => { const i = isoDe(v); return i ? i.slice(8, 10) + '/' + i.slice(5, 7) : ''; };
+
+  const grupos = {};
+  nros.forEach(nro => {
+    const r = rend.find(x => String(x['N° Planilla']).trim() === nro);
+    if (!r) throw new Error('No se encontró la rendición N° ' + nro);
+    const todos = tks.filter(t => String(t['N° Planilla']).trim() === nro);
+    const total = todos.length
+      ? round2_(todos.filter(t => String(t.Estado) !== 'Rechazado').reduce((a, t) => a + num_(t['Total con IVA']), 0))
+      : round2_(num_(r.Total));
+    const k = norm_(r.Supervisor);
+    if (!grupos[k]) grupos[k] = { nombre: String(r.Supervisor).trim(), rend: [], pedidos: [] };
+    grupos[k].rend.push({ nro: nro, fecha: r.Fecha, total: total });
+  });
+  Object.keys(grupos).forEach(k => {
+    const g = grupos[k];
+    g.rend.sort((a, b) => (isoDe(a.fecha) || '').localeCompare(isoDe(b.fecha) || '') || (+a.nro) - (+b.nro));
+    g.pedidos = pedidos.filter(p => norm_(p.Supervisor) === k && String(p.Estado) !== 'Rechazado')
+      .filter(p => { const i = isoDe(p.Fecha); return i && i >= desde && i <= hasta; })
+      .map(p => ({ fecha: p.Fecha, monto: num_(p.Monto) }));
+    g.solicitado = round2_(g.pedidos.reduce((a, p) => a + p.monto, 0));
+    g.rendido = round2_(g.rend.reduce((a, r) => a + r.total, 0));
+    g.remanente = sal[k] ? sal[k].saldo : 0;
+  });
+  const lista = Object.keys(grupos).map(k => grupos[k]).sort((a, b) => a.nombre.localeCompare(b.nombre));
+
+  const hoy = new Date();
+  const nombre = 'Informe rendiciones combustible ' + Utilities.formatDate(hoy, CFG.TZ, 'dd-MM-yyyy HH.mm');
+  const blob = armarPdfInforme_(nombre, lista, desde, hasta, hoy, corta);
+  const f = DriveApp.getFolderById(CFG.FOLDER_ID).createFile(blob);
+  try { f.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW); } catch (e) {}
+  return { id: f.getId(), preview: 'https://drive.google.com/file/d/' + f.getId() + '/preview', link: 'https://drive.google.com/file/d/' + f.getId() + '/view' };
+}
+
+function armarPdfInforme_(nombre, lista, desde, hasta, hoy, corta) {
+  const doc = { paginas: [], imagenes: [] };
+  const AZUL = '0.122 0.220 0.392', ROJO = '0.776 0.157 0.157', GRIS_F = '0.93 0.95 0.98', GRIS_L = '0.75 0.75 0.75';
+  const PW = 595, PH = 842, M = 34, X0 = M, XR = PW - M;
+  const cols = [['SUPERVISOR', 118], ['SOLICITADO', 112], ['RENDICIONES', 150], ['RENDIDO', 74], ['REMANENTE', XR - X0 - 454]];
+  const fs = 9, lh = 13;
+  const isoTxt = i => i.slice(8, 10) + '/' + i.slice(5, 7) + '/' + i.slice(0, 4);
+  let logo = null;
+  try { const li = pdfImagen_(doc, DriveApp.getFileById(CFG.LOGO_KTL_ID).getBlob().getBytes()); if (li !== null) logo = li; } catch (e) {}
+
+  let p, y;
+  const cabecera = primera => {
+    p = pdfPagina_(doc, PW, PH);
+    y = M;
+    if (primera) {
+      let lw = 0;
+      if (logo !== null) { const d = doc.imagenes[logo], h = 44; lw = h * d.w / d.h; pdfImg_(p, logo, XR - lw, y, lw, h); }
+      pdfTxt_(p, X0, y + 16, 15, true, 'INFORME DE RENDICIONES DE COMBUSTIBLE', AZUL);
+      pdfTxt_(p, X0, y + 33, 10, false, 'Fecha: ' + Utilities.formatDate(hoy, CFG.TZ, 'dd/MM/yyyy'));
+      pdfTxt_(p, X0, y + 47, 10, false, 'Solicitado en la semana del ' + isoTxt(desde) + ' al ' + isoTxt(hasta));
+      y += 64;
+    }
+    let x = X0;
+    pdfRellenar_(p, X0, y, XR - X0, 22, AZUL);
+    cols.forEach((c, j) => {
+      if (j >= 3) pdfTxtR_(p, x + c[1] - 5, y + 14.5, 8.5, true, c[0], '1 1 1');
+      else pdfTxt_(p, x + 5, y + 14.5, 8.5, true, c[0], '1 1 1');
+      x += c[1];
+    });
+    y += 22;
+  };
+  cabecera(true);
+
+  let tSol = 0, tRen = 0, tRem = 0;
+  lista.forEach((g, i) => {
+    const sol = g.pedidos.length ? g.pedidos.map(q => corta(q.fecha) + '   ' + money_(q.monto)) : ['Sin pedidos'];
+    const ren = g.rend.map(r => 'N° ' + r.nro + ' (' + corta(r.fecha) + ')   ' + money_(r.total));
+    const n = Math.max(sol.length, ren.length, 1);
+    const h = n * lh + 10;
+    if (y + h > PH - M - 70) cabecera(false);
+    if (i % 2) pdfRellenar_(p, X0, y, XR - X0, h, GRIS_F);
+    const base = y + 5 + lh - 3.5;
+    let x = X0;
+    pdfTxt_(p, x + 5, base, fs, true, pdfCortar_(g.nombre, fs, true, cols[0][1] - 10)); x += cols[0][1];
+    sol.forEach((t, k) => pdfTxt_(p, x + 5, base + k * lh, fs, false, pdfCortar_(t, fs, false, cols[1][1] - 10), g.pedidos.length ? '0 0 0' : '0.45 0.45 0.45')); x += cols[1][1];
+    ren.forEach((t, k) => pdfTxt_(p, x + 5, base + k * lh, fs, false, pdfCortar_(t, fs, false, cols[2][1] - 10))); x += cols[2][1];
+    pdfTxtR_(p, x + cols[3][1] - 5, base, fs, true, money_(g.rendido)); x += cols[3][1];
+    const neg = Math.round(g.remanente * 100) < 0;
+    pdfTxtR_(p, x + cols[4][1] - 5, base, fs, true, (neg ? '- ' : '') + money_(Math.abs(g.remanente)), neg ? ROJO : AZUL);
+    pdfLinea_(p, X0, y + h, XR, y + h, 0.5, GRIS_L);
+    y += h;
+    tSol += g.solicitado; tRen += g.rendido; tRem += g.remanente;
+  });
+
+  // Totales
+  if (y + 26 > PH - M - 50) cabecera(false);
+  pdfRellenar_(p, X0, y, XR - X0, 24, '0.89 0.92 0.97');
+  pdfRect_(p, X0, y, XR - X0, 24, 1, AZUL);
+  let x = X0;
+  pdfTxt_(p, x + 5, y + 15.5, 9.5, true, 'TOTAL'); x += cols[0][1];
+  pdfTxt_(p, x + 5, y + 15.5, 9.5, true, money_(tSol)); x += cols[1][1] + cols[2][1];
+  pdfTxtR_(p, x + cols[3][1] - 5, y + 15.5, 9.5, true, money_(tRen)); x += cols[3][1];
+  const negT = Math.round(tRem * 100) < 0;
+  pdfTxtR_(p, x + cols[4][1] - 5, y + 15.5, 9.5, true, (negT ? '- ' : '') + money_(Math.abs(tRem)), negT ? ROJO : AZUL);
+  y += 34;
+  pdfTxt_(p, X0, y + 8, 8, false, 'Remanente: disponible de cada supervisor a la fecha del informe (en rojo, gastó más de lo depositado).', '0.4 0.4 0.4');
+  pdfTxt_(p, X0, y + 52, 9.5, false, '.------------------------------------------');
+  pdfTxt_(p, X0, y + 64, 9.5, false, 'Firma de Responsable Administrativo');
+  return pdfArmar_(doc, nombre + '.pdf');
+}
+
 function armarPdf_(nombre, nro, supervisor, tickets, fecha) {
   try {
     return armarPdfDirecto_(nombre, nro, supervisor, tickets, fecha);

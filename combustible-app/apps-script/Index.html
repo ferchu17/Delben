@@ -412,10 +412,20 @@
 
     <!-- ADMIN: RENDICIONES -->
     <div id="v-rendiciones" class="vista hidden">
+      <div class="card" id="infCard">
+        <h2>Informe para Finanzas</h2>
+        <p class="muted" style="margin-top:-6px">Tildá las rendiciones que vas a rendir y tocá <b>Generar informe</b>. Sale un PDF con cada supervisor: lo que solicitó en la semana, lo que se rinde y el remanente que le queda.</p>
+        <div class="grid2">
+          <div><label>Solicitado desde</label><input id="infDesde" type="date"></div>
+          <div><label>Hasta</label><input id="infHasta" type="date"></div>
+        </div>
+        <div class="tot-bar"><span id="infCant">0 rendiciones tildadas</span><span id="infTot">$ 0,00</span></div>
+        <button class="btn verde block" id="infBtn" onclick="generarInforme()" disabled>Generar informe PDF</button>
+      </div>
       <div class="card">
         <h2>Rendiciones</h2>
         <div class="tabla-wrap"><table>
-          <thead><tr><th>N°</th><th>Fecha</th><th>Supervisor</th><th class="r hm">Tickets</th><th class="r">Total</th><th>Estado</th><th>Archivos</th></tr></thead>
+          <thead><tr><th class="ck"><input type="checkbox" id="infTodas" title="Tildar todas" onchange="tildarTodas(this.checked)" style="width:18px;height:18px"></th><th>N°</th><th>Fecha</th><th>Supervisor</th><th class="r hm">Tickets</th><th class="r">Total</th><th>Estado</th><th>Archivos</th></tr></thead>
           <tbody id="tbRend"></tbody>
         </table></div>
       </div>
@@ -1329,7 +1339,11 @@ function guardarRev(id, estado){
 
 function renderRend(){
   const ro = AD.readOnly;
+  $('infCard').classList.toggle('hidden', ro);
+  document.querySelector('#v-rendiciones th.ck').classList.toggle('hidden', ro);
+  if (!$('infDesde').value){ const w = semanaPasada(); $('infDesde').value = w[0]; $('infHasta').value = w[1]; }
   $('tbRend').innerHTML = AD.rendiciones.map(r => `<tr>
+    ${ro ? '' : `<td><input type="checkbox" class="infCk" value="${esc(r.nro)}" ${INF_SEL[r.nro] ? 'checked' : ''} onchange="tildar(this)" style="width:18px;height:18px"></td>`}
     <td><b>${esc(r.nro)}</b></td><td>${esc(r.fecha)}</td><td>${esc(r.supervisor)}</td>
     <td class="r hm">${r.cant}</td><td class="r"><b>${money(r.total)}</b></td>
     <td>${ro ? esc(r.estado) : `<select onchange="estadoRend(${r.nro}, this.value)" style="min-width:150px">
@@ -1340,7 +1354,41 @@ function renderRend(){
       ${r.excel ? `<a class="btn verde sm" href="${esc(r.excel)}" target="_blank">Excel</a>` : ''}
       <button class="btn gris sm" onclick="verTicketsRend(${r.nro})">Tickets</button>
       ${ro ? '' : `<button class="btn naranja sm" onclick="regenerar(${r.nro})">Regenerar</button>`}
-    </div></td></tr>`).join('') || '<tr><td colspan="7" class="muted">Todavía no hay rendiciones.</td></tr>';
+    </div></td></tr>`).join('') || '<tr><td colspan="8" class="muted">Todavía no hay rendiciones.</td></tr>';
+  contarInforme();
+}
+
+/* ---- Informe para Finanzas: rendiciones tildadas ---- */
+const INF_SEL = {};
+function semanaPasada(){
+  const d = new Date(); d.setHours(12, 0, 0, 0);
+  const lunes = new Date(d); lunes.setDate(d.getDate() - ((d.getDay() + 6) % 7) - 7);
+  const dom = new Date(lunes); dom.setDate(lunes.getDate() + 6);
+  const iso = x => x.getFullYear() + '-' + String(x.getMonth() + 1).padStart(2, '0') + '-' + String(x.getDate()).padStart(2, '0');
+  return [iso(lunes), iso(dom)];
+}
+function tildar(ck){ if (ck.checked) INF_SEL[ck.value] = true; else delete INF_SEL[ck.value]; contarInforme(); }
+function tildarTodas(v){ document.querySelectorAll('.infCk').forEach(ck => { ck.checked = v; tildar(ck); }); }
+function contarInforme(){
+  const sel = AD.rendiciones.filter(r => INF_SEL[r.nro]);
+  $('infCant').textContent = sel.length + (sel.length === 1 ? ' rendición tildada' : ' rendiciones tildadas');
+  $('infTot').textContent = money(sel.reduce((a, r) => a + r.total, 0));
+  $('infBtn').disabled = !sel.length;
+  const cks = document.querySelectorAll('.infCk');
+  $('infTodas').checked = cks.length > 0 && sel.length === cks.length;
+}
+function generarInforme(){
+  const nros = AD.rendiciones.filter(r => INF_SEL[r.nro]).map(r => r.nro);
+  if (!nros.length) return modal('err', 'Elegí las rendiciones', 'Tildá las rendiciones que van en el informe.');
+  const desde = $('infDesde').value, hasta = $('infHasta').value;
+  if (!desde || !hasta || desde > hasta) return modal('err', 'Revisá las fechas', 'Completá desde y hasta de la semana de lo solicitado.');
+  loader(true);
+  run('generarInforme', S.token, nros, desde, hasta).then(r => {
+    $('pdfTit').textContent = 'Informe de rendiciones';
+    $('pdfPags').innerHTML = `<iframe src="${esc(r.preview)}" allow="autoplay" style="width:100%;height:100%;border:0;background:#fff"></iframe>`;
+    $('pdfAbrir').href = r.link;
+    $('pdfView').classList.remove('hidden');
+  }).catch(e => modal('err', 'Informe', esc(errMsg(e)))).finally(() => loader(false));
 }
 
 function verTicketsRend(nro){
