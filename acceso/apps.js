@@ -46,6 +46,10 @@ window.PORTAL_APPS = [
     link: '../cargos/', guia: '../instructivos/cargos.html',
     perfiles: ['Supervisor', 'Coordinador', 'Administrativo'], color1: '#2a4a7a', color2: '#3a70c0' },
 
+  { id: 'licencias', nombre: 'Licencias del Personal', desc: 'Vacaciones, enfermedad y demás licencias con firma, PDF y mail', img: '../iconos/licencias-192.png', icono: 'fa-solid fa-file-signature',
+    link: '../licencias/', guia: '../instructivos/licencias.html', guiaRol: { Administrador: 'admin', '*': 'supervisor' },
+    perfiles: ['Supervisor', 'Coordinador', 'Administrativo'], color1: '#6B2D5C', color2: '#8E3B7A' },
+
   { id: 'documentacion', nombre: 'Documentación', desc: 'Automotriz, ART y Seguro de vida', img: '../iconos/documentacion-192.png', icono: 'fa-solid fa-folder-open',
     link: '../documentacion/', guia: '../instructivos/documentacion.html',
     perfiles: ['Supervisor', 'Coordinador', 'Administrativo', 'Flota'], color1: '#6b4a1a', color2: '#a07030' },
