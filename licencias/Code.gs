@@ -133,9 +133,9 @@ const EMPRESAS_DEFAULT = [
 const CONFIG_DEFAULT = [
   ['clave', 'valor', 'detalle'],
   ['EMAIL_ADMIN', 'fjacyno@ktl-seguridad.com', 'Recibe copia de todas las licencias'],
-  ['RRHH_1', '', 'Contacto 1 de Recursos Humanos'],
-  ['RRHH_2', '', 'Contacto 2 de Recursos Humanos'],
-  ['RRHH_3', '', 'Contacto 3 de Recursos Humanos'],
+  ['RRHH_1', 'amancilla@ktl-seguridad.com', 'Contacto 1 de Recursos Humanos'],
+  ['RRHH_2', 'pmoldes@ktl-seguridad.com', 'Contacto 2 de Recursos Humanos'],
+  ['RRHH_3', 'sventemilla@ktl-seguridad.com', 'Contacto 3 de Recursos Humanos'],
   ['CIUDAD', 'Buenos Aires', 'Ciudad que va en la fecha del formulario']
 ];
 
@@ -392,9 +392,12 @@ function config_() {
   const sh = hojaOCrear_(licSs_(), CFG.SHEET_CONFIG, CONFIG_DEFAULT);
   const v = sh.getDataRange().getDisplayValues();
   const c = {};
+  // Valores por defecto del código; lo que esté cargado en la hoja Config tiene prioridad.
+  CONFIG_DEFAULT.slice(1).forEach(function (r) { c[r[0]] = r[1]; });
   for (let i = 1; i < v.length; i++) {
     const k = String(v[i][0] || '').trim().toUpperCase();
-    if (k) c[k] = String(v[i][1] || '').trim();
+    const val = String(v[i][1] || '').trim();
+    if (k && val) c[k] = val;
   }
   return c;
 }
