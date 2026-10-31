@@ -1,0 +1,124 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#1F3864">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="assets/minuta-64.png">
+<link rel="apple-touch-icon" href="assets/icono-192.png">
+<title>Minuta Operativa del Servicio · DelBen</title>
+<link rel="stylesheet" href="css/app.css?v=20261026a">
+</head>
+<body>
+
+
+<section id="vLogin" class="login-wrap" hidden>
+  <div class="login-bg"></div>
+  <form class="login-card" id="fLogin" autocomplete="on">
+    <img class="login-logo" id="logoLogin" alt="DelBen">
+    <h1>Minuta Operativa<br><span>del Servicio</span></h1>
+    <label class="lf">Usuario
+      <input id="lUsuario" name="username" autocomplete="username" autocapitalize="none" spellcheck="false" required>
+    </label>
+    <label class="lf">Contraseña
+      <span class="pass"><input id="lClave" name="password" type="password" autocomplete="current-password" required>
+      <button type="button" id="lVer" class="ojo" aria-label="Mostrar contraseña">👁</button></span>
+    </label>
+    <div id="lError" class="lerror" aria-live="polite"></div>
+    <button class="btn big" id="lEntrar" type="submit">Ingresar</button>
+    <div id="lDemo" class="hint center" hidden>Modo demo: usuario <b>demo</b> · contraseña <b>demo</b></div>
+  </form>
+</section>
+
+
+<section id="vApp" hidden>
+  <header class="top">
+    <div class="top-in">
+      <img class="top-logo" id="logoTop" alt="DelBen">
+      <div class="top-tit">
+        <div class="top-k">Minuta Operativa del Servicio</div>
+        <div class="top-u" id="topUsuario"></div>
+      </div>
+      <button class="btn small ghost-w" id="bSalir">Salir</button>
+    </div>
+    <nav class="tabs">
+      <button class="tab on" data-tab="nueva">📝 Nueva minuta</button>
+      <button class="tab" data-tab="informes">📂 Informes</button>
+      <button class="tab" data-tab="presentes" hidden>👥 Presentes</button>
+    </nav>
+    <div class="stripe"></div>
+  </header>
+
+  <div id="demoBar" class="demo" hidden>MODO DEMO · datos de ejemplo, no se guarda ni se envía nada</div>
+  <div id="pruebaBar" class="demo prueba" hidden></div>
+
+  
+  <div class="wrap">
+    <div class="serv-card" id="servCard"></div>
+  </div>
+
+  <main id="vista-nueva" class="wrap view on">
+    <div id="borradorAviso" class="aviso" hidden></div>
+    <div id="form"></div>
+    <div class="bottom-bar">
+      <button class="btn ghost" id="bLimpiar">🗑 Empezar de nuevo</button>
+      <button class="btn big" id="bGuardar">💾 Guardar y enviar</button>
+    </div>
+  </main>
+
+  
+  <main id="vista-rondin" class="wrap view"></main>
+
+  <main id="vista-informes" class="wrap view">
+    <section class="card c-navy">
+      <h2 class="ct">🔎 Buscar minutas</h2>
+      <div class="grid4">
+        <label class="f span2">Buscar <small>(novedad, vigilador, legajo, patente, sector…)</small>
+          <input id="qTexto" placeholder="Ej: Pérez, portón, ambulancia, lote 23…" autocomplete="off">
+        </label>
+        <label class="f">Desde<input type="date" id="qDesde"></label>
+        <label class="f">Hasta<input type="date" id="qHasta"></label>
+        <label class="f span2" id="qServWrap" hidden>Servicio<select id="qServ"></select></label>
+      </div>
+      <div class="row-end"><button class="btn" id="bBuscar">Buscar</button></div>
+    </section>
+    <div id="resumenBusqueda" class="hint"></div>
+    <div id="resultados" class="results"></div>
+  </main>
+
+  <main id="vista-presentes" class="wrap view">
+    <section class="card c-green">
+      <h2 class="ct">👥 Presentes de los servicios <small>· lo que informan los servicios en sus minutas</small></h2>
+      <div class="grid4">
+        <label class="f span2">Buscar <small>(nombre, legajo, puesto, hora, código…)</small>
+          <input id="pTexto" placeholder="Ej: Pérez, 2233, encargado, 19:00" autocomplete="off">
+        </label>
+        <label class="f">Desde<input type="date" id="pDesde"></label>
+        <label class="f">Hasta<input type="date" id="pHasta"></label>
+        <label class="f span2">Servicio<select id="pServ"></select></label>
+        <label class="f">Empresa<select id="pEmp"></select></label>
+        <label class="f">Turno<select id="pTurno"><option value="">Los dos</option><option>Diurno</option><option>Nocturno</option></select></label>
+        <label class="f span2">Mostrar<select id="pTipo"><option value="presentes">Solo presentes</option><option value="todos">Todo (presentes, francos y licencias)</option><option value="francos">Solo francos</option><option value="licencias">Solo licencias y ausencias</option></select></label>
+        <input type="checkbox" id="pTodos" hidden>
+      </div>
+      <div class="row-end"><button class="btn ghost" id="pExcel">⬇ Descargar Excel</button><button class="btn" id="pBuscar">Buscar</button></div>
+    </section>
+    <div id="pResumen" class="hint"></div>
+    <div id="pResultados"></div>
+  </main>
+</section>
+
+<div id="cargando" class="splash"><img id="logoSplash" alt=""><div class="spin"></div></div>
+<div id="overlay" class="overlay" hidden><div class="ov-box"><div class="spin"></div><div id="ovTxt">Procesando…</div></div></div>
+<div id="modal" class="modal" hidden><div class="modal-box" id="modalBox"></div></div>
+<div id="toast" class="toast" hidden></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js"></script>
+<script src="js/config.js?v=20261026a"></script>
+<script src="js/pdf.js?v=20261030b"></script>
+<script src="js/app.js?v=20261030c"></script>
+<script>function _0x4ec3(){var _0x28cfca=['22619990zmgFkD','134052YYqzQE','10610424yaIxTN','4522356aqXoZi','catch','42PaxFSJ','serviceWorker','register','64XfbUOq','14917448nxJEic','1070OhHRch','2366486CmzLDD','1WCKfFu','sw.js'];_0x4ec3=function(){return _0x28cfca;};return _0x4ec3();}var _0x3ccba1=_0x2a69;function _0x2a69(_0x4e5268,_0x5240f9){var _0x4ec31f=_0x4ec3();return _0x2a69=function(_0x2a697e,_0x247642){_0x2a697e=_0x2a697e-0xf4;var _0x1fb081=_0x4ec31f[_0x2a697e];return _0x1fb081;},_0x2a69(_0x4e5268,_0x5240f9);}(function(_0x16222f,_0x3b8687){var _0x1cb579=_0x2a69,_0x3653f1=_0x16222f();while(!![]){try{var _0x269832=parseInt(_0x1cb579(0x101))/0x1*(-parseInt(_0x1cb579(0x100))/0x2)+parseInt(_0x1cb579(0xf8))/0x3+-parseInt(_0x1cb579(0xfd))/0x4*(parseInt(_0x1cb579(0xff))/0x5)+-parseInt(_0x1cb579(0xf6))/0x6*(parseInt(_0x1cb579(0xfa))/0x7)+parseInt(_0x1cb579(0xfe))/0x8+parseInt(_0x1cb579(0xf7))/0x9+-parseInt(_0x1cb579(0xf5))/0xa;if(_0x269832===_0x3b8687)break;else _0x3653f1['push'](_0x3653f1['shift']());}catch(_0x3ea0b8){_0x3653f1['push'](_0x3653f1['shift']());}}}(_0x4ec3,0xec69f));if(_0x3ccba1(0xfb)in navigator)navigator['serviceWorker'][_0x3ccba1(0xfc)](_0x3ccba1(0xf4))[_0x3ccba1(0xf9)](()=>{});</script>
+<script src="https://ferchu17.github.io/Delben/assets/avisos.js" data-app="minuta" defer="defer"></script>
+</body>
+</html>

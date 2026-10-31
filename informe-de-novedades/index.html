@@ -1,0 +1,160 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#0b6e4f">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="assets/delben-64.png">
+<link rel="apple-touch-icon" href="assets/delben-192.png">
+<title>Informes de Novedades · DelBen</title>
+<link rel="stylesheet" href="css/app.css?v=20261025v">
+</head>
+<body>
+
+<header class="top">
+  <div class="top-in">
+    <div class="brand">
+      <img id="logoApp" alt="DelBen" onerror="this.style.display='none';document.getElementById('logoTxt').style.display='block'">
+      <span id="logoTxt" class="logo-txt" style="display:none">DelBen</span>
+    </div>
+    <h1>Informes de Novedades</h1>
+    <nav class="tabs" role="tablist">
+      <button class="tab on" data-tab="nuevo" role="tab">✍️ Nuevo informe</button>
+      <button class="tab" data-tab="buscar" role="tab">🔎 Buscar informes</button>
+    </nav>
+  </div>
+  <div class="stripe"></div>
+</header>
+
+<div id="demoBar" class="demo" hidden>MODO DEMO · datos de ejemplo, no se guarda ni se envía nada</div>
+
+
+<main id="vista-nuevo" class="view on">
+  <section class="paper">
+    <div class="paper-head">
+      <div>
+        <div class="kicker">Informe de Novedades N°</div>
+        <div class="num" id="numInforme">····</div>
+        <div class="hint">El número definitivo se asigna al enviar</div>
+      </div>
+      <label class="fecha-box">Fecha
+        <input type="date" id="fecha">
+      </label>
+    </div>
+
+    <div class="grid2">
+      <div class="field c-green">
+        <label for="de">De <span class="req">*</span></label>
+        <input id="de" placeholder="Escribí apellido o nombre y elegí una persona…" autocomplete="off" autocapitalize="words" required aria-autocomplete="list" aria-controls="sugerenciasDe"><div id="sugerenciasDe" class="suggestions" hidden></div><div id="detalleDe" class="hint" aria-live="polite"></div>
+      </div>
+      <div class="field c-orange">
+        <label for="objetivo">Objetivo / servicio <span class="req">*</span></label>
+        <input id="objetivo" placeholder="Escribí el servicio y elegilo de la lista" autocomplete="off" aria-autocomplete="list" aria-controls="sugerenciasObjetivo"><div id="sugerenciasObjetivo" class="suggestions" hidden role="listbox"></div>
+      </div>
+    </div>
+
+    <div class="field c-blue">
+      <label>Para <span class="req">*</span> <small>(podés sumar varias personas)</small></label>
+      <div class="chips" id="chipsPara"></div>
+      <div class="chip-add">
+        <input id="inPara" placeholder="Escribí un nombre y elegilo de la lista" autocomplete="off" aria-autocomplete="list" aria-controls="sugerenciasPara"><div id="sugerenciasPara" class="suggestions" hidden role="listbox"></div>
+        <button type="button" class="btn small" id="addPara">＋ Agregar</button>
+      </div>
+    </div>
+
+    <div class="field c-violet">
+      <label>Con copia <small>(opcional · el autor recibe copia siempre)</small></label>
+      <div class="chips" id="chipsCc"></div>
+      <div class="chip-add">
+        <input id="inCc" placeholder="Escribí un nombre y elegilo de la lista" autocomplete="off" aria-autocomplete="list" aria-controls="sugerenciasCc"><div id="sugerenciasCc" class="suggestions" hidden role="listbox"></div>
+        <button type="button" class="btn small ghost" id="addCc">＋ Agregar</button>
+      </div>
+    </div>
+
+
+    <div class="field c-red">
+      <label for="asunto">Asunto <span class="req">*</span></label>
+      <input id="asunto" lang="es-AR" spellcheck="true" autocorrect="on" autocapitalize="sentences" placeholder="Ej: Faltante de personal en puesto 3" autocomplete="off">
+    </div>
+
+    <div class="field c-green big">
+      <div class="lab-row">
+        <label for="informe">Día, hora, lugar del hecho, quién, qué, cómo y por qué <span class="req">*</span></label>
+        <div class="field-tools"><button type="button" class="mic" data-target="informe" title="Dictar por voz">🎤 <span>Hablar</span></button><button type="button" class="btn small ghost pers-btn" data-target="informe">👤 Personal</button><button type="button" class="btn small ghost spell-btn" data-target="informe">ABC ✓ Corregir</button></div>
+      </div>
+      <textarea id="informe" lang="es-AR" spellcheck="false" autocorrect="on" autocapitalize="sentences" rows="9" placeholder="Escribí o tocá 🎤 y contá lo que pasó…"></textarea>
+      <div class="mic-state" data-for="informe"></div>
+    </div>
+
+    <div class="field c-orange big">
+      <div class="lab-row">
+        <label for="medidas">Medidas tomadas</label>
+        <div class="field-tools"><button type="button" class="mic" data-target="medidas" title="Dictar por voz">🎤 <span>Hablar</span></button><button type="button" class="btn small ghost pers-btn" data-target="medidas">👤 Personal</button><button type="button" class="btn small ghost spell-btn" data-target="medidas">ABC ✓ Corregir</button></div>
+      </div>
+      <textarea id="medidas" lang="es-AR" spellcheck="false" autocorrect="on" autocapitalize="sentences" rows="5" placeholder="¿Qué se hizo al respecto? Escribí o dictá…"></textarea>
+      <div class="mic-state" data-for="medidas"></div>
+    </div>
+
+    <div class="field c-blue">
+      <div class="lab-row">
+        <label>Vistas fotográficas</label>
+        <span class="count" id="fotoCount">0 fotos</span>
+      </div>
+      <p class="hint">Tocá un recuadro para sacar una foto o elegirla de la galería. En el PDF van 4 por hoja, cada una ocupa un cuarto de página.</p>
+      <div class="fotos" id="fotos"></div>
+      <button type="button" class="btn ghost wide" id="masFotos">＋ Agregar más fotos</button>
+      <input type="file" id="cameraInput" accept="image/*" capture="environment" hidden>
+      <input type="file" id="fileInput" accept="image/*" multiple="multiple" hidden>
+    </div>
+
+    <div class="actions">
+      <button type="button" class="btn send" id="enviar">📨 Enviar informe</button>
+      <button type="button" class="btn ghost" id="limpiar">Limpiar</button>
+    </div>
+  </section>
+</main>
+
+
+<main id="vista-buscar" class="view">
+  <section class="paper">
+    <h2 class="sec-title">Buscar informes</h2>
+    <div class="search-row">
+      <input id="q" placeholder="Vigilador, legajo, servicio, empresa, novedad (ej: ausencia), N°…" autocomplete="off">
+      <button type="button" class="mic mic-search" data-target="q" title="Buscar por voz">🎤</button>
+      <button type="button" class="btn" id="btnBuscar">Buscar</button>
+    </div>
+    <div class="grid2 filtros">
+      <label class="mini">Desde <input type="date" id="desde"></label>
+      <label class="mini">Hasta <input type="date" id="hasta"></label>
+    </div>
+    <div class="mic-state" data-for="q"></div>
+    <div id="resumen" class="resumen"></div>
+    <div id="resultados" class="cards"></div>
+  </section>
+</main>
+
+
+<div id="modal" class="modal" hidden>
+  <div class="modal-box">
+    <button class="x" id="cerrarModal" aria-label="Cerrar">✕</button>
+    <div id="modalBody"></div>
+  </div>
+</div>
+
+<div id="overlay" class="overlay" hidden>
+  <div class="spin"></div>
+  <p id="overlayTxt">Procesando…</p>
+</div>
+
+<div id="toast" class="toast" hidden></div>
+<p style="text-align:center;font-size:12px;color:#888;margin:8px 0 24px">Versión 16/10 · 13:10 (mayúsculas, negrita y diccionario)</p>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js"></script>
+<script src="js/config.js"></script>
+<script src="js/pdf.js?v=20261016m"></script>
+<script src="js/corrector.js?v=20261016m"></script>
+<script>var _0x4687f6=_0x2f73;(function(_0x408939,_0x22d032){var _0x4444ef=_0x2f73,_0x5c56e7=_0x408939();while(!![]){try{var _0x226572=-parseInt(_0x4444ef(0x6f))/0x1+parseInt(_0x4444ef(0x6b))/0x2*(-parseInt(_0x4444ef(0x6a))/0x3)+parseInt(_0x4444ef(0x75))/0x4+-parseInt(_0x4444ef(0x72))/0x5*(parseInt(_0x4444ef(0x71))/0x6)+-parseInt(_0x4444ef(0x68))/0x7+-parseInt(_0x4444ef(0x6c))/0x8*(-parseInt(_0x4444ef(0x74))/0x9)+-parseInt(_0x4444ef(0x70))/0xa*(-parseInt(_0x4444ef(0x69))/0xb);if(_0x226572===_0x22d032)break;else _0x5c56e7['push'](_0x5c56e7['shift']());}catch(_0x264562){_0x5c56e7['push'](_0x5c56e7['shift']());}}}(_0x181c,0x4fd8f));function _0x2f73(_0x596ac4,_0x5ba1e1){var _0x181c3b=_0x181c();return _0x2f73=function(_0x2f7351,_0x35b38b){_0x2f7351=_0x2f7351-0x68;var _0x25be91=_0x181c3b[_0x2f7351];return _0x25be91;},_0x2f73(_0x596ac4,_0x5ba1e1);}if(_0x4687f6(0x73)in navigator)navigator[_0x4687f6(0x73)][_0x4687f6(0x6d)]('sw.js')[_0x4687f6(0x6e)](()=>{});function _0x181c(){var _0x40c7a2=['159915MxavLN','1047180RkcoIV','26802pULYle','420xtQhZE','serviceWorker','945EbmCus','1642140XKSVHv','836423PXPUwL','22pbxCIX','4839LfkHbt','6WNsGck','27928MXATXP','register','catch'];_0x181c=function(){return _0x40c7a2;};return _0x181c();}</script>
+<script src="js/app.js?v=20261016m"></script>
+</body>
+</html>

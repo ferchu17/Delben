@@ -1,0 +1,112 @@
+{
+ "_ayuda": "Para cada app, la PRIMERA entrada es la última actualización. Para avisar cambios nuevos agregá una entrada arriba con un id nuevo.",
+ "novedades": [
+  {
+   "id": "2026-10-30",
+   "fecha": "30/10/2026",
+   "titulo": "Novedades del Personal: cambios nuevos",
+   "cambios": [
+    "Planillas como Excel: se puede pintar una columna entera tocando su encabezado, y copiar / pegar con el botón derecho del mouse (además de Ctrl+C / Ctrl+V).",
+    "Autoguardado: si se cierra la planilla sin guardar, al volver a abrirla se recupera lo cargado y se avisa si hubo un error.",
+    "Retén / Instrucción: arranca con 5 filas; se agregan más con los botones de agregar filas (también en Planificación de servicios).",
+    "Si se borra una licencia o vacaciones ya informadas por el supervisor, aparece un aviso: primero hay que anular la licencia.",
+    "Presentes de los servicios: nocturnos en gris, diurnos en celeste, una línea por fila y comentario con el horario cuando no es de 12 hs.",
+    "Las búsquedas de personal son por apellido y nombre (y DNI si se repite), nunca por legajo.",
+    "Perfiles: las pantallas y pestañas se autorizan desde SGI > Datos Varios > Perfiles.",
+    "Presentismo General: cada período sale completo de una sola fuente (archivo o app), sin períodos repetidos ni a medias."
+   ]
+  }
+ ],
+ "sgi": [
+  {
+   "id": "2026-10-30",
+   "fecha": "30/10/2026",
+   "titulo": "SGI: cambios nuevos",
+   "cambios": [
+    "Gestión de Personal: nueva pestaña Cargos Históricos (personal de baja y cargos de más de 2 años), con buscador, colores y PDF.",
+    "Los cargos firmados se descuentan en Cargos del Personal.",
+    "Vacacioneros: informe en PDF y Excel por empresa, zona y servicio (servicio donde estuvo más de 10 días); grupos de Zárate y Fincas de Iraola 2 aparte.",
+    "Proyección de Vacaciones: se completan las vacaciones informadas por los supervisores.",
+    "Flota: informe completo del vehículo en PDF; Mantenimiento con facturas y presupuestos (foto, PDF o cámara).",
+    "Indumentaria: botón para agregar filas en todas las cargas masivas; Próxima Entrega en meses; Curvas sin tintorería.",
+    "Datos Varios: servicios con la palabra baja en negro (solo los ve el administrador), también en Líneas Tel.; precios sincronizados con el inventario; Perfiles en orden alfabético con buscador.",
+    "Gestión de Personal: nuevas pestañas Diagrama Automático (vacaciones del año en bloques de 7 o 14 días con el vacacionero, por servicio, zona, empresa o grupo) y Cobertura de Servicios (cuántos vigiladores necesita cada servicio, con franqueros optimizados).",
+    "Preparación de Indumentaria: lo escaneado con el celular (app Escáner) aparece solo en las filas; después tocás Guardar Preparación."
+   ]
+  }
+ ],
+ "minuta": [
+  {
+   "id": "2026-10-30",
+   "fecha": "30/10/2026",
+   "titulo": "Minuta Operativa: cambios nuevos",
+   "cambios": [
+    "PDF con colores más sobrios (rojo como color principal, gris oscuro y gris).",
+    "Recorridas / rondines: nueva columna Foto. Tocando \"Ver\" (o cualquier foto) se abre la foto grande con su título; \"Cerrar\" vuelve al informe.",
+    "Novedades relevantes / anomalías: botón \"Ver foto\" cuando hay una foto de esa novedad.",
+    "El PDF se guarda como \"Servicio DD-MM-AAAA Día\" o \"Noche\" (sin la palabra Delben).",
+    "Las personas cargadas en Correos CC (Escritorio) para el servicio salen con copia por defecto."
+   ]
+  }
+ ],
+ "escritorio": [
+  {
+   "id": "2026-10-30",
+   "fecha": "30/10/2026",
+   "titulo": "Escritorio DELBEN: cambios nuevos",
+   "cambios": [
+    "Nuevo botón Correos CC: por servicio, nombre y apellido, cargo, correo y qué se le comparte. Esas personas reciben copia de la Minuta Operativa por defecto. Se pueden modificar y eliminar.",
+    "Aviso de actualizaciones en todas las apps (este mensaje)."
+   ]
+  }
+ ],
+ "presentismo": [
+  {
+   "id": "2026-10-30",
+   "fecha": "30/10/2026",
+   "titulo": "Presentismo: cambios nuevos",
+   "cambios": [
+    "Códigos QR: 6 por hoja, siempre iguales, y se elige cuáles imprimir.",
+    "Los servicios con la palabra baja ya no aparecen.",
+    "Los permisos se dan desde SGI > Datos Varios > Perfiles."
+   ]
+  }
+ ],
+ "combustible": [
+  {
+   "id": "2026-10-30",
+   "fecha": "30/10/2026",
+   "titulo": "Control de Combustible: cambios nuevos",
+   "cambios": [
+    "El Jefe de Operaciones entra con el perfil de supervisor.",
+    "Los servicios con la palabra baja ya no aparecen.",
+    "Los permisos se dan desde SGI > Datos Varios > Perfiles."
+   ]
+  }
+ ],
+ "licencias": [
+  {
+   "id": "2026-10-30",
+   "fecha": "30/10/2026",
+   "titulo": "Licencias del Personal: cambios nuevos",
+   "cambios": [
+    "Nuevo tipo de licencia: Alta de licencia, con adjunto por foto, cámara o archivo.",
+    "Los servicios con la palabra baja ya no aparecen.",
+    "Los permisos se dan desde SGI > Datos Varios > Perfiles."
+   ]
+  }
+ ],
+ "escaner": [
+  {
+   "id": "2026-10-30",
+   "fecha": "30/10/2026",
+   "titulo": "Escáner de Indumentaria (nuevo)",
+   "cambios": [
+    "Preparación: escaneás el código o QR, elegís quién retira, objetivo y a quién se asigna (legajo, empresa y DNI se completan solos) y aparece en la PC en SGI › Preparación de Indumentaria.",
+    "Inventario: escaneás, cargás la cantidad que hay y Aceptar: el inventario se actualiza solo.",
+    "Imprimir QR: elegís los ítems y salen los QR de 2,5 × 2,5 cm con el nombre al lado (la selección queda en la hoja QR Indumentaria de Drive).",
+    "Solo para el administrador."
+   ]
+  }
+ ]
+}
