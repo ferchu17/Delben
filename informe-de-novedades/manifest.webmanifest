@@ -1,0 +1,33 @@
+{
+  "name": "Informes de Novedades · DelBen",
+  "short_name": "Novedades",
+  "description": "Carga y envío de Informes de Novedades con fotos, PDF y dictado por voz.",
+  "id": "/Delben/informe-de-novedades/",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "lang": "es-AR",
+  "background_color": "#ffffff",
+  "theme_color": "#0b6e4f",
+  "icons": [
+    {
+      "src": "assets/icono-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "assets/icono-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "assets/icono-maskable-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ]
+}
