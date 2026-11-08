@@ -1,0 +1,23 @@
+name: Publicar APK
+
+# Este repositorio (público) solo tiene la página ya protegida. Las APK se arman en el repositorio privado
+# y llegan acá en una rama "apk-<nombre>"; esta acción las publica siempre en el mismo link:
+# https://github.com/ferchu17/Delben/releases/download/<nombre>/<archivo>.apk
+on:
+  push:
+    branches: ["apk-*"]
+
+permissions:
+  contents: write
+
+jobs:
+  publicar:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - name: Publicar en el link fijo
+        env: { GH_TOKEN: "${{ github.token }}" }
+        run: |
+          TAG=$(jq -r .tag release.json); TITULO=$(jq -r .titulo release.json); NOTAS=$(jq -r .notas release.json); ARCHIVO=$(jq -r .archivo release.json)
+          gh release view "$TAG" >/dev/null 2>&1 || gh release create "$TAG" --target main --title "$TITULO" --notes "$NOTAS"
+          gh release upload "$TAG" "$ARCHIVO" --clobber
