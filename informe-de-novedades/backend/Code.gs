@@ -1,0 +1,616 @@
+/* ============================================================
+   INFORME DE NOVEDADES — Backend (Google Apps Script)
+   Se publica como "Aplicación web" y la app (GitHub Pages) lo
+   llama por fetch/POST. Todo responde JSON.
+   ============================================================ */
+
+const CONFIG = {
+  SPREADSHEET_ID: '1Z06eLpbng51tYcycQlr0fLNI1OYmOpnmQp94YHY_coY',
+  HOJA_INFORMES:  'informes_novedades',
+  HOJA_DICCIONARIO: 'diccionario',   // palabras que los supervisores agregan al corrector (para todos)
+  HOJA_USUARIOS:  'Usuarios y contraseñas',
+  HOJA_quienRetira: 'quienRetira',
+  HOJA_OBJETIVOS: 'objetivos',
+  HOJA_PERSONAL:  'personal',      // listado de personal / vigiladores (legajo | nombre | empresa | estado)
+  PERSONAL_GID:   1959223792,      // pestaña del personal (gid de la URL)
+
+  // Se identifican por el gid de la URL (…/edit?gid=XXXX), así no importa cómo se llame la pestaña.
+  USUARIOS_GID:  310678371,    // encabezados: id | nombre | usuario | password | rol | correo
+  OBJETIVOS_GID: 1642036355,   // encabezados: id | nombre | dir | localidad | jurisdiccion | empresa
+  CARPETA_ID:     '1NXkehdUKNsGKs_yjyfzHev82v_cBH9jz',   // carpeta de Drive donde se guardan los PDF
+
+  // Opcional: si lo completás, la app tiene que mandar el mismo valor (js/config.js → TOKEN)
+  TOKEN: '',
+
+  // Si la detección automática de columnas falla, poné acá el nombre EXACTO del encabezado
+  USUARIOS_COL_NOMBRE: '',   // ej: 'Nombre y apellido'
+  USUARIOS_COL_EMAIL:  '',   // ej: 'Correo'
+  OBJETIVOS_COL_NOMBRE: '',  // ej: 'Objetivo'
+  OBJETIVOS_COL_EMAIL:  '',  // ej: 'Mail'
+  QUIENRETIRA_COL_NOMBRE:  '',  // ej: 'Apellido y nombre'
+  QUIENRETIRA_COL_EMPRESA: '',  // ej: 'Empresa'
+  QUIENRETIRA_COL_LEGAJO:  '',  // ej: 'Legajo'
+  QUIENRETIRA_COL_EMAIL:   '',  // ej: 'Correo' (opcional: si no existe, el correo se busca en Usuarios o se pide al enviar)
+
+  LOGO_APP_ID: '1vP4JEsIwr37oQxkWtBD5bmjvWpetuBCf',   // logo DelBen en Drive
+
+  REMITENTE: 'Informes de Novedades'
+};
+
+// Columnas de la hoja informes_novedades (base 0)
+// id | informe_N | fecha | de | para | asunto | objetivo | informe | medidas_tomadas | informe (link)
+const COL = { ID: 0, NUM: 1, FECHA: 2, DE: 3, PARA: 4, ASUNTO: 5, OBJ: 6, TEXTO: 7, MEDIDAS: 8, LINK: 9 };
+const HEADERS = ['id', 'informe_N', 'fecha', 'de', 'para', 'asunto', 'objetivo', 'informe', 'medidas_tomadas', 'informe'];
+
+/* ------------------------- Entradas web ------------------------- */
+
+function doGet(e) {
+  // Diagnóstico y prueba de lectura: abrir /exec?action=listas debe devolver JSON.
+  try {
+    const action = e && e.parameter && e.parameter.action;
+    if (action === 'listas') return json_(listas_());
+    if (action === 'numero') return json_({ ok: true, siguiente: siguienteNumero_() });
+    if (action === 'logo') return json_(logo_());
+    return json_({
+      ok: true,
+      msg: 'API Informe de Novedades funcionando',
+      version: '2026-10-15-post-json',
+      pruebaPost: 'Enviar POST JSON con action=listas'
+    });
+  } catch (err) {
+    return json_({ ok: false, error: String(err && err.message || err) });
+  }
+}
+
+function doPost(e) {
+  try {
+    if (!e || !e.postData || !e.postData.contents) {
+      return json_({ ok: false, error: 'La petición POST llegó vacía. Se esperaba un cuerpo JSON.' });
+    }
+    const req = JSON.parse(e.postData.contents);
+    if (!req || typeof req !== 'object' || Array.isArray(req)) {
+      return json_({ ok: false, error: 'El cuerpo recibido no es un objeto JSON.' });
+    }
+    if (CONFIG.TOKEN && req.token !== CONFIG.TOKEN) return json_({ ok: false, error: 'No autorizado' });
+    switch (req.action) {
+      case 'logo':       return json_(logo_());
+      case 'listas':     return json_(listas_());
+      case 'numero':     return json_({ ok: true, siguiente: siguienteNumero_() });
+      case 'agregarPalabra': return json_(agregarPalabra_(req));
+      case 'reservar':   return json_(reservar_(req));
+      case 'finalizar':  return json_(finalizar_(req));
+      case 'buscar':     return json_(buscar_(req));
+      case 'pdf':        return json_(obtenerPdf_(req));
+      case 'reenviar':   return json_(reenviar_(req));
+      default:           return json_({ ok: false, error: 'Acción desconocida: ' + String(req.action || '(vacía)') });
+    }
+  } catch (err) {
+    return json_({ ok: false, error: String(err && err.message || err) });
+  }
+}
+
+function json_(o) {
+  return ContentService.createTextOutput(JSON.stringify(o)).setMimeType(ContentService.MimeType.JSON);
+}
+
+function logo_() {
+  const b = DriveApp.getFileById(CONFIG.LOGO_APP_ID).getBlob();
+  return { ok: true, src: 'data:' + b.getContentType() + ';base64,' + Utilities.base64Encode(b.getBytes()) };
+}
+
+// Cada lista se lee por separado: si una falla, las otras (y el N° siguiente) siguen llegando.
+function listas_() {
+  const out = { ok: true, errores: [] };
+  const intentar = function (clave, fn, vacio) {
+    try { out[clave] = fn(); }
+    catch (e) { out[clave] = vacio; out.errores.push(clave + ': ' + (e && e.message || e)); }
+  };
+  intentar('usuarios',    leerUsuarios_,    []);
+  intentar('quienRetira', leerquienRetir_,  []);
+  intentar('objetivos',   leerObjetivos_,   []);
+  intentar('personal',    personalCache_,   []);
+  intentar('diccionario', leerDiccionario_, []);
+  intentar('siguiente',   siguienteNumero_, '0001');
+  return out;
+}
+
+/* ------------------------- Hojas y listas ------------------------- */
+
+function ss_() { return SpreadsheetApp.openById(CONFIG.SPREADSHEET_ID); }
+
+function hojaInformes_() {
+  const ss = ss_();
+  let sh = ss.getSheetByName(CONFIG.HOJA_INFORMES);
+  if (!sh) sh = ss.insertSheet(CONFIG.HOJA_INFORMES);
+  if (sh.getLastRow() === 0) sh.getRange(1, 1, 1, HEADERS.length).setValues([HEADERS]).setFontWeight('bold');
+  return sh;
+}
+
+function norm_(s) {
+  return String(s == null ? '' : s).toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
+}
+
+// Busca la fila de encabezados (entre las primeras 5) y devuelve {rows, head, headerRow}
+function hojaPor_(nombreHoja, gid) {
+  const ss = ss_();
+  let sh = null;
+  if (gid) sh = ss.getSheets().find(s => s.getSheetId() === Number(gid)) || null;
+  if (!sh && nombreHoja) sh = ss.getSheetByName(nombreHoja);
+  if (!sh) throw new Error('No existe la pestaña "' + nombreHoja + '" (gid ' + gid + ')');
+  return sh;
+}
+
+function tabla_(nombreHoja, gid) {
+  const sh = hojaPor_(nombreHoja, gid);
+  const vals = sh.getDataRange().getValues();
+  let h = 0;
+  for (let i = 0; i < Math.min(5, vals.length); i++) {
+    if (vals[i].some(c => /mail|correo|nombre|objetivo|servicio/.test(norm_(c)))) { h = i; break; }
+  }
+  return { head: vals[h].map(norm_), headRaw: vals[h], rows: vals.slice(h + 1) };
+}
+
+function idx_(head, exacto, regex) {
+  if (exacto) { const i = head.indexOf(norm_(exacto)); if (i >= 0) return i; }
+  for (let i = 0; i < head.length; i++) if (regex.test(head[i])) return i;
+  return -1;
+}
+
+// IMPORTANTE: nunca se devuelve ninguna columna de contraseña, solo nombre y correo.
+function leerUsuarios_() {
+  const t = tabla_(CONFIG.HOJA_USUARIOS, CONFIG.USUARIOS_GID);
+  const iMail = idx_(t.head, CONFIG.USUARIOS_COL_EMAIL, /mail|correo/);
+  let iFull = idx_(t.head, CONFIG.USUARIOS_COL_NOMBRE, /nombre\s*y\s*apellido|apellido\s*y\s*nombre|nombre completo|^persona$/);
+  let iNom = -1, iApe = -1;
+  if (iFull < 0) { iNom = idx_(t.head, '', /^nombres?$/); iApe = idx_(t.head, '', /^apellidos?$/); }
+  if (iFull < 0 && iNom < 0) iFull = idx_(t.head, '', /nombre|apellido/);
+  if (iFull < 0 && iNom < 0) iFull = idx_(t.head, '', /usuario/);
+  const out = [], seen = {};
+  t.rows.forEach(r => {
+    let nombre = iFull >= 0 ? r[iFull] : [r[iNom], iApe >= 0 ? r[iApe] : ''].join(' ');
+    nombre = String(nombre || '').replace(/\s+/g, ' ').trim();
+    if (!nombre || seen[norm_(nombre)]) return;
+    seen[norm_(nombre)] = 1;
+    out.push({ nombre: nombre, email: iMail >= 0 ? String(r[iMail] || '').trim() : '' });
+  });
+  return out.sort((a, b) => a.nombre.localeCompare(b.nombre, 'es'));
+}
+
+// Personal (vigiladores) para mencionar en el texto: pestaña "personal" de Stock Manager.
+// Devuelve { nombre, legajo, empresa } solo del personal activo (sin bajas).
+const EMPRESAS_SIGLA_ = {
+  'P.P.Q. SA': 'PPQ',
+  'KONTROL DEFENSA ELECTRONICA S.A.': 'KDE',
+  'L E GUYET SERVICIOS DE SEGURIDAD S.R.L.': 'LE GUYET',
+  'LEG': 'LEG'
+};
+function leerPersonal_() {
+  const vals = hojaPor_(CONFIG.HOJA_PERSONAL, CONFIG.PERSONAL_GID).getDataRange().getDisplayValues();
+  if (vals.length < 2) return [];
+  // Fila de encabezados: la primera (de las 5 primeras) que tenga "legajo" o "nombre".
+  let h = 0;
+  for (let i = 0; i < Math.min(5, vals.length); i++) if (vals[i].some(c => /legajo|nombre|apellido/.test(norm_(c)))) { h = i; break; }
+  const enc = vals[h].map(norm_);
+  const busca = re => enc.findIndex(x => re.test(x));
+  const cL = busca(/legajo|^leg\.?$/);
+  const cFull = busca(/apellido\s*y\s*nombre|nombre\s*y\s*apellido|nombre completo|^nombre$|^nombres$/);
+  const cApe = busca(/^apellidos?$/), cNom = busca(/^nombres?$/);
+  const cE = busca(/empresa|razon social/), cS = busca(/^estado$|situacion/);
+  if (cL < 0 || (cFull < 0 && cApe < 0)) throw new Error('La pestaña del personal no tiene columnas de legajo y nombre. Encabezados: ' + vals[h].join(' | '));
+  const out = [];
+  vals.slice(h + 1).forEach(f => {
+    let nombre = cApe >= 0 && cNom >= 0 && cFull === cNom ? (f[cApe] + ' ' + f[cNom]) : (cFull >= 0 ? f[cFull] : f[cApe]);
+    nombre = String(nombre || '').replace(/\s+/g, ' ').trim().toUpperCase();
+    const legajo = String(f[cL] || '').trim();
+    if (!nombre || !legajo) return;
+    if (cS >= 0 && /^baja/.test(norm_(f[cS]))) return;
+    const emp = cE >= 0 ? String(f[cE] || '').trim() : '';
+    out.push({ nombre: nombre, legajo: legajo, empresa: EMPRESAS_SIGLA_[emp] || emp });
+  });
+  return out.sort((a, b) => a.nombre.localeCompare(b.nombre, 'es'));
+}
+
+// Diccionario compartido del corrector: pestaña "diccionario" (palabra | agregada_por | fecha).
+function hojaDiccionario_() {
+  const ss = ss_();
+  let sh = ss.getSheetByName(CONFIG.HOJA_DICCIONARIO);
+  if (!sh) { sh = ss.insertSheet(CONFIG.HOJA_DICCIONARIO); sh.getRange(1, 1, 1, 3).setValues([['palabra', 'agregada_por', 'fecha']]).setFontWeight('bold'); }
+  return sh;
+}
+function leerDiccionario_() {
+  const sh = hojaDiccionario_(), last = sh.getLastRow();
+  if (last < 2) return [];
+  return sh.getRange(2, 1, last - 1, 1).getDisplayValues().map(r => String(r[0] || '').trim()).filter(Boolean);
+}
+function agregarPalabra_(req) {
+  const palabra = String(req.palabra || '').trim().slice(0, 60);
+  if (!palabra || /\s{2,}/.test(palabra)) return { ok: false, error: 'Palabra vacía' };
+  const lock = LockService.getScriptLock(); lock.waitLock(20000);
+  try {
+    const ya = leerDiccionario_().some(w => norm_(w) === norm_(palabra));
+    if (!ya) hojaDiccionario_().appendRow([palabra, String(req.de || ''), Utilities.formatDate(new Date(), 'America/Argentina/Buenos_Aires', 'dd/MM/yyyy HH:mm')]);
+    return { ok: true, palabra: palabra, nueva: !ya };
+  } finally { lock.releaseLock(); }
+}
+
+// El listado de personal es grande: se guarda 10 minutos en caché (en partes) para que la app cargue rápido.
+function personalCache_() {
+  const cache = CacheService.getScriptCache();
+  try {
+    const n = Number(cache.get('pers_n') || 0);
+    if (n > 0) {
+      const partes = cache.getAll(Array.from({ length: n }, (_, i) => 'pers_' + i));
+      const txt = Array.from({ length: n }, (_, i) => partes['pers_' + i]).join('');
+      if (Object.keys(partes).length === n) return JSON.parse(txt);
+    }
+  } catch (e) {}
+  const lista = leerPersonal_();
+  try {
+    const txt = JSON.stringify(lista), TAM = 90000, obj = {};
+    let i = 0;
+    for (let k = 0; k < txt.length; k += TAM, i++) obj['pers_' + i] = txt.slice(k, k + TAM);
+    obj.pers_n = String(i);
+    cache.putAll(obj, 600);
+  } catch (e) {}
+  return lista;
+}
+
+// Lista del campo "De" y del personal (vigiladores): pestaña "quienRetira".
+// Devuelve { nombre, empresa, legajo }.
+function leerquienRetir_() {
+  const ss = ss_();
+  const esperado = norm_(CONFIG.HOJA_quienRetira).replace(/\s+/g, '');
+
+  // Acepta "quienRetira" o "quien retira", sin distinguir mayúsculas ni tildes.
+  const sh = ss.getSheets().find(s => norm_(s.getName()).replace(/\s+/g, '') === esperado);
+  if (!sh) {
+    throw new Error('No se encontró la pestaña "' + CONFIG.HOJA_quienRetira + '" en la planilla. Verificá el nombre de la hoja.');
+  }
+
+  const vals = sh.getDataRange().getDisplayValues();
+  if (!vals.length) return [];
+
+  const reNombre = /^(nombre|nombres|apellido y nombre|apellidos y nombres|nombre y apellido|nombre completo|quienretira|quien retira|personal|empleado|vigilador|persona)$/;
+  let headerRow = 0, colNombre = -1;
+
+  for (let r = 0; r < Math.min(5, vals.length); r++) {
+    const heads = vals[r].map(norm_);
+    let c = -1;
+    if (CONFIG.QUIENRETIRA_COL_NOMBRE) c = heads.indexOf(norm_(CONFIG.QUIENRETIRA_COL_NOMBRE));
+    if (c < 0) c = heads.findIndex(h => reNombre.test(h));
+    if (c >= 0) { headerRow = r; colNombre = c; break; }
+  }
+  if (colNombre < 0) {
+    headerRow = 0;
+    colNombre = vals[0].findIndex(v => String(v || '').trim() !== '');
+    if (colNombre < 0) colNombre = 0;
+  }
+
+  const heads = vals[headerRow].map(norm_);
+  let colEmpresa = CONFIG.QUIENRETIRA_COL_EMPRESA ? heads.indexOf(norm_(CONFIG.QUIENRETIRA_COL_EMPRESA)) : -1;
+  if (colEmpresa < 0) colEmpresa = heads.findIndex(h => /empresa|razon social|firma/.test(h));
+  let colLegajo = CONFIG.QUIENRETIRA_COL_LEGAJO ? heads.indexOf(norm_(CONFIG.QUIENRETIRA_COL_LEGAJO)) : -1;
+  if (colLegajo < 0) colLegajo = heads.findIndex(h => /legajo|^leg\.?$|n.*legajo/.test(h));
+
+  let colMail = CONFIG.QUIENRETIRA_COL_EMAIL ? heads.indexOf(norm_(CONFIG.QUIENRETIRA_COL_EMAIL)) : -1;
+  if (colMail < 0) colMail = heads.findIndex(h => /mail|correo/.test(h));
+
+  const vistos = {}, out = [];
+  vals.slice(headerRow + 1).forEach(row => {
+    const nombre = String(row[colNombre] || '').replace(/\s+/g, ' ').trim();
+    const clave = norm_(nombre);
+    if (!nombre || /^(nombre|nombres|apellido|personal|empleado|vigilador|persona)$/.test(clave)) return;
+    // Clave única: nombre + legajo, así dos "Martínez" distintos no se pisan.
+    const legajo = colLegajo >= 0 ? String(row[colLegajo] || '').trim() : '';
+    const k = clave + '|' + legajo;
+    if (vistos[k]) return;
+    vistos[k] = true;
+    out.push({
+      nombre: nombre,
+      empresa: colEmpresa >= 0 ? String(row[colEmpresa] || '').trim() : '',
+      legajo: legajo,
+      email: colMail >= 0 ? String(row[colMail] || '').trim() : ''
+    });
+  });
+  return out.sort((a, b) => a.nombre.localeCompare(b.nombre, 'es'));
+}
+
+function leerObjetivos_() {
+  const t = tabla_(CONFIG.HOJA_OBJETIVOS, CONFIG.OBJETIVOS_GID);
+  const iMail = idx_(t.head, CONFIG.OBJETIVOS_COL_EMAIL, /mail|correo/);
+  const iNom = idx_(t.head, CONFIG.OBJETIVOS_COL_NOMBRE, /objetivo|servicio|nombre|puesto|cliente/);
+  const col = iNom >= 0 ? iNom : 0;
+  const out = [], seen = {};
+  t.rows.forEach(r => {
+    const nombre = String(r[col] || '').replace(/\s+/g, ' ').trim();
+    if (!nombre || seen[norm_(nombre)]) return;
+    seen[norm_(nombre)] = 1;
+    out.push({ nombre: nombre, email: iMail >= 0 ? String(r[iMail] || '').trim() : '' });
+  });
+  return out.sort((a, b) => a.nombre.localeCompare(b.nombre, 'es'));
+}
+
+/* ------------------------- Numeración ------------------------- */
+
+function pad_(n, l) { n = String(n); while (n.length < l) n = '0' + n; return n; }
+
+function siguienteNumero_() {
+  const sh = hojaInformes_();
+  const last = sh.getLastRow();
+  let maxN = 0;
+  if (last > 1) sh.getRange(2, COL.NUM + 1, last - 1, 1).getValues()
+    .forEach(r => { maxN = Math.max(maxN, parseInt(String(r[0]).replace(/\D/g, ''), 10) || 0); });
+  return pad_(maxN + 1, 4);
+}
+
+/* ------------------------- Guardado en 2 pasos -------------------------
+   1) reservar: asigna el N° (con candado, sin duplicados) y escribe la fila.
+   2) finalizar: recibe el PDF ya armado con ese N°, lo guarda en Drive,
+      completa el link en la hoja y envía los mails.
+-------------------------------------------------------------------- */
+
+function reservar_(req) {
+  const d = req.data || {};
+  const lock = LockService.getScriptLock();
+  lock.waitLock(30000);
+  try {
+    const sh = hojaInformes_();
+    const last = sh.getLastRow();
+    let maxId = 0, maxN = 0;
+    if (last > 1) sh.getRange(2, 1, last - 1, 2).getValues().forEach(r => {
+      maxId = Math.max(maxId, Number(r[COL.ID]) || 0);
+      maxN = Math.max(maxN, parseInt(String(r[COL.NUM]).replace(/\D/g, ''), 10) || 0);
+    });
+    const id = maxId + 1, num = pad_(maxN + 1, 4), row = last + 1;
+    sh.getRange(row, COL.NUM + 1).setNumberFormat('@');
+    sh.getRange(row, COL.FECHA + 1).setNumberFormat('@');
+    sh.getRange(row, 1, 1, HEADERS.length).setValues([[
+      id, num, d.fecha || '', d.de || '', (d.para || []).join('; '),
+      d.asunto || '', d.objetivo || '', d.informe || '', d.medidas || '', ''
+    ]]);
+    SpreadsheetApp.flush();
+    return { ok: true, id: id, numero: num };
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+function buscarFila_(sh, id) {
+  const last = sh.getLastRow();
+  if (last < 2) return -1;
+  const ids = sh.getRange(2, 1, last - 1, 1).getValues();
+  for (let i = 0; i < ids.length; i++) if (String(ids[i][0]) === String(id)) return i + 2;
+  return -1;
+}
+
+function slug_(s) {
+  return norm_(s).replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '').slice(0, 40);
+}
+
+// Carpeta de los PDF: la configurada; si la cuenta no puede abrirla, se usa (o crea) "Informes de Novedades" en su Drive.
+function carpetaInformes_() {
+  try { return DriveApp.getFolderById(CONFIG.CARPETA_ID); }
+  catch (e) {
+    const it = DriveApp.getFoldersByName('Informes de Novedades');
+    const f = it.hasNext() ? it.next() : DriveApp.createFolder('Informes de Novedades');
+    console.warn('No se pudo abrir la carpeta ' + CONFIG.CARPETA_ID + ' (' + e.message + '). Se usa: ' + f.getUrl());
+    return f;
+  }
+}
+
+// Ejecutar a mano una vez para verificar el acceso a la carpeta de Drive.
+function probarCarpeta() {
+  try { const f = DriveApp.getFolderById(CONFIG.CARPETA_ID); Logger.log('OK carpeta configurada: ' + f.getName() + ' · ' + f.getUrl()); }
+  catch (e) { Logger.log('NO se puede abrir la carpeta configurada: ' + e.message + '\nSe usaría: ' + carpetaInformes_().getUrl()); }
+}
+
+function finalizar_(req) {
+  const sh = hojaInformes_();
+  const row = buscarFila_(sh, req.id);
+  if (row < 0) throw new Error('No se encontró el informe reservado');
+  const vals = sh.getRange(row, 1, 1, HEADERS.length).getValues()[0];
+  const num = String(vals[COL.NUM]);
+  const nombre = 'Informe_de_Novedades_' + num + (slug_(vals[COL.ASUNTO]) ? '_' + slug_(vals[COL.ASUNTO]) : '') + '.pdf';
+
+  let url = String(vals[COL.LINK] || '');
+  let file;
+  if (url) {
+    file = DriveApp.getFileById(idDeUrl_(url));              // reintento: se reutiliza el PDF
+  } else {
+    const blob = Utilities.newBlob(Utilities.base64Decode(req.pdfBase64), 'application/pdf', nombre);
+    file = carpetaInformes_().createFile(blob);
+    url = file.getUrl();
+    sh.getRange(row, COL.LINK + 1).setValue(url);
+  }
+  const enviados = enviarMail_(file.getBlob().setName(nombre), num, vals[COL.ASUNTO], vals[COL.DE], req.to, req.cc, vals[COL.OBJ]);
+  return { ok: true, id: req.id, numero: num, url: url, enviados: enviados };
+}
+
+/* ------------------------- Mail ------------------------- */
+
+function emailsValidos_(arr) {
+  return [].concat.apply([], (arr || []).map(s => String(s || '').split(/[;,\s]+/))).map(s => s.trim()).filter(s => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(s))
+    .filter((s, i, a) => a.indexOf(s) === i);
+}
+
+function enviarMail_(blob, num, asunto, de, to, cc, objetivo) {
+  to = emailsValidos_(to);
+  cc = emailsValidos_(cc).filter(e => to.indexOf(e) < 0);
+  if (!to.length) throw new Error('No hay destinatarios con correo válido');
+  const html =
+    '<div style="font-family:Arial,sans-serif;max-width:560px;border:1px solid #e3e8e5;border-radius:12px;overflow:hidden">' +
+    '<div style="height:6px;background:linear-gradient(90deg,#1fa364,#0e86a8,#f5821f,#d7263d)"></div>' +
+    '<div style="padding:20px 24px;color:#1b2a2f">' +
+    '<h2 style="margin:0 0 4px;color:#0b6e4f">Informe de Novedades N° ' + num + '</h2>' +
+    '<p style="margin:0 0 14px;color:#5b6b70">Adjunto en PDF</p>' +
+    '<table style="font-size:14px;border-collapse:collapse">' +
+    '<tr><td style="padding:3px 12px 3px 0;color:#5b6b70">De</td><td><b>' + esc_(de) + '</b></td></tr>' +
+    '<tr><td style="padding:3px 12px 3px 0;color:#5b6b70">Asunto</td><td><b>' + esc_(asunto) + '</b></td></tr>' +
+    '<tr><td style="padding:3px 12px 3px 0;color:#5b6b70">Objetivo</td><td><b>' + esc_(objetivo) + '</b></td></tr></table>' +
+    '</div></div>';
+  correoDelben_({
+    to: to.join(','), cc: cc.join(','), name: CONFIG.REMITENTE,
+    subject: 'Informe de Novedades N° ' + num + ' - ' + asunto,
+    htmlBody: html, attachments: [blob]
+  });
+  return { to: to, cc: cc };
+}
+
+function esc_(s) {
+  return String(s || '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+}
+
+function idDeUrl_(url) {
+  const m = String(url).match(/[-\w]{25,}/);
+  if (!m) throw new Error('Link de Drive inválido');
+  return m[0];
+}
+
+/* ------------------------- Buscador ------------------------- */
+
+function fechaTxt_(v) {
+  if (v instanceof Date) return Utilities.formatDate(v, 'America/Argentina/Buenos_Aires', 'dd/MM/yyyy');
+  return String(v || '');
+}
+
+function fechaNum_(txt) {            // 'dd/mm/yyyy' -> yyyymmdd
+  const m = String(txt).match(/(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+  return m ? Number(m[3]) * 10000 + Number(m[2]) * 100 + Number(m[1]) : 0;
+}
+
+function buscar_(req) {
+  const sh = hojaInformes_();
+  const last = sh.getLastRow();
+  if (last < 2) return { ok: true, items: [] };
+  const vals = sh.getRange(2, 1, last - 1, HEADERS.length).getValues();
+  // Cada palabra buscada puede coincidir con sus parecidas: "ausencia" encuentra "faltó", "ausente", etc.
+  const SINONIMOS = [
+    ['ausencia', 'ausente', 'falta', 'falto', 'faltando', 'faltante', 'inasistencia', 'no se presento', 'no concurrio'],
+    ['tarde', 'tardanza', 'llegada tarde', 'demora', 'retraso'],
+    ['robo', 'hurto', 'faltante de', 'sustraccion'],
+    ['abandono', 'abandono de puesto', 'se retiro', 'dejo el puesto'],
+    ['accidente', 'lesion', 'herido', 'golpe'],
+    ['enfermedad', 'enfermo', 'medico', 'certificado']
+  ];
+  const variantes = t => { const g = SINONIMOS.find(l => l.some(w => w === t || (t.length >= 4 && w.startsWith(t)))); return g ? g.concat([t]) : [t]; };
+  const tokens = norm_(req.q || '').split(/\s+/).filter(Boolean).map(variantes);
+  const desde = req.desde ? Number(String(req.desde).replace(/-/g, '')) : 0;   // 'yyyy-mm-dd'
+  const hasta = req.hasta ? Number(String(req.hasta).replace(/-/g, '')) : 99999999;
+  const items = [];
+  vals.forEach(r => {
+    if (!r[COL.ID]) return;
+    const f = fechaTxt_(r[COL.FECHA]), fn = fechaNum_(f);
+    if (fn && (fn < desde || fn > hasta)) return;
+    const hay = norm_([r[COL.NUM], f, r[COL.DE], r[COL.PARA], r[COL.ASUNTO], r[COL.OBJ], r[COL.TEXTO], r[COL.MEDIDAS]].join(' '));
+    if (!tokens.every(vs => vs.some(t => hay.indexOf(t) >= 0))) return;
+    items.push({
+      id: r[COL.ID], numero: String(r[COL.NUM]), fecha: f, de: r[COL.DE], para: r[COL.PARA],
+      asunto: r[COL.ASUNTO], objetivo: r[COL.OBJ], informe: r[COL.TEXTO], medidas: r[COL.MEDIDAS],
+      link: String(r[COL.LINK] || '')
+    });
+  });
+  items.sort((a, b) => Number(b.id) - Number(a.id));
+  return { ok: true, items: items.slice(0, 150), total: items.length };
+}
+
+function filaPorId_(id) {
+  const sh = hojaInformes_();
+  const row = buscarFila_(sh, id);
+  if (row < 0) throw new Error('Informe no encontrado');
+  return sh.getRange(row, 1, 1, HEADERS.length).getValues()[0];
+}
+
+function obtenerPdf_(req) {
+  const r = filaPorId_(req.id);
+  if (!r[COL.LINK]) throw new Error('Este informe todavía no tiene PDF');
+  const f = DriveApp.getFileById(idDeUrl_(r[COL.LINK]));
+  return { ok: true, base64: Utilities.base64Encode(f.getBlob().getBytes()), nombre: f.getName(), url: String(r[COL.LINK]) };
+}
+
+function reenviar_(req) {
+  const r = filaPorId_(req.id);
+  if (!r[COL.LINK]) throw new Error('Este informe todavía no tiene PDF');
+  const f = DriveApp.getFileById(idDeUrl_(r[COL.LINK]));
+  const env = enviarMail_(f.getBlob(), String(r[COL.NUM]), r[COL.ASUNTO], r[COL.DE], req.to, req.cc, r[COL.OBJ]);
+  return { ok: true, enviados: env };
+}
+
+/* ------------------------- Utilidad de prueba -------------------------
+   Ejecutala una vez desde el editor para aceptar los permisos y ver las listas. */
+function probarListas() {
+  Logger.log('Encabezados usuarios: ' + JSON.stringify(tabla_(CONFIG.HOJA_USUARIOS, CONFIG.USUARIOS_GID).headRaw.filter(h => !/contrase|clave|pass/i.test(h))));
+  Logger.log('Encabezados personal: ' + JSON.stringify(hojaPor_(CONFIG.HOJA_PERSONAL, CONFIG.PERSONAL_GID).getRange(1, 1, 1, 30).getDisplayValues()[0].filter(String)));
+  Logger.log('Encabezados objetivos: ' + JSON.stringify(tabla_(CONFIG.HOJA_OBJETIVOS, CONFIG.OBJETIVOS_GID).headRaw));
+  Logger.log(JSON.stringify({
+    usuarios: leerUsuarios_().slice(0, 5),
+    quienRetira: leerquienRetir_().slice(0, 5),
+    objetivos: leerObjetivos_().slice(0, 5),
+    personal: leerPersonal_().slice(0, 5),
+    siguiente: siguienteNumero_()
+  }, null, 2));
+}
+
+// Ejecutala una vez desde el editor: pide el permiso de "Enviar correo" y te manda un mail de prueba a vos.
+// Después hay que publicar una VERSIÓN NUEVA de la implementación para que la app tome el permiso.
+function probarCorreo() {
+  const para = 'fjacyno@ktl-seguridad.com';   // a quién llega la prueba
+  correoDelben_({ to: para, name: CONFIG.REMITENTE, subject: 'Prueba Informe de Novedades', htmlBody: 'Si te llegó este correo, el envío funciona.' });
+  Logger.log('Correo de prueba enviado a ' + para + ' · cupo restante hoy: ' + MailApp.getRemainingDailyQuota());
+}
+
+/* ===================== Correos DELBEN con respaldo de cupo (2026-10-30) =====================
+   Los correos salen de la cuenta que publica la app (delbensgi). Google da un cupo diario por cuenta:
+   si se termina, el correo sale igual por delben1sgi (Minuta Operativa) y, si esa tampoco tiene cupo,
+   por delbensgii (Escáner). Se mantienen el nombre del remitente, "Responder a", copias y adjuntos.
+   El pase se firma con la clave de la pestaña oculta SSO_Novedades de Stock Manager (no va en el código). */
+var CORREO_RELAYS_ = [
+  'https://script.google.com/macros/s/AKfycbxvD1lTi3XX9_KcDYhA0JE2b9ph68Ijd1Y18cO10JN0Xzx5vlIuYRBrlYYD1mvA21NvAw/exec', // delben1sgi
+  'https://script.google.com/macros/s/AKfycbyzfF7fC_wjHXROx39V59pMX00WSiYrMFqFsrRvw0jVymMBTuZ4hesaz3VWTABH0rtGPw/exec'  // delbensgii
+];
+var CORREO_SS_CLAVE_ = '1Z06eLpbng51tYcycQlr0fLNI1OYmOpnmQp94YHY_coY';
+
+function correoEsCupo_(e) { return /demasiadas veces|too many times|cuota|quota|limit/i.test(String(e && e.message || e)); }
+
+function correoDelben_(op) {
+  op = op || {};
+  var n = [op.to, op.cc, op.bcc].join(',').split(/[,;]/).filter(function (x) { return String(x).trim(); }).length || 1;
+  var cupo = 999; try { cupo = MailApp.getRemainingDailyQuota(); } catch (e) { }
+  if (cupo >= n) {
+    try { MailApp.sendEmail(op); return; } catch (e) { if (!correoEsCupo_(e)) throw e; }
+  }
+  correoRespaldo_(op);
+}
+
+function correoRespaldo_(op) {
+  var h = SpreadsheetApp.openById(CORREO_SS_CLAVE_).getSheetByName('SSO_Novedades');
+  var secreto = h ? String(h.getRange('A1').getValue() || '').trim() : '';
+  if (!secreto) throw new Error('Se terminó el cupo de correos de hoy y falta la clave del respaldo (pestaña SSO_Novedades).');
+  var esc = function (t) { return String(t || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); };
+  var aB = function (b) { b = b && b.getBlob ? b.getBlob() : b; return { nombre: b.getName() || 'adjunto', tipo: b.getContentType(), b64: Utilities.base64Encode(b.getBytes()) }; };
+  var req = {
+    action: 'correoRelay', to: String(op.to || ''), cc: String(op.cc || ''), bcc: String(op.bcc || ''),
+    subject: String(op.subject || 'DELBEN'), name: String(op.name || 'DELBEN'), replyTo: String(op.replyTo || ''),
+    html: op.htmlBody || ('<div style="font-family:Arial,sans-serif;white-space:pre-wrap">' + esc(op.body) + '</div>'),
+    adjuntos: [].concat(op.attachments || []).filter(function (b) { return b; }).map(aB), inline: []
+  };
+  Object.keys(op.inlineImages || {}).forEach(function (k) { var x = aB(op.inlineImages[k]); x.cid = k; req.inline.push(x); });
+  var ult = '';
+  for (var i = 0; i < CORREO_RELAYS_.length; i++) {
+    var vence = Date.now() + 120000;
+    req.relay = 'relay.' + vence + '.' + Utilities.base64EncodeWebSafe(Utilities.computeHmacSha256Signature('relay.' + vence, secreto)).replace(/=+$/, '');
+    try {
+      var r = UrlFetchApp.fetch(CORREO_RELAYS_[i], { method: 'post', contentType: 'text/plain;charset=utf-8', payload: JSON.stringify(req), muteHttpExceptions: true, followRedirects: true });
+      var o = JSON.parse(r.getContentText());
+      if (o && o.ok) { Logger.log('Correo enviado por la cuenta de respaldo ' + (i + 1) + ' (quedan ' + o.quedan + ').'); return; }
+      ult = (o && o.error) || 'sin respuesta';
+    } catch (e) { ult = String(e && e.message || e); }
+  }
+  throw new Error('Se terminó el cupo de correos de hoy en las tres cuentas DELBEN. Probá mañana. (' + ult + ')');
+}
+
+// Ejecutar una vez desde el editor (con la cuenta que publica) para dar los permisos del respaldo de correos.
+function autorizarCorreoDelben() {
+  UrlFetchApp.getRequest(CORREO_RELAYS_[0]);
+  SpreadsheetApp.openById(CORREO_SS_CLAVE_).getName();
+  Logger.log('Permisos OK. Cupo de correos hoy: ' + MailApp.getRemainingDailyQuota());
+}
