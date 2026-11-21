@@ -1,0 +1,370 @@
+<!doctype html>
+<html lang="es">
+<head><script>(function(){try{if(window.top!==window)return;var ua=navigator.userAgent||"";if(/; wv\)/.test(ua))return;if(navigator.standalone||(window.matchMedia&&(matchMedia("(display-mode: standalone)").matches||matchMedia("(display-mode: fullscreen)").matches||matchMedia("(display-mode: minimal-ui)").matches)))return;if(String(document.referrer).indexOf("android-app://")===0)return;if(/[?&]quedar=1/.test(location.search))return;var d={},n=0;try{for(var i=0;i<localStorage.length;i++){var k=localStorage.key(i),v=localStorage.getItem(k);if(v!=null&&v.length<200000){d[k]=v;n++;}}}catch(e){}var u="https://delbensgi.com.ar"+location.pathname.replace(/^\/Delben(?=\/|$)/,"")+location.search,r=location.hash||"";if(n){u+="#__delben="+encodeURIComponent(btoa(unescape(encodeURIComponent(JSON.stringify(d)))))+"|"+encodeURIComponent(r);}else u+=r;location.replace(u);}catch(e){}})();</script>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>DELBEN · Sistema de Gestión Integral para empresas de seguridad</title>
+<meta name="description" content="DELBEN reúne presentismo con QR, novedades, licencias, credenciales, flota, combustible, minuta y control en vivo en un solo sistema. Asesoramiento y auditorías en seguridad.">
+<link rel="icon" type="image/png" href="../iconos/escritorio-64.png">
+<meta property="og:title" content="DELBEN · Toda la operación de tu empresa de seguridad en un solo lugar">
+<meta property="og:description" content="16 apps conectadas, en el celular y en la PC, con un solo usuario.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+<style>
+:root{--az:#0f5fbf;--az2:#1e7fe0;--ve:#13a35a;--ve2:#2fd17f;--osc:#071a33;--osc2:#0c2a4d;--tx:#0f172a;--mu:#5b6b82;--cl:#f3f7fc;--li:#e3ebf5;--bl:#fff}
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+body{font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;color:var(--tx);background:var(--bl);line-height:1.55;overflow-x:hidden}
+a{color:inherit;text-decoration:none}
+img{max-width:100%;display:block}
+.cont{width:min(1160px,100% - 32px);margin:0 auto}
+.btn{display:inline-flex;align-items:center;gap:8px;padding:13px 22px;border-radius:999px;font-weight:700;font-size:15px;transition:transform .2s,box-shadow .2s,background .2s;cursor:pointer;border:0}
+.btn:hover{transform:translateY(-2px)}
+.btn-p{background:linear-gradient(135deg,var(--ve),var(--ve2));color:#fff;box-shadow:0 10px 24px rgba(19,163,90,.35)}
+.btn-s{background:rgba(255,255,255,.12);color:#fff;border:1px solid rgba(255,255,255,.35)}
+.btn-a{background:var(--az);color:#fff}
+.chip{display:inline-flex;align-items:center;gap:6px;padding:6px 12px;border-radius:999px;font-size:12.5px;font-weight:700;letter-spacing:.04em;text-transform:uppercase}
+/* NAV */
+nav{position:fixed;inset:0 0 auto 0;z-index:50;transition:background .3s,box-shadow .3s}
+nav.sol{background:rgba(7,26,51,.92);backdrop-filter:blur(10px);box-shadow:0 6px 24px rgba(0,0,0,.25)}
+nav .cont{display:flex;align-items:center;justify-content:space-between;height:68px}
+.marca{display:flex;align-items:center;gap:10px;color:#fff;font-weight:900;letter-spacing:.08em}
+.marca img{height:40px;width:auto;background:#fff;border-radius:10px;padding:3px 6px;box-shadow:0 2px 8px rgba(0,0,0,.25)}
+.menu{display:flex;gap:26px;align-items:center}
+.menu a{color:#dbe8f7;font-weight:600;font-size:14.5px}
+.menu a:hover{color:#fff}
+.hamb{display:none;background:none;border:0;color:#fff;font-size:26px;cursor:pointer}
+/* HERO */
+.hero{position:relative;min-height:100vh;padding:120px 0 80px;color:#fff;background:radial-gradient(1200px 600px at 85% 10%,rgba(47,209,127,.25),transparent 60%),radial-gradient(900px 600px at 10% 90%,rgba(30,127,224,.35),transparent 60%),linear-gradient(160deg,var(--osc) 0%,var(--osc2) 60%,#0a3a6a 100%);overflow:hidden;display:flex;align-items:center}
+.hero::before{content:"";position:absolute;inset:0;background-image:linear-gradient(rgba(255,255,255,.05) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.05) 1px,transparent 1px);background-size:44px 44px;mask-image:radial-gradient(ellipse at center,#000 30%,transparent 75%)}
+.hero .cont{position:relative;display:grid;grid-template-columns:1.1fr .9fr;gap:40px;align-items:center}
+.hero .chip{background:rgba(47,209,127,.15);color:#7ff0b4;border:1px solid rgba(47,209,127,.35)}
+.hero h1{font-size:clamp(34px,5vw,58px);line-height:1.05;font-weight:900;margin:18px 0;letter-spacing:-.02em}
+.hero h1 .gr{background:linear-gradient(90deg,#5fe3a1,#6fb6ff);-webkit-background-clip:text;background-clip:text;color:transparent}
+.hero p.lead{font-size:18px;color:#c7d6ea;max-width:560px}
+.hero .ctas{display:flex;gap:12px;flex-wrap:wrap;margin-top:28px}
+.rota{display:inline-block;min-width:10ch;color:#7ff0b4;border-bottom:3px solid rgba(127,240,180,.5)}
+.mini{display:flex;gap:22px;margin-top:34px;flex-wrap:wrap}
+.mini div{font-size:13px;color:#a9bdd8}
+.mini b{display:block;font-size:26px;color:#fff;font-weight:800}
+/* TELÉFONO */
+.tel{position:relative;width:290px;height:590px;margin:0 auto;border-radius:44px;background:#0b0f17;padding:12px;box-shadow:0 40px 80px rgba(0,0,0,.5),inset 0 0 0 2px #2a3548;transform:rotate(-4deg);animation:flota 6s ease-in-out infinite}
+@keyframes flota{0%,100%{transform:rotate(-4deg) translateY(0)}50%{transform:rotate(-4deg) translateY(-14px)}}
+.tel::before{content:"";position:absolute;top:18px;left:50%;width:90px;height:22px;margin-left:-45px;background:#0b0f17;border-radius:0 0 14px 14px;z-index:3}
+.pant{position:relative;width:100%;height:100%;border-radius:34px;overflow:hidden;background:#f3f7fc;color:var(--tx)}
+.vista{position:absolute;inset:0;padding:44px 14px 14px;opacity:0;transform:translateX(30px);transition:opacity .6s,transform .6s}
+.vista.on{opacity:1;transform:none}
+.vh{display:flex;align-items:center;gap:8px;margin-bottom:12px}
+.vh img{width:30px;height:30px;border-radius:8px}
+.vh b{font-size:13px}
+.vh small{display:block;font-size:10.5px;color:var(--mu)}
+.tarj{background:#fff;border-radius:14px;padding:12px;box-shadow:0 2px 8px rgba(15,23,42,.08);margin-bottom:10px;font-size:12px}
+.qr{width:120px;height:120px;margin:6px auto;background:conic-gradient(from 0deg,#0f172a 0 25%,#fff 0 50%,#0f172a 0 75%,#fff 0) 0 0/24px 24px;border:8px solid #fff;outline:2px solid #0f172a;border-radius:6px;position:relative}
+.qr::after{content:"";position:absolute;inset:-8px;border:3px solid var(--ve);border-radius:10px;animation:esc 2s linear infinite}
+@keyframes esc{0%{clip-path:inset(0 0 100% 0)}50%{clip-path:inset(0 0 0 0)}100%{clip-path:inset(100% 0 0 0)}}
+.ok{display:flex;align-items:center;gap:8px;color:var(--ve);font-weight:800;justify-content:center;margin-top:6px}
+.fila{display:flex;justify-content:space-between;align-items:center;padding:7px 0;border-bottom:1px solid var(--li)}
+.fila:last-child{border:0}
+.pt{width:9px;height:9px;border-radius:50%;display:inline-block;margin-right:6px}
+.barra{height:8px;border-radius:9px;background:var(--li);overflow:hidden;margin-top:6px}
+.barra i{display:block;height:100%;background:linear-gradient(90deg,var(--ve),var(--az2));animation:llena 2.4s ease-out forwards}
+@keyframes llena{from{width:0}}
+.cred{width:150px;margin:4px auto;border-radius:12px;overflow:hidden;background:#fff;box-shadow:0 6px 18px rgba(0,0,0,.18)}
+.cred .t{background:linear-gradient(135deg,#0f5fbf,#13a35a);color:#fff;font-weight:800;font-size:10px;padding:16px 10px 8px;text-align:right}
+.cred .f{width:58px;height:70px;margin:8px auto 4px;border-radius:8px;background:linear-gradient(#dfe7f1,#c5d2e2);border:2px solid #0f5fbf}
+.cred p{font-size:9.5px;text-align:center;padding:0 8px 4px}
+.cred .p{background:#0f5fbf;color:#fff;text-align:center;font-size:8px;padding:5px;letter-spacing:.1em;font-weight:700}
+.puntos{display:flex;gap:6px;justify-content:center;position:absolute;bottom:-30px;left:0;right:0}
+.puntos i{width:8px;height:8px;border-radius:50%;background:rgba(255,255,255,.3);transition:.3s}
+.puntos i.on{background:#7ff0b4;width:22px;border-radius:9px}
+/* SECCIONES */
+section{padding:96px 0}
+.tit{text-align:center;max-width:760px;margin:0 auto 52px}
+.tit .chip{background:#e6f4ec;color:var(--ve)}
+.tit h2{font-size:clamp(28px,3.6vw,42px);line-height:1.12;font-weight:900;letter-spacing:-.02em;margin:14px 0 12px}
+.tit p{color:var(--mu);font-size:17px}
+.aparece{opacity:0;transform:translateY(28px);transition:opacity .7s,transform .7s}
+.aparece.vis{opacity:1;transform:none}
+/* PROBLEMA → SOLUCIÓN */
+.antes{background:var(--cl)}
+.ad{display:grid;grid-template-columns:1fr auto 1fr;gap:26px;align-items:stretch}
+.ad .col{background:#fff;border-radius:22px;padding:28px;box-shadow:0 10px 30px rgba(15,23,42,.06)}
+.ad h3{font-size:20px;margin-bottom:14px}
+.ad li{list-style:none;padding:9px 0 9px 30px;position:relative;color:#334155;border-bottom:1px dashed var(--li)}
+.ad li:last-child{border:0}
+.ad .mal li::before{content:"✕";position:absolute;left:0;color:#dc2626;font-weight:900}
+.ad .bien li::before{content:"✓";position:absolute;left:0;color:var(--ve);font-weight:900}
+.ad .bien{border:2px solid rgba(19,163,90,.35)}
+.flecha{display:flex;align-items:center;font-size:42px;color:var(--ve)}
+/* RECORRIDO POR PERFIL */
+.perf{display:grid;grid-template-columns:280px 1fr;gap:28px}
+.perf .tabs{display:flex;flex-direction:column;gap:10px}
+.perf button{display:flex;gap:12px;align-items:center;text-align:left;padding:16px 18px;border-radius:16px;border:1px solid var(--li);background:#fff;font:inherit;font-weight:700;cursor:pointer;transition:.25s}
+.perf button span{font-size:26px}
+.perf button small{display:block;font-weight:500;color:var(--mu);font-size:12.5px}
+.perf button.on{background:linear-gradient(135deg,var(--az),var(--az2));color:#fff;border-color:transparent;box-shadow:0 12px 28px rgba(15,95,191,.3)}
+.perf button.on small{color:#d7e7fb}
+.panel{background:linear-gradient(160deg,#f7fafe,#eef4fb);border-radius:24px;padding:32px;border:1px solid var(--li);min-height:330px}
+.panel h3{font-size:24px;margin-bottom:6px}
+.panel .sub{color:var(--mu);margin-bottom:20px}
+.pasos{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:14px}
+.paso{background:#fff;border-radius:16px;padding:16px;box-shadow:0 4px 14px rgba(15,23,42,.06);animation:entra .5s both}
+.paso b{display:flex;gap:8px;align-items:center;margin-bottom:6px}
+.paso p{font-size:14px;color:#475569}
+@keyframes entra{from{opacity:0;transform:translateY(12px)}}
+/* FLUJO */
+.flujo{background:linear-gradient(160deg,var(--osc),var(--osc2));color:#fff}
+.flujo .tit p{color:#a9bdd8}
+.flujo .tit .chip{background:rgba(47,209,127,.15);color:#7ff0b4}
+.linea{display:grid;grid-template-columns:repeat(5,1fr);gap:18px;position:relative}
+.linea::before{content:"";position:absolute;top:34px;left:8%;right:8%;height:3px;background:linear-gradient(90deg,var(--ve2),var(--az2));opacity:.6}
+.nodo{text-align:center;position:relative}
+.nodo .c{width:70px;height:70px;margin:0 auto 14px;border-radius:50%;display:grid;place-items:center;font-size:30px;background:#0f2f57;border:3px solid var(--ve2);box-shadow:0 0 0 8px rgba(47,209,127,.12);position:relative;z-index:1}
+.nodo b{display:block;margin-bottom:6px}
+.nodo p{font-size:13.5px;color:#a9bdd8}
+/* APPS */
+.filtros{display:flex;gap:10px;justify-content:center;flex-wrap:wrap;margin-bottom:30px}
+.filtros button{padding:9px 18px;border-radius:999px;border:1px solid var(--li);background:#fff;font:inherit;font-weight:700;font-size:14px;cursor:pointer;transition:.2s}
+.filtros button.on{background:var(--tx);color:#fff;border-color:var(--tx)}
+.apps{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:18px}
+.app{background:#fff;border:1px solid var(--li);border-radius:20px;padding:20px;transition:transform .25s,box-shadow .25s,opacity .3s;position:relative;overflow:hidden}
+.app:hover{transform:translateY(-6px);box-shadow:0 18px 40px rgba(15,23,42,.12)}
+.app::after{content:"";position:absolute;inset:auto -40% -60% auto;width:160px;height:160px;border-radius:50%;background:radial-gradient(rgba(30,127,224,.12),transparent 70%)}
+.app img{width:54px;height:54px;border-radius:14px;margin-bottom:12px;box-shadow:0 6px 16px rgba(15,23,42,.15)}
+.app b{display:block;font-size:16.5px;margin-bottom:4px}
+.app p{font-size:14px;color:#475569}
+.app .tag{position:absolute;top:16px;right:16px;font-size:11px;font-weight:800;color:var(--az);background:#e8f1fc;padding:3px 9px;border-radius:999px}
+.app.oc{display:none}
+/* NÚMEROS */
+.nums{display:grid;grid-template-columns:repeat(4,1fr);gap:18px;margin-top:-50px;position:relative;z-index:2}
+.num{background:#fff;border-radius:20px;padding:24px;text-align:center;box-shadow:0 14px 40px rgba(15,23,42,.1)}
+.num b{display:block;font-size:40px;font-weight:900;background:linear-gradient(90deg,var(--az),var(--ve));-webkit-background-clip:text;background-clip:text;color:transparent}
+.num span{color:var(--mu);font-size:14px}
+/* VENTAJAS */
+.vent{display:grid;grid-template-columns:repeat(3,1fr);gap:18px}
+.v{padding:26px;border-radius:20px;background:var(--cl);border:1px solid var(--li);transition:.25s}
+.v:hover{background:#fff;box-shadow:0 14px 34px rgba(15,23,42,.08)}
+.v .ic{width:50px;height:50px;border-radius:14px;display:grid;place-items:center;font-size:24px;background:linear-gradient(135deg,var(--az),var(--ve));color:#fff;margin-bottom:14px}
+.v b{display:block;font-size:17px;margin-bottom:6px}
+.v p{color:#475569;font-size:14.5px}
+/* ASESORAMIENTO */
+.ases{background:linear-gradient(180deg,#f3f7fc,#fff)}
+.ases-g{display:grid;grid-template-columns:.9fr 1.1fr;gap:40px;align-items:start}
+.perfil{background:linear-gradient(160deg,var(--osc),#0a3a6a);color:#fff;border-radius:26px;padding:34px;position:sticky;top:90px}
+.perfil h3{font-size:26px;margin:10px 0}
+.perfil p{color:#c7d6ea;margin-bottom:14px}
+.perfil .chip{background:rgba(47,209,127,.15);color:#7ff0b4}
+.servs{display:grid;gap:14px}
+.serv{display:flex;gap:16px;background:#fff;border:1px solid var(--li);border-radius:18px;padding:18px 20px;cursor:pointer;transition:.25s}
+.serv:hover{border-color:var(--az2);box-shadow:0 10px 26px rgba(15,95,191,.12)}
+.serv .n{flex:0 0 46px;height:46px;border-radius:12px;display:grid;place-items:center;font-weight:900;color:#fff;background:linear-gradient(135deg,var(--az),var(--ve))}
+.serv b{display:block;font-size:16.5px}
+.serv p{font-size:14px;color:#475569;max-height:0;overflow:hidden;transition:max-height .35s,margin .35s}
+.serv.ab p{max-height:120px;margin-top:6px}
+/* FAQ */
+.faq{max-width:820px;margin:0 auto}
+details{border:1px solid var(--li);border-radius:16px;padding:16px 20px;margin-bottom:12px;background:#fff}
+summary{cursor:pointer;font-weight:700;list-style:none;display:flex;justify-content:space-between;gap:10px}
+summary::after{content:"+";font-size:22px;color:var(--az);transition:.2s}
+details[open] summary::after{transform:rotate(45deg)}
+details p{margin-top:10px;color:#475569}
+/* CTA y CONTACTO */
+.cta{background:linear-gradient(135deg,var(--az),#0a3a6a 55%,var(--ve));color:#fff;border-radius:30px;padding:56px;text-align:center;position:relative;overflow:hidden}
+.cta h2{font-size:clamp(26px,3.4vw,40px);font-weight:900;margin-bottom:10px}
+.cta p{color:#dbe8f7;max-width:620px;margin:0 auto 24px}
+.contacto{display:grid;grid-template-columns:repeat(3,1fr);gap:18px;margin-top:30px}
+.ct{display:flex;gap:14px;align-items:center;background:#fff;border:1px solid var(--li);border-radius:18px;padding:20px;transition:.2s}
+.ct:hover{border-color:var(--ve)}
+.ct .ic{font-size:28px}
+.ct small{display:block;color:var(--mu)}
+footer{background:var(--osc);color:#93a8c4;padding:30px 0;text-align:center;font-size:14px}
+.wa{position:fixed;right:18px;bottom:18px;z-index:60;width:58px;height:58px;border-radius:50%;background:#25d366;display:grid;place-items:center;box-shadow:0 10px 26px rgba(37,211,102,.45);animation:late 2.4s infinite}
+@keyframes late{0%,100%{box-shadow:0 0 0 0 rgba(37,211,102,.5)}50%{box-shadow:0 0 0 14px rgba(37,211,102,0)}}
+.wa svg{width:30px;height:30px;fill:#fff}
+@media (max-width:960px){
+ .hero .cont,.ases-g,.perf{grid-template-columns:1fr}
+ .tel{width:250px;height:510px}
+ .ad{grid-template-columns:1fr}.flecha{justify-content:center;transform:rotate(90deg)}
+ .linea{grid-template-columns:1fr;gap:26px}.linea::before{display:none}
+ .nums{grid-template-columns:repeat(2,1fr)}
+ .vent,.contacto{grid-template-columns:1fr}
+ .perfil{position:static}
+ .perf .tabs{flex-direction:row;overflow-x:auto;padding-bottom:6px}
+ .perf button{flex:0 0 auto}
+ .menu{position:fixed;top:68px;left:0;right:0;flex-direction:column;background:rgba(7,26,51,.97);padding:20px;gap:18px;display:none}
+ .menu.ab{display:flex}
+ .hamb{display:block}
+ .cta{padding:36px 22px}
+ section{padding:72px 0}
+}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}.aparece{opacity:1;transform:none}}
+</style>
+</head>
+<body>
+<nav id="nav"><div class="cont">
+  <a class="marca" href="#inicio"><img src="../descargos/assets/logo_delben.png" alt="DELBEN"><span>DELBEN</span></a>
+  <div class="menu" id="menu">
+    <a href="#perfiles">Cómo funciona</a><a href="#apps">Apps</a><a href="#ventajas">Ventajas</a><a href="#asesoramiento">Asesoramiento</a><a href="#preguntas">Preguntas</a>
+    <a class="btn btn-p" href="#contacto" style="padding:10px 18px">Pedir demostración</a>
+  </div>
+  <button class="hamb" id="hamb" aria-label="Menú">☰</button>
+</div></nav>
+
+<header class="hero" id="inicio">
+  <div class="cont">
+    <div>
+      <span class="chip">● Sistema de Gestión Integral</span>
+      <h1>Toda tu empresa de seguridad,<br><span class="gr">en vivo y en un solo lugar</span></h1>
+      <p class="lead">Presentismo con QR, novedades, licencias, credenciales, flota, combustible y minuta: <span class="rota" id="rota">conectados</span>. En el celular y en la computadora, con un solo usuario.</p>
+      <div class="ctas">
+        <a class="btn btn-p" href="#contacto">Quiero una demostración →</a>
+        <a class="btn btn-s" href="#perfiles">Ver cómo funciona</a>
+      </div>
+      <div class="mini">
+        <div><b data-cuenta="16">0</b>apps conectadas</div>
+        <div><b>1</b>usuario para todo</div>
+        <div><b>24/7</b>control en vivo</div>
+      </div>
+    </div>
+    <div style="position:relative">
+      <div class="tel"><div class="pant">
+        <div class="vista on">
+          <div class="vh"><img src="../iconos/presentismo-192.png" alt=""><div><b>Presentismo</b><small>Puesto Acceso Norte · 06:00</small></div></div>
+          <div class="tarj" style="text-align:center"><b>Escaneá el QR del puesto</b><div class="qr"></div><div class="ok">✓ Presente registrado</div><small style="color:#5b6b82">con ubicación y horario</small></div>
+          <div class="tarj"><div class="fila"><span><i class="pt" style="background:#13a35a"></i>Turno mañana</span><b>06:00 – 14:00</b></div><div class="fila"><span><i class="pt" style="background:#1e7fe0"></i>Relevo</span><b>14:00</b></div></div>
+        </div>
+        <div class="vista">
+          <div class="vh"><img src="../iconos/novedades-192.png" alt=""><div><b>Centro de monitoreo</b><small>Presentes en vivo</small></div></div>
+          <div class="tarj"><b>Servicios cubiertos</b><div class="barra"><i style="width:92%"></i></div><small style="color:#5b6b82">92% de los puestos con presente</small></div>
+          <div class="tarj"><div class="fila"><span><i class="pt" style="background:#13a35a"></i>Planta Sur</span><b>4/4</b></div><div class="fila"><span><i class="pt" style="background:#13a35a"></i>Barrio Los Robles</span><b>6/6</b></div><div class="fila"><span><i class="pt" style="background:#f59e0b"></i>Depósito Este</span><b>2/3</b></div><div class="fila"><span><i class="pt" style="background:#dc2626"></i>Oficinas Centro</span><b>Falta 1</b></div></div>
+          <div class="tarj" style="background:#fff7ed;color:#9a3412"><b>⚠ Aviso enviado al supervisor</b></div>
+        </div>
+        <div class="vista">
+          <div class="vh"><img src="../iconos/sgi-192.png" alt=""><div><b>Credenciales</b><small>Gestión de Personal</small></div></div>
+          <div class="cred"><div class="t">CREDENCIAL<br>DEL PERSONAL</div><div class="f"></div><p><b>PÉREZ JUAN</b><br>Vigilador · Legajo 1234</p><div class="p">INTRANSFERIBLE</div></div>
+          <div class="tarj" style="margin-top:10px"><div class="fila"><span>Habilitación</span><b style="color:#13a35a">Vigente</b></div><div class="fila"><span>Vence</span><b>23/06/2027</b></div></div>
+        </div>
+      </div></div>
+      <div class="puntos" id="puntos"><i class="on"></i><i></i><i></i></div>
+    </div>
+  </div>
+</header>
+
+<div class="cont"><div class="nums aparece">
+  <div class="num"><b data-cuenta="16">0</b><span>apps en un solo sistema</span></div>
+  <div class="num"><b>QR</b><span>presentismo desde el puesto</span></div>
+  <div class="num"><b>PDF</b><span>actas y descargos firmados en pantalla</span></div>
+  <div class="num"><b>0</b><span>planillas sueltas por WhatsApp</span></div>
+</div></div>
+
+<section class="antes" id="problema"><div class="cont">
+  <div class="tit aparece"><span class="chip">El problema</span><h2>Dejá de perseguir planillas</h2><p>Lo que hoy se resuelve con llamados, papeles y fotos por chat, DELBEN lo ordena solo.</p></div>
+  <div class="ad aparece">
+    <div class="col mal"><h3>Sin DELBEN</h3><ul><li>Presentes por teléfono o en papel</li><li>Novedades que llegan tarde a RR.HH.</li><li>Faltantes que se descubren cuando el cliente reclama</li><li>Actas y descargos sin firma o perdidos</li><li>Rendiciones de combustible en tickets sueltos</li></ul></div>
+    <div class="flecha">→</div>
+    <div class="col bien"><h3>Con DELBEN</h3><ul><li>Presente con QR o DNI, con ubicación y hora</li><li>Novedades semanales listas para liquidar y facturar</li><li>Alerta al supervisor apenas falta alguien</li><li>Firmas en pantalla y PDF guardado al instante</li><li>Foto del ticket y planilla lista para finanzas</li></ul></div>
+  </div>
+</div></section>
+
+<section id="perfiles"><div class="cont">
+  <div class="tit aparece"><span class="chip">Recorrido</span><h2>Cada persona ve solo lo que necesita</h2><p>Elegí un perfil y mirá cómo es su día con DELBEN.</p></div>
+  <div class="perf aparece">
+    <div class="tabs" id="ptabs">
+      <button class="on" data-p="vig"><span>🛡️</span><div>Vigilador<small>En el puesto</small></div></button>
+      <button data-p="sup"><span>🚙</span><div>Supervisor<small>En la calle</small></div></button>
+      <button data-p="com"><span>🖥️</span><div>Centro de monitoreo<small>En vivo</small></div></button>
+      <button data-p="adm"><span>📊</span><div>Administración y RR.HH.<small>En la oficina</small></div></button>
+      <button data-p="dir"><span>👔</span><div>Dirección<small>Desde cualquier lugar</small></div></button>
+    </div>
+    <div class="panel" id="panel"></div>
+  </div>
+</div></section>
+
+<section class="flujo"><div class="cont">
+  <div class="tit aparece"><span class="chip">Todo conectado</span><h2>Un dato se carga una vez y llega a todos</h2><p>Así viaja un presente desde el puesto hasta la factura.</p></div>
+  <div class="linea aparece">
+    <div class="nodo"><div class="c">📱</div><b>1. Presente</b><p>El vigilador escanea el QR del puesto.</p></div>
+    <div class="nodo"><div class="c">🖥️</div><b>2. En vivo</b><p>El centro de monitoreo lo ve al instante.</p></div>
+    <div class="nodo"><div class="c">🔔</div><b>3. Alerta</b><p>Si falta alguien, avisa al supervisor por Telegram.</p></div>
+    <div class="nodo"><div class="c">🗂️</div><b>4. Novedades</b><p>Horas y ausencias pasan solas a la semana.</p></div>
+    <div class="nodo"><div class="c">💼</div><b>5. Liquidación</b><p>RR.HH. y facturación con los datos listos.</p></div>
+  </div>
+</div></section>
+
+<section id="apps"><div class="cont">
+  <div class="tit aparece"><span class="chip">Las apps</span><h2>Una app para cada tarea, todas conectadas</h2><p>Se instalan en el celular como una app, sin tiendas, y se actualizan solas.</p></div>
+  <div class="filtros aparece" id="filtros"><button class="on" data-f="todas">Todas</button><button data-f="per">Personal</button><button data-f="ope">Operación</button><button data-f="flo">Flota y stock</button></div>
+  <div class="apps" id="lista-apps">
+    <div class="app" data-g="per"><span class="tag">Personal</span><img src="../iconos/presentismo-192.png" alt=""><b>Presentismo de Servicios</b><p>Presente con QR o DNI desde el puesto, con ubicación, horario y foto.</p></div>
+    <div class="app" data-g="per"><span class="tag">Personal</span><img src="../iconos/novedades-192.png" alt=""><b>Novedades del Personal</b><p>Proyección y novedades semanales de cada servicio, listas para liquidar.</p></div>
+    <div class="app" data-g="per"><span class="tag">Personal</span><img src="../iconos/licencias-192.png" alt=""><b>Licencias</b><p>Vacaciones, enfermedad y demás licencias con firma digital, PDF y aviso por correo.</p></div>
+    <div class="app" data-g="per"><span class="tag">Personal</span><img src="../iconos/descargos-192.png" alt=""><b>Pedido de explicaciones</b><p>Descargos firmados en el celular, con su PDF y seguimiento.</p></div>
+    <div class="app" data-g="per"><span class="tag">Personal</span><img src="../iconos/datos-personal-192.png" alt=""><b>Ficha de Datos</b><p>Cada persona actualiza sus datos, el DNI y su foto con fondo blanco para la credencial.</p></div>
+    <div class="app" data-g="per"><span class="tag">Personal</span><img src="../iconos/sgi-192.png" alt=""><b>Credenciales y habilitaciones</b><p>Vencimientos a la vista e impresión de credenciales con foto, a tamaño DNI.</p></div>
+    <div class="app" data-g="per"><span class="tag">Personal</span><img src="../iconos/cargos-192.png" alt=""><b>Cargos de indumentaria</b><p>Entrega y devolución de ropa firmadas con el dedo en pantalla.</p></div>
+    <div class="app" data-g="ope"><span class="tag">Operación</span><img src="../iconos/minuta-192.png" alt=""><b>Minuta Operativa</b><p>La minuta diaria de cada servicio, con fotos, novedades y PDF para el cliente.</p></div>
+    <div class="app" data-g="ope"><span class="tag">Operación</span><img src="../iconos/rondin-192.png" alt=""><b>Rondín</b><p>Recorridas con puntos de control y registro de cada pasada.</p></div>
+    <div class="app" data-g="ope"><span class="tag">Operación</span><img src="../iconos/novedades-192.png" alt=""><b>Control de Presentismo</b><p>Centro de monitoreo: presentes en vivo de todos los servicios y alertas de faltantes.</p></div>
+    <div class="app" data-g="ope"><span class="tag">Operación</span><img src="../iconos/documentacion-192.png" alt=""><b>Informe de Novedades</b><p>Qué, cómo, cuándo y dónde: informes con fotos, PDF y envío por correo.</p></div>
+    <div class="app" data-g="flo"><span class="tag">Flota y stock</span><img src="../iconos/moviles-192.png" alt=""><b>Control de Móviles</b><p>Revisión de vehículos con fotos y PDF; VTV y seguros al día.</p></div>
+    <div class="app" data-g="flo"><span class="tag">Flota y stock</span><img src="../iconos/combustible-192.png" alt=""><b>Combustible</b><p>Fondos y rendiciones con foto del ticket y planilla lista para finanzas.</p></div>
+    <div class="app" data-g="flo"><span class="tag">Flota y stock</span><img src="../iconos/documentacion-192.png" alt=""><b>Documentación</b><p>Cédulas, pólizas, ART y seguros siempre a mano.</p></div>
+    <div class="app" data-g="flo"><span class="tag">Flota y stock</span><img src="../iconos/sgi-192.png" alt=""><b>SGI · Stock e indumentaria</b><p>Inventario, órdenes de compra y entrega de indumentaria con códigos QR.</p></div>
+    <div class="app" data-g="ope"><span class="tag">Operación</span><img src="../iconos/escritorio-192.png" alt=""><b>Escritorio DELBEN</b><p>Todas las apps en pestañas, entrando una sola vez desde la PC.</p></div>
+  </div>
+</div></section>
+
+<section class="antes" id="ventajas"><div class="cont">
+  <div class="tit aparece"><span class="chip">Por qué DELBEN</span><h2>Pensado por quien gestiona seguridad todos los días</h2><p>Nació dentro de la operación de una empresa de seguridad, para resolver los problemas reales.</p></div>
+  <div class="vent aparece">
+    <div class="v"><div class="ic">📲</div><b>Celular y PC</b><p>Se instala como una app en Android, iPhone y la computadora. Sin tiendas y sin actualizar a mano.</p></div>
+    <div class="v"><div class="ic">🔐</div><b>Perfiles y permisos</b><p>Cada usuario ve y edita solo lo que le habilitás, pantalla por pantalla.</p></div>
+    <div class="v"><div class="ic">⚡</div><b>En vivo</b><p>Presentes, faltantes y alertas al momento, con avisos por correo y Telegram.</p></div>
+    <div class="v"><div class="ic">✍️</div><b>Firmas y PDF</b><p>Actas, licencias y descargos firmados en pantalla, con su PDF guardado.</p></div>
+    <div class="v"><div class="ic">👥</div><b>Varios a la vez</b><p>Muchas personas cargan al mismo tiempo sin pisarse los datos.</p></div>
+    <div class="v"><div class="ic">🛟</div><b>Datos protegidos</b><p>Acceso con usuario, claves que no salen del servidor y copias de seguridad.</p></div>
+  </div>
+</div></section>
+
+<section class="ases" id="asesoramiento"><div class="cont">
+  <div class="tit aparece"><span class="chip">Asesoramiento</span><h2>Auditorías y asesoramiento en seguridad</h2><p>Experiencia en la dirección y el control operativo de servicios de seguridad, al servicio de tu empresa u objetivo.</p></div>
+  <div class="ases-g">
+    <div class="perfil aparece"><span class="chip">Consultor</span><h3>Fernando M. Jacyno</h3><p>Asesoramiento de alto nivel para empresas de seguridad y para quienes contratan seguridad: diagnóstico, planificación, control y capacitación.</p><p>Cada trabajo termina con un informe claro y recomendaciones concretas para aplicar.</p><a class="btn btn-p" href="#contacto">Consultar →</a></div>
+    <div class="servs aparece" id="servs">
+      <div class="serv"><div class="n">01</div><div><b>Control Estratégico y Evaluación de Objetivos</b><p>Relevamiento del objetivo, de sus puestos y de su cobertura, y evaluación de cómo se cumple el servicio.</p></div></div>
+      <div class="serv"><div class="n">02</div><div><b>Estudios de Seguridad Integrales</b><p>Análisis completo de instalaciones, accesos, perímetros, procedimientos y tecnología.</p></div></div>
+      <div class="serv"><div class="n">03</div><div><b>Evaluaciones de Riesgos</b><p>Identificación y priorización de los riesgos del objetivo según su probabilidad e impacto.</p></div></div>
+      <div class="serv"><div class="n">04</div><div><b>Análisis de Riesgo y Vulnerabilidad</b><p>Detección de puntos débiles y de amenazas, con medidas para reducirlos.</p></div></div>
+      <div class="serv"><div class="n">05</div><div><b>Manuales de Operaciones</b><p>Consignas, procedimientos y protocolos escritos para cada puesto y cada situación.</p></div></div>
+      <div class="serv"><div class="n">06</div><div><b>Análisis y Recomendaciones</b><p>Informe con hallazgos y un plan de mejoras ordenado por prioridad.</p></div></div>
+      <div class="serv"><div class="n">07</div><div><b>Capacitación de Supervisores y Jefes de Seguridad</b><p>Formación práctica en control operativo, liderazgo, manejo de novedades y uso de la tecnología.</p></div></div>
+    </div>
+  </div>
+</div></section>
+
+<section id="preguntas"><div class="cont">
+  <div class="tit aparece"><span class="chip">Preguntas frecuentes</span><h2>Lo que más nos preguntan</h2></div>
+  <div class="faq aparece">
+    <details><summary>¿Hace falta instalar algo?</summary><p>No. Se abre desde el navegador y, si querés, se agrega a la pantalla del celular o de la PC como una app. Funciona en Android y iPhone.</p></details>
+    <details><summary>¿Cada persona ve todo?</summary><p>No. Cada usuario tiene un perfil y vos elegís qué pantallas puede ver y cuáles puede modificar.</p></details>
+    <details><summary>¿Qué pasa si varios cargan datos al mismo tiempo?</summary><p>Cada uno guarda lo suyo. El sistema ordena las escrituras para que nadie pise el trabajo de otro.</p></details>
+    <details><summary>¿Se puede usar con nuestros datos?</summary><p>Sí. Cargamos tu personal, tus servicios y tus objetivos, y cada empresa tiene su información separada.</p></details>
+    <details><summary>¿Cómo se cobra?</summary><p>Abono mensual según la cantidad de usuarios. Te armamos una propuesta a medida después de la demostración.</p></details>
+  </div>
+</div></section>
+
+<section id="contacto" style="padding-top:20px"><div class="cont">
+  <div class="cta aparece"><h2>¿Lo querés ver funcionando?</h2><p>Coordinamos una demostración con datos de prueba y te armamos una propuesta según los usuarios y servicios de tu empresa.</p><a class="btn btn-p" href="https://wa.me/5491140887543?text=Hola%2C%20quiero%20una%20demostraci%C3%B3n%20de%20DELBEN" target="_blank" rel="noopener">Pedir demostración por WhatsApp</a></div>
+  <div class="contacto aparece">
+    <a class="ct" href="mailto:info@delbensgi.com.ar"><span class="ic">✉️</span><div><b>info@delbensgi.com.ar</b><small>Escribinos</small></div></a>
+    <a class="ct" href="https://wa.me/5491140887543" target="_blank" rel="noopener"><span class="ic">💬</span><div><b>11 4088 7543</b><small>WhatsApp</small></div></a>
+    <a class="ct" href="../portal/"><span class="ic">🔑</span><div><b>Portal de clientes</b><small>Entrar a DELBEN</small></div></a>
+  </div>
+</div></section>
+
+<footer>© DELBEN · Sistema de Gestión Integral · info@delbensgi.com.ar · <a href="privacidad.html" style="color:#93a8c4">Privacidad</a> · <a href="eliminar-datos.html" style="color:#93a8c4">Eliminar mis datos</a></footer>
+<a class="wa" href="https://wa.me/5491140887543" target="_blank" rel="noopener" aria-label="WhatsApp"><svg viewBox="0 0 32 32"><path d="M16 3a13 13 0 0 0-11.2 19.6L3 29l6.6-1.7A13 13 0 1 0 16 3zm0 23.6a10.6 10.6 0 0 1-5.4-1.5l-.4-.2-3.9 1 1-3.8-.3-.4A10.6 10.6 0 1 1 16 26.6zm5.8-7.9c-.3-.2-1.9-.9-2.2-1s-.5-.2-.7.2-.8 1-1 1.2-.4.2-.7.1a8.7 8.7 0 0 1-4.3-3.8c-.3-.6.3-.5.9-1.7.1-.2 0-.4 0-.6l-1-2.4c-.3-.6-.5-.5-.7-.5h-.6a1.2 1.2 0 0 0-.9.4 3.6 3.6 0 0 0-1.1 2.7 6.3 6.3 0 0 0 1.3 3.3 14.4 14.4 0 0 0 5.5 4.9c2 .9 2.8.9 3.8.8a3.3 3.3 0 0 0 2.1-1.5 2.7 2.7 0 0 0 .2-1.5c-.1-.1-.3-.2-.6-.4z"/></svg></a>
+
+<script>function _0x1dd5(_0x184777,_0x3ec895){var _0x5a1f11=_0x5a1f();return _0x1dd5=function(_0x1dd533,_0x1c4ebb){_0x1dd533=_0x1dd533-0x1a4;var _0x754d0e=_0x5a1f11[_0x1dd533];return _0x754d0e;},_0x1dd5(_0x184777,_0x3ec895);}function _0x5a1f(){var _0x326fa4=['255582bgpUsZ','Ve\x20qué\x20puestos\x20están\x20cubiertos\x20y\x20cuáles\x20no,\x20al\x20instante.','Recibe\x20su\x20ropa,\x20pide\x20licencias\x20y\x20hace\x20descargos\x20firmando\x20con\x20el\x20dedo.','Completa\x20su\x20ficha','#ptabs\x20button','classList','#puntos\x20i','Dirección','textContent','hamb','unobserve','menu','Le\x20llega\x20un\x20aviso\x20por\x20Telegram\x20cuando\x20falta\x20un\x20presente.','firmados','Habilitaciones\x20con\x20vencimiento\x20y\x20credenciales\x20con\x20foto\x20para\x20imprimir.','Escanea\x20el\x20QR\x20del\x20puesto\x20o\x20pone\x20su\x20DNI.\x20Queda\x20la\x20hora\x20y\x20la\x20ubicación.','Actualiza\x20domicilio\x20y\x20teléfono\x20y\x20se\x20saca\x20la\x20foto\x20para\x20la\x20credencial.','Desde\x20el\x20celular,\x20en\x20el\x20puesto.','al\x20día','<h3>','130RUChdB','<div\x20class=\x22paso\x22\x20style=\x22animation-delay:','dataset','Toda\x20la\x20operación\x20ordenada,\x20con\x20historial\x20de\x20cada\x20cambio.','Registra\x20cada\x20llamado\x20y\x20cada\x20novedad\x20del\x20turno.','panel','499190boaDBU','.hero\x20[data-cuenta]','nav','rota','transition','Permisos','11886mDscWM','102537RxSDPC','min','onclick','399478CcMWSv','vis','Vigilador','observe','getElementById','Credenciales','querySelectorAll','innerHTML','Firma\x20en\x20pantalla','en\x20vivo','3LiTqaL','remove','s\x22><b><span\x20style=\x22font-size:22px\x22>','scrollY','Todos\x20los\x20servicios\x20en\x20una\x20pantalla.','join','target','</p></div>','opacity\x20.25s','Horas,\x20ausencias\x20y\x20licencias\x20de\x20cada\x20servicio,\x20listas\x20para\x20liquidar.','Decide\x20qué\x20ve\x20y\x20qué\x20modifica\x20cada\x20perfil.','opacity','Novedades\x20del\x20servicio\x20con\x20fotos\x20y\x20PDF\x20para\x20el\x20cliente.','</p><div\x20class=\x22pasos\x22>','style','El\x20estado\x20de\x20la\x20empresa,\x20de\x20un\x20vistazo.','1960960vhwGQE','#lista-apps\x20.app','addEventListener','12309MiabGS','224PmOquT','Saca\x20la\x20foto\x20del\x20ticket\x20y\x20la\x20planilla\x20se\x20arma\x20sola.','toggle','add','</div>','map','Control\x20total','pow','Centro\x20de\x20monitoreo','🗂️','Recibe\x20alertas','4IDlFWH','Cobertura,\x20ausentismo\x20y\x20novedades\x20por\x20servicio\x20y\x20por\x20período.','</span>','#filtros\x20button','forEach','Da\x20el\x20presente','.aparece'];_0x5a1f=function(){return _0x326fa4;};return _0x5a1f();}(function(_0x43a8f1,_0x2f36b1){var _0x3ed86e=_0x1dd5,_0x50cbce=_0x43a8f1();while(!![]){try{var _0xaf37=parseInt(_0x3ed86e(0x1d9))/0x1+-parseInt(_0x3ed86e(0x1dc))/0x2*(-parseInt(_0x3ed86e(0x1e6))/0x3)+parseInt(_0x3ed86e(0x1b1))/0x4*(parseInt(_0x3ed86e(0x1d2))/0x5)+-parseInt(_0x3ed86e(0x1d8))/0x6*(parseInt(_0x3ed86e(0x1a6))/0x7)+-parseInt(_0x3ed86e(0x1f6))/0x8+parseInt(_0x3ed86e(0x1b8))/0x9+-parseInt(_0x3ed86e(0x1cc))/0xa*(-parseInt(_0x3ed86e(0x1a5))/0xb);if(_0xaf37===_0x2f36b1)break;else _0x50cbce['push'](_0x50cbce['shift']());}catch(_0x1e4d0d){_0x50cbce['push'](_0x50cbce['shift']());}}}(_0x5a1f,0x21563),(function(){var _0x1bb343=_0x1dd5,_0x48b896=document[_0x1bb343(0x1e0)](_0x1bb343(0x1d4));function _0x293137(){var _0x48e70b=_0x1bb343;_0x48b896[_0x48e70b(0x1bd)]['toggle']('sol',window[_0x48e70b(0x1e9)]>0x1e);}window[_0x1bb343(0x1a4)]('scroll',_0x293137,{'passive':!![]}),_0x293137();var _0x376e9d=document['getElementById'](_0x1bb343(0x1c3));document[_0x1bb343(0x1e0)](_0x1bb343(0x1c1))[_0x1bb343(0x1db)]=function(){var _0x27d6b8=_0x1bb343;_0x376e9d[_0x27d6b8(0x1bd)][_0x27d6b8(0x1a8)]('ab');},_0x376e9d[_0x1bb343(0x1e2)]('a')[_0x1bb343(0x1b5)](function(_0x504bac){var _0x2ea3d2=_0x1bb343;_0x504bac[_0x2ea3d2(0x1db)]=function(){var _0x1ab79c=_0x2ea3d2;_0x376e9d[_0x1ab79c(0x1bd)][_0x1ab79c(0x1e7)]('ab');};});var _0x2f782e=['conectados',_0x1bb343(0x1e5),_0x1bb343(0x1c5),'sin\x20papeles',_0x1bb343(0x1ca)],_0x1c764b=0x0,_0x3d892a=document[_0x1bb343(0x1e0)](_0x1bb343(0x1d5));setInterval(function(){var _0x129389=_0x1bb343;_0x1c764b=(_0x1c764b+0x1)%_0x2f782e['length'],_0x3d892a['style'][_0x129389(0x1f1)]=0x0,setTimeout(function(){var _0x29abdc=_0x129389;_0x3d892a[_0x29abdc(0x1c0)]=_0x2f782e[_0x1c764b],_0x3d892a[_0x29abdc(0x1f4)][_0x29abdc(0x1f1)]=0x1;},0xfa);},0x960),_0x3d892a[_0x1bb343(0x1f4)][_0x1bb343(0x1d6)]=_0x1bb343(0x1ee);var _0x243d35=document[_0x1bb343(0x1e2)]('.vista'),_0x371a6e=document[_0x1bb343(0x1e2)](_0x1bb343(0x1be)),_0x104fb3=0x0;setInterval(function(){var _0x918e38=_0x1bb343;_0x243d35[_0x104fb3][_0x918e38(0x1bd)][_0x918e38(0x1e7)]('on'),_0x371a6e[_0x104fb3]['classList'][_0x918e38(0x1e7)]('on'),_0x104fb3=(_0x104fb3+0x1)%_0x243d35['length'],_0x243d35[_0x104fb3][_0x918e38(0x1bd)]['add']('on'),_0x371a6e[_0x104fb3][_0x918e38(0x1bd)]['add']('on');},0xe10);var _0x55e123=new IntersectionObserver(function(_0x448974){var _0x268981=_0x1bb343;_0x448974[_0x268981(0x1b5)](function(_0x2a798b){var _0x5cdae5=_0x268981;if(!_0x2a798b['isIntersecting'])return;_0x2a798b[_0x5cdae5(0x1ec)]['classList'][_0x5cdae5(0x1a9)](_0x5cdae5(0x1dd)),_0x2a798b[_0x5cdae5(0x1ec)][_0x5cdae5(0x1e2)]('[data-cuenta]')['forEach'](_0x35a713),_0x55e123[_0x5cdae5(0x1c2)](_0x2a798b['target']);});},{'threshold':0.15});document[_0x1bb343(0x1e2)](_0x1bb343(0x1b7))[_0x1bb343(0x1b5)](function(_0x378734){var _0xc9b77c=_0x1bb343;_0x55e123[_0xc9b77c(0x1df)](_0x378734);});function _0x35a713(_0x1477c3){var _0x514adc=_0x1bb343;if(_0x1477c3[_0x514adc(0x1ce)]['ok'])return;_0x1477c3[_0x514adc(0x1ce)]['ok']=0x1;var _0x4f21c9=+_0x1477c3[_0x514adc(0x1ce)]['cuenta'],_0x360519=null;function _0x49c585(_0x3f070c){var _0x361f46=_0x514adc;if(!_0x360519)_0x360519=_0x3f070c;var _0x3ea029=Math[_0x361f46(0x1da)](0x1,(_0x3f070c-_0x360519)/0x4b0);_0x1477c3[_0x361f46(0x1c0)]=Math['round'](_0x4f21c9*(0x1-Math[_0x361f46(0x1ad)](0x1-_0x3ea029,0x3)));if(_0x3ea029<0x1)requestAnimationFrame(_0x49c585);}requestAnimationFrame(_0x49c585);}document[_0x1bb343(0x1e2)](_0x1bb343(0x1d3))['forEach'](_0x35a713);var _0xa756b6={'vig':[_0x1bb343(0x1de),_0x1bb343(0x1c9),[['📱',_0x1bb343(0x1b6),_0x1bb343(0x1c7)],['📝',_0x1bb343(0x1bb),_0x1bb343(0x1c8)],['✍️',_0x1bb343(0x1e4),_0x1bb343(0x1ba)]]],'sup':['Supervisor','En\x20la\x20calle,\x20con\x20todo\x20en\x20el\x20bolsillo.',[['🔔',_0x1bb343(0x1b0),_0x1bb343(0x1c4)],['🗒️','Carga\x20la\x20minuta',_0x1bb343(0x1f2)],['⛽','Rinde\x20combustible',_0x1bb343(0x1a7)]]],'com':[_0x1bb343(0x1ae),_0x1bb343(0x1ea),[['🟢','Presentes\x20en\x20vivo',_0x1bb343(0x1b9)],['🚨','Faltantes','Detecta\x20ausencias\x20y\x20llegadas\x20tarde\x20antes\x20de\x20que\x20reclame\x20el\x20cliente.'],['📞','Seguimiento',_0x1bb343(0x1d0)]]],'adm':['Administración\x20y\x20RR.HH.','Datos\x20listos,\x20sin\x20perseguir\x20a\x20nadie.',[[_0x1bb343(0x1af),'Novedades\x20semanales',_0x1bb343(0x1ef)],['🪪',_0x1bb343(0x1e1),_0x1bb343(0x1c6)],['👕','Indumentaria\x20y\x20stock','Pedidos,\x20entregas\x20firmadas\x20e\x20inventario\x20con\x20códigos\x20QR.']]],'dir':[_0x1bb343(0x1bf),_0x1bb343(0x1f5),[['📊','Informes',_0x1bb343(0x1b2)],['🔐',_0x1bb343(0x1d7),_0x1bb343(0x1f0)],['📈',_0x1bb343(0x1ac),_0x1bb343(0x1cf)]]]},_0x2c3d58=document['getElementById'](_0x1bb343(0x1d1));function _0x5f2349(_0x4e4ede){var _0xf2ada6=_0x1bb343,_0x540365=_0xa756b6[_0x4e4ede];_0x2c3d58[_0xf2ada6(0x1e3)]=_0xf2ada6(0x1cb)+_0x540365[0x0]+'</h3><p\x20class=\x22sub\x22>'+_0x540365[0x1]+_0xf2ada6(0x1f3)+_0x540365[0x2][_0xf2ada6(0x1ab)](function(_0x568ac4,_0x3672bf){var _0x422543=_0xf2ada6;return _0x422543(0x1cd)+_0x3672bf*0.08+_0x422543(0x1e8)+_0x568ac4[0x0]+_0x422543(0x1b3)+_0x568ac4[0x1]+'</b><p>'+_0x568ac4[0x2]+_0x422543(0x1ed);})[_0xf2ada6(0x1eb)]('')+_0xf2ada6(0x1aa);}document['querySelectorAll'](_0x1bb343(0x1bc))['forEach'](function(_0x39f88c){var _0x429d55=_0x1bb343;_0x39f88c[_0x429d55(0x1db)]=function(){var _0x155ed7=_0x429d55;document[_0x155ed7(0x1e2)]('#ptabs\x20button')['forEach'](function(_0x34b061){var _0x3a02b4=_0x155ed7;_0x34b061['classList'][_0x3a02b4(0x1e7)]('on');}),_0x39f88c['classList']['add']('on'),_0x5f2349(_0x39f88c[_0x155ed7(0x1ce)]['p']);};}),_0x5f2349('vig'),document[_0x1bb343(0x1e2)](_0x1bb343(0x1b4))[_0x1bb343(0x1b5)](function(_0x484ef4){var _0x1ca5cb=_0x1bb343;_0x484ef4[_0x1ca5cb(0x1db)]=function(){var _0x1394c8=_0x1ca5cb;document['querySelectorAll'](_0x1394c8(0x1b4))['forEach'](function(_0x3caba8){var _0x5df7cd=_0x1394c8;_0x3caba8[_0x5df7cd(0x1bd)]['remove']('on');}),_0x484ef4[_0x1394c8(0x1bd)][_0x1394c8(0x1a9)]('on');var _0x3aed2b=_0x484ef4['dataset']['f'];document[_0x1394c8(0x1e2)](_0x1394c8(0x1f7))[_0x1394c8(0x1b5)](function(_0xbf6163){var _0x16d9f3=_0x1394c8;_0xbf6163[_0x16d9f3(0x1bd)][_0x16d9f3(0x1a8)]('oc',_0x3aed2b!=='todas'&&_0xbf6163[_0x16d9f3(0x1ce)]['g']!==_0x3aed2b);});};}),document['querySelectorAll']('#servs\x20.serv')[_0x1bb343(0x1b5)](function(_0x54364a,_0x613cdf){var _0x22fbbf=_0x1bb343;if(_0x613cdf===0x0)_0x54364a[_0x22fbbf(0x1bd)][_0x22fbbf(0x1a9)]('ab');_0x54364a[_0x22fbbf(0x1db)]=function(){var _0xba8d03=_0x22fbbf;_0x54364a['classList'][_0xba8d03(0x1a8)]('ab');};});}()));</script>
+</body>
+</html>
