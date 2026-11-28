@@ -1,0 +1,1523 @@
+{
+  "_ayuda": "Para cada app, la PRIMERA entrada es la última actualización. Para avisar cambios nuevos agregá una entrada arriba con un id nuevo.",
+  "novedades": [
+    {
+      "id": "2026-11-27c",
+      "version": "2026.11.27c",
+      "fecha": "27/11/2026",
+      "titulo": "Conformación horaria de RAZ",
+      "cambios": [
+        "Conformación de RAZ (Trelles, Montenegro y Barracas): las horas de cada día van todas en la columna TM, tanto contratadas como realizadas, igual que el modelo.",
+        "Debajo de los totales sale una sola fila \"Cantidad de Horas a Facturar\" y, si hay custodia cargada, la fila \"Cantidad de Horas a Facturar Custodia\".",
+        "En Totales, las horas diurnas y nocturnas de RAZ salen bien separadas."
+      ]
+    },
+    {
+      "id": "2026-11-27b",
+      "version": "2026.11.27b",
+      "fecha": "27/11/2026",
+      "titulo": "RRHH 30/31 y licencias",
+      "cambios": [
+        "Informe RRHH: se descarga sin error (antes fallaba al armar las columnas ARTP / T. ART del STD).",
+        "30/31 días y RRHH: ya no salen las personas dadas de baja en períodos anteriores, y cada persona sale en una sola fila aunque haya trabajado en varios servicios.",
+        "Administración: si cambiás un día que tenía una licencia informada (por ejemplo sacar ENF y poner horas), el cambio queda guardado. Antes la licencia se volvía a poner sola al guardar.",
+        "Administración: lo que cambiás en Novedades semanales queda también en la Planificación, y lo que cambiás en la Planificación queda también en Novedades semanales (aunque el día ya haya pasado)."
+      ]
+    },
+    {
+      "id": "2026-11-27r",
+      "version": "2026.11.27r",
+      "fecha": "27/11/2026",
+      "titulo": "Arreglo en Informes",
+      "cambios": [
+        "Si un informe tardaba o fallaba y mientras tanto ibas a otra pantalla, salía un error del programa. Ahora no pasa más. No cambia nada de cómo se usa."
+      ]
+    },
+    {
+      "id": "2026-11-22b",
+      "version": "2026.11.22b",
+      "fecha": "22/11/2026",
+      "titulo": "Bot: períodos viejos",
+      "cambios": [
+        "El bot ahora encuentra los días, francos y horas de una persona en cualquier período, también los anteriores a la app (2023, 2024, 2025 y principios de 2026), que están en el archivo histórico y en los Excel de Drive. Antes decía «No lo encontré»."
+      ]
+    },
+    {
+      "id": "2026-11-22a",
+      "version": "2026.11.22a",
+      "fecha": "22/11/2026",
+      "titulo": "Mantenimiento",
+      "cambios": [
+        "Se quitó código viejo de pantallas que ya no se usaban. No cambia nada de lo que ves; la página carga un poco más liviana."
+      ]
+    },
+    {
+      "id": "2026-11-20s",
+      "version": "2026.11.20s",
+      "fecha": "20/11/2026",
+      "titulo": "Raizen ahora es SIGNAR ENERGY",
+      "cambios": [
+        "Raizen ahora se llama SIGNAR ENERGY: los servicios y sus registros (ausencias, salidas, ropa, inventarios, cargos, presentes, minutas) ya figuran con el nombre nuevo.",
+        "Si alguien escribe «raizen», se cambia solo por SIGNAR ENERGY, y buscar «raizen» o «signar» encuentra lo mismo."
+      ]
+    },
+    {
+      "id": "2026-11-17",
+      "version": "2026.11.17",
+      "fecha": "17/11/2026",
+      "titulo": "Correos desde DELBEN",
+      "cambios": [
+        "Los correos que manda esta app ahora salen de la cuenta DELBEN (delbensgi@gmail.com), ya no de fjacyno@gmail.com. Si un día se termina el cupo de esa cuenta, salen por las otras cuentas DELBEN."
+      ]
+    },
+    {
+      "id": "2026-11-16d",
+      "version": "2026.11.16d",
+      "fecha": "16/11/2026",
+      "titulo": "Novedades cargadas por el bot",
+      "cambios": [
+        "Las novedades que se le dictan al bot de Telegram quedan cargadas en la planilla de Novedades semanales (figuran como cargadas por el bot).",
+        "Las semanas ya enviadas no se pueden cambiar por el bot (salvo Administración)."
+      ]
+    },
+    {
+      "id": "2026-11-16c",
+      "version": "2026.11.16c",
+      "fecha": "16/11/2026",
+      "titulo": "Novedades para el cierre al entrar",
+      "cambios": [
+        "Al entrar a Novedades del Personal (solo Administración) sale una ventana con las novedades para el cierre del período en curso y del anterior, incluidas las que se le dictan al bot.",
+        "Sale cada vez que entrás, hasta que borres la nota en Novedades para el cierre."
+      ]
+    },
+    {
+      "id": "2026-11-16b",
+      "version": "2026.11.16b",
+      "fecha": "16/11/2026",
+      "titulo": "Avisos del bot en Novedades semanales",
+      "cambios": [
+        "Lo que se le pide al bot de Telegram para un servicio (por ejemplo: \"franco a Pérez Daniel el domingo 20, San Francisco\") le aparece al supervisor del servicio en una ventana al abrir la planilla de Novedades semanales de ese servicio.",
+        "Al tocar Aceptar el aviso queda como visto y no vuelve a salir; después sigue trabajando normal."
+      ]
+    },
+    {
+      "id": "2026-11-16",
+      "version": "2026.11.16",
+      "fecha": "16/11/2026",
+      "titulo": "Novedades: cambios nuevos",
+      "cambios": [
+        "Informes: los totales de horas extras y vacaciones también salen por zona (supervisor), para el bot de Telegram."
+      ]
+    },
+    {
+      "id": "2026-11-13c",
+      "version": "2026.11.13.3",
+      "fecha": "13/11/2026",
+      "titulo": "Novedades del Personal: cambios nuevos",
+      "cambios": [
+        "Guardar Novedades semanales es más rápido: las pestañas se mandan juntas en vez de una por una.",
+        "Si se carga a alguien que es baja, el nombre queda en negro y sale un aviso; al guardar se avisa de nuevo con legajo, empresa y fecha de baja (se puede guardar igual).",
+        "Lo que administración cambia en la Proyección de un período ya empezado también pasa a Novedades semanales, de hoy en adelante.",
+        "Planificación de servicios muestra siempre lo último guardado en Novedades semanales.",
+        "En Planificación, Escape cierra el menú del botón derecho sin salir de la ventana.",
+        "Los asuntos de los correos ya no dicen \"Delben\".",
+        "Control de cierre: sale una ventana con las Novedades para el cierre que se anotaron en el período.",
+        "STD, 30/31 días y Consolidado: nueva columna \"Plus Vac\" (al lado de Feriad. Trab.): días de vacaciones con plus, hasta 21 por período de vacaciones (desde el período 2026). Cuentan las vacaciones cargadas en Licencias del Personal con período 2026.",
+        "STD: la ART se abre en ART (primeros 10 días desde que empezó, mirando el período anterior), ARTP (el resto) y T. ART (total).",
+        "Nuevo botón Informes en el Escritorio (solo Administrador): horas a facturar, extras y vacaciones por empresa."
+      ]
+    },
+    {
+      "id": "2026-11-09",
+      "version": "2026.11.09",
+      "fecha": "09/11/2026",
+      "titulo": "Novedades del Personal: cambios nuevos",
+      "cambios": [
+        "Zona y supervisor de cada persona según el servicio donde trabaja (solo personal activo).",
+        "Feriados por jurisdicción (CABA / PBA) según el servicio, también en conformaciones y Excel.",
+        "30/31 días con el cliente donde más trabajó, orden de cierre, totales y antigüedad al cierre.",
+        "Ficha del personal por apellido y nombre y DNI (no por legajo); llegadas tarde y colores de estados en Presentes de los servicios.",
+        "Proyección anticipada de los próximos períodos y simulador con horas por persona (200 a 240), esquema a medida y puestos que rotan o quedan fijos.",
+        "Presentismo General igual a la planilla, sin fórmulas, ceros ni filas repetidas.",
+        "Los informes se arman en segundo plano sin tiempo de espera."
+      ]
+    },
+    {
+      "id": "2026-10-30",
+      "fecha": "30/10/2026",
+      "titulo": "Novedades del Personal: cambios nuevos",
+      "cambios": [
+        "Planillas como Excel: se puede pintar una columna entera tocando su encabezado, y copiar / pegar con el botón derecho del mouse (además de Ctrl+C / Ctrl+V).",
+        "Autoguardado: si se cierra la planilla sin guardar, al volver a abrirla se recupera lo cargado y se avisa si hubo un error.",
+        "Retén / Instrucción: arranca con 5 filas; se agregan más con los botones de agregar filas (también en Planificación de servicios).",
+        "Si se borra una licencia o vacaciones ya informadas por el supervisor, aparece un aviso: primero hay que anular la licencia.",
+        "Presentes de los servicios: nocturnos en gris, diurnos en celeste, una línea por fila y comentario con el horario cuando no es de 12 hs.",
+        "Las búsquedas de personal son por apellido y nombre (y DNI si se repite), nunca por legajo.",
+        "Perfiles: las pantallas y pestañas se autorizan desde SGI > Datos Varios > Perfiles.",
+        "Presentismo General: cada período sale completo de una sola fuente (archivo o app), sin períodos repetidos ni a medias."
+      ]
+    }
+  ],
+  "sgi": [
+    {
+      "id": "2026-11-27zb",
+      "version": "2026.11.27zb",
+      "fecha": "27/11/2026",
+      "titulo": "Bloqueo de empresas",
+      "cambios": [
+        "Datos Varios › Bloqueo de empresas (solo el Administrador): cada empresa cliente con sus botones Desbloquear, Solo lectura y Bloquear.",
+        "Solo lectura: entran y consultan todo, pero no pueden cargar ni modificar datos. Bloqueada: no entran a ninguna app ni al bot.",
+        "Se puede programar un cambio para una fecha y hora, y cargar empresas nuevas.",
+        "Muestra las llaves en uso y las contratadas de cada empresa."
+      ]
+    },
+    {
+      "id": "2026-11-27z",
+      "version": "2026.11.27z",
+      "fecha": "27/11/2026",
+      "titulo": "Perfiles más fáciles de entender",
+      "cambios": [
+        "Datos Varios › Perfiles: a la izquierda los perfiles y a la derecha cada ventana con sus pestañas. Cada pestaña tiene 3 opciones: No ve / Ve / Ve y edita.",
+        "En el título de cada ventana podés cambiar la ventana entera con un solo toque.",
+        "Se ven los usuarios que tiene cada perfil.",
+        "Botón \"Ver como usuario\": muestra exactamente qué ventanas y pestañas ve esa persona.",
+        "Botones \"Copiar de otro perfil\" y \"Nuevo perfil\". Las ventanas de confirmación son las del SGI.",
+        "La tabla con todos los perfiles juntos sigue disponible con \"Ver todos los perfiles en tabla\"."
+      ]
+    },
+    {
+      "id": "2026-11-27y",
+      "version": "2026.11.27y",
+      "fecha": "27/11/2026",
+      "titulo": "Arreglo: pantalla vacía en Flota",
+      "cambios": [
+        "Al entrar desde el Escritorio o volver a abrir el SGI, ahora se aplican los permisos de Perfiles (antes el perfil veía todas las pestañas o quedaba la pantalla vacía).",
+        "Si la pestaña que estaba abierta no está permitida, se abre la primera permitida."
+      ]
+    },
+    {
+      "id": "2026-11-27x",
+      "version": "2026.11.27x",
+      "fecha": "27/11/2026",
+      "titulo": "Permisos y bot",
+      "cambios": [
+        "Permisos: cada vez que se abre una ventana se vuelven a aplicar; ningún perfil ve pestañas o botones que no tiene habilitados. Si no se pueden leer, no se muestra nada de más.",
+        "Un perfil con una sola ventana (ej.: Flota) entra directo a esa ventana y no tiene el botón Menú. Cambiar contraseña la ve dentro de su ventana.",
+        "Bot: nueva consulta «Horas eventuales por servicio» (lo que cada servicio hizo de más sobre lo contratado, lo que en la planilla se pinta de azul). Fila nueva en Perfiles › Bot (preguntas)."
+      ]
+    },
+    {
+      "id": "2026-11-27w",
+      "version": "2026.11.27w",
+      "fecha": "27/11/2026",
+      "titulo": "Credenciales desde DELBEN Pro",
+      "cambios": [
+        "La dirección …/sgi/#credenciales abre directo Gestión de Personal › Credenciales (la usa DELBEN Pro)."
+      ]
+    },
+    {
+      "id": "2026-11-27v",
+      "version": "2026.11.27v",
+      "fecha": "27/11/2026",
+      "titulo": "Bot: habilitaciones",
+      "cambios": [
+        "El bot responde las habilitaciones del personal: la de una persona (por nombre, DNI o legajo) o las vencidas y las que vencen en los próximos 30 días.",
+        "En Datos Varios › Perfiles, ventana «Bot (preguntas)», está la fila «Habilitaciones del personal» para elegir qué perfil la puede consultar (por defecto, los que ven Habilitaciones en Gestión de Personal)."
+      ]
+    },
+    {
+      "id": "2026-11-27u",
+      "version": "2026.11.27u",
+      "fecha": "27/11/2026",
+      "titulo": "Credenciales",
+      "cambios": [
+        "El QR de las credenciales lleva el logo de KTL en el centro (se sigue leyendo con cualquier celular).",
+        "Las fotos de las credenciales salen con más calidad.",
+        "El dorso de la habilitación trae la ART (logo y teléfono de emergencias) y el teléfono de atención.",
+        "La ficha que abre el QR muestra la hora en vivo y se cierra sola a los 90 segundos; no se puede copiar ni seleccionar el texto."
+      ]
+    },
+    {
+      "id": "2026-11-27t",
+      "version": "2026.11.27t",
+      "fecha": "27/11/2026",
+      "titulo": "Flota: kilometraje",
+      "cambios": [
+        "Nuevo Vehículo: campo Kilometraje.",
+        "Listado de Flota: columna Kilometraje (el cargado en el vehículo o, si es mayor, el último de Mantenimiento).",
+        "La barra de espacio de DELBEN Pro ya no sale repetida cuando el SGI se abre dentro del Escritorio."
+      ]
+    },
+    {
+      "id": "2026-11-27s",
+      "version": "2026.11.27s",
+      "fecha": "27/11/2026",
+      "titulo": "Contraseñas ocultas",
+      "cambios": [
+        "Datos Varios › Autorizaciones: al editar un usuario la contraseña ya no se ve. Si querés cambiarla, escribí la nueva; si dejás el campo vacío, queda la que tenía."
+      ]
+    },
+    {
+      "id": "2026-11-27r",
+      "version": "2026.11.27r",
+      "fecha": "27/11/2026",
+      "titulo": "Arreglo: «Error al cargar» al volver al menú",
+      "cambios": [
+        "Al volver al menú, a quienes no son Administrador ya no les aparece «Error al cargar» (el SGI pedía las últimas conexiones, que solo puede ver el Administrador). No cambia nada más."
+      ]
+    },
+    {
+      "id": "2026-11-22g",
+      "version": "2026.11.22g",
+      "fecha": "22/11/2026",
+      "titulo": "Bot: Jefe de Operaciones y Supervisores",
+      "cambios": [
+        "El perfil Jefe de Operaciones ahora consulta en el bot todos los servicios, igual que el Supervisor (antes no veía ninguno).",
+        "Jefe de Operaciones y Supervisores pueden pedir horas extras y vacaciones por empresa (KDE, PPQ, LEG, LEGUYET), por zona, por servicio (cualquier servicio), por vigilador y el total.",
+        "En Perfiles › Bot (preguntas) quedaron iguales los dos perfiles."
+      ]
+    },
+    {
+      "id": "2026-11-22f",
+      "version": "2026.11.22f",
+      "fecha": "22/11/2026",
+      "titulo": "Perfiles: preguntas del bot",
+      "cambios": [
+        "En Datos Varios › Perfiles hay otra ventana nueva, «Bot (preguntas)», con una fila por cada consulta del bot de Telegram y WhatsApp: buscar personal, vacaciones, licencias, indumentaria, servicios, cobertura, documentos, móviles, presentes faltantes, horas extras por zona y por servicio, cargar novedades, avisos a servicios e informes de administración.",
+        "Para cada perfil elegís si puede hacer esa pregunta. Arranca con lo que cada perfil puede preguntar hoy; tocá Guardar para aplicarlo."
+      ]
+    },
+    {
+      "id": "2026-11-22e",
+      "version": "2026.11.22e",
+      "fecha": "22/11/2026",
+      "titulo": "Perfiles: apps del Portal y del Escritorio",
+      "cambios": [
+        "En Datos Varios › Perfiles hay una ventana nueva, «Portal y Escritorio», con una fila por cada app (SGI, Novedades del Personal, Minuta, Control de Móviles, Licencias, Combustible, etc.).",
+        "Ahí elegís qué perfil ve cada app: «Sin acceso» = no la ve en el Portal ni en el Escritorio. Arranca con lo que cada perfil ve hoy; tocá Guardar para aplicarlo.",
+        "Cada app nueva aparece sola en esa lista."
+      ]
+    },
+    {
+      "id": "2026-11-22d",
+      "version": "2026.11.22d",
+      "fecha": "22/11/2026",
+      "titulo": "Orden de Compra en PDF A4",
+      "cambios": [
+        "El botón PDF de la Orden de Compra (y Reimprimir) ahora genera un PDF A4 de verdad, con el mismo diseño. Ya no usa la impresión del navegador, así que no lo desconfigura lo que quedó elegido para la impresora de etiquetas.",
+        "Las etiquetas le avisan a la impresora su medida exacta (64 × 32 mm)."
+      ]
+    },
+    {
+      "id": "2026-11-22c",
+      "version": "2026.11.22c",
+      "fecha": "22/11/2026",
+      "titulo": "Bot: horas extras por servicio",
+      "cambios": [
+        "El bot (Telegram y WhatsApp) contesta las horas extras por servicio y quiénes las hicieron. Cada persona cuenta en el servicio donde trabajó más días.",
+        "Quién puede preguntarlo lo decidís en Datos Varios › Perfiles › «Bot - Horas extras por servicio» (de entrada, solo el Administrador).",
+        "En Perfiles se agregaron las pestañas que faltaban: Habilitaciones, Credenciales y Bot WhatsApp."
+      ]
+    },
+    {
+      "id": "2026-11-22b",
+      "version": "2026.11.22b",
+      "fecha": "22/11/2026",
+      "titulo": "Solicitudes Registradas: varias a la vez",
+      "cambios": [
+        "Tildá varias solicitudes (columna Etiq.) y aparece una barra para cargarles juntas la fecha de retiro y/o la X de LEY 299/11.",
+        "Si una solicitud no tenía fecha de retiro, al cargarla se crea sola la salida en Registro de Salida y se descuenta del stock.",
+        "Antes de guardar te muestra un resumen para confirmar (y avisa si falta stock)."
+      ]
+    },
+    {
+      "id": "2026-11-22a",
+      "version": "2026.11.22a",
+      "fecha": "22/11/2026",
+      "titulo": "Mantenimiento",
+      "cambios": [
+        "Se quitó código viejo que ya no se usaba (exportaciones a PDF sin botón y funciones de pantallas anteriores). No cambia nada de lo que ves; la página carga un poco más liviana.",
+        "Parte diario de Telegram: si tarda mucho, ya no se corta; sigue en la próxima vuelta hasta que les llega a todos."
+      ]
+    },
+    {
+      "id": "2026-11-20f",
+      "version": "2026.11.20f",
+      "fecha": "20/11/2026",
+      "titulo": "Bot de WhatsApp",
+      "cambios": [
+        "Datos Varios › Bot WhatsApp (solo Administrador): configuración paso a paso del bot oficial de WhatsApp.",
+        "Responde igual que el bot de Telegram: mismos usuarios (por su celular), mismos permisos y mismas preguntas, por texto o audio.",
+        "Los avisos y el parte de la mañana siguen por Telegram.",
+        "Sin tarjeta: hasta 1.000 respuestas gratis por mes."
+      ]
+    },
+    {
+      "id": "2026-11-20e",
+      "version": "2026.11.20e",
+      "fecha": "20/11/2026",
+      "titulo": "Credenciales: arreglos",
+      "cambios": [
+        "Imprime solo a las personas tildadas (antes salían dos cuando había números de registro repetidos).",
+        "El logo de KTL va incluido en la credencial: sale siempre, también en PDF.",
+        "La credencial de habilitación sale solo si la persona tiene fecha de vencimiento cargada."
+      ]
+    },
+    {
+      "id": "2026-11-20d",
+      "version": "2026.11.20d",
+      "fecha": "20/11/2026",
+      "titulo": "SGI: credenciales con foto y logo",
+      "cambios": [
+        "La credencial trae sola la foto que cada persona se sacó en la Ficha de Datos.",
+        "El logo de KTL ahora sale también al guardar como PDF.",
+        "Avisa quiénes todavía no tienen foto o habilitación cargada."
+      ]
+    },
+    {
+      "id": "2026-11-20c",
+      "version": "2026.11.20c",
+      "fecha": "20/11/2026",
+      "titulo": "SGI: Habilitaciones y Credenciales",
+      "cambios": [
+        "Gestión de Personal › Habilitaciones: el listado del personal con su habilitación. Tocá el nombre para cargar cargo, jurisdicción, N° de credencial, desde y hasta. Avisa las vencidas y las que vencen en 30 días.",
+        "Gestión de Personal › Credenciales: tildá a quiénes imprimir y elegí credencial del personal, habilitación o las dos (tamaño real tipo DNI).",
+        "Datos Varios › Empresas: ahora se cargan la prestadora, su legajo y el N° de expediente (salen en la habilitación).",
+        "Las dos pestañas nuevas ya están en Perfiles para elegir quién las ve."
+      ]
+    },
+    {
+      "id": "2026-11-20b",
+      "version": "2026.11.20b",
+      "fecha": "20/11/2026",
+      "titulo": "SGI: guardado simultáneo y seguridad",
+      "cambios": [
+        "Dos o tres personas pueden guardar a la vez sin pisarse: cada una manda solo lo que cambió.",
+        "Si dos cargan un registro nuevo al mismo tiempo, al segundo se le da el número siguiente (no se reemplaza ninguno).",
+        "Las OC de varios artículos se guardan enteras: al editarlas quedan exactamente como se guardaron (antes las líneas podían quedar mezcladas).",
+        "La clave se controla siempre en el servidor y ya no viaja al navegador.",
+        "La sesión vence a las 6 horas sin uso: hay que volver a entrar con el usuario.",
+        "Borrar registros es solo para el Administrador, con la ventana de confirmación del SGI."
+      ]
+    },
+    {
+      "id": "2026-11-20s",
+      "version": "2026.11.20s",
+      "fecha": "20/11/2026",
+      "titulo": "Raizen ahora es SIGNAR ENERGY",
+      "cambios": [
+        "Raizen ahora se llama SIGNAR ENERGY: los servicios y sus registros (ausencias, salidas, ropa, inventarios, cargos, presentes, minutas) ya figuran con el nombre nuevo.",
+        "Si alguien escribe «raizen», se cambia solo por SIGNAR ENERGY, y buscar «raizen» o «signar» encuentra lo mismo."
+      ]
+    },
+    {
+      "id": "2026-11-17d",
+      "version": "2026.11.17d",
+      "fecha": "17/11/2026",
+      "titulo": "Correos desde DELBEN",
+      "cambios": [
+        "Los correos que manda esta app ahora salen de la cuenta DELBEN (delbensgi@gmail.com), ya no de fjacyno@gmail.com. Si un día se termina el cupo de esa cuenta, salen por las otras cuentas DELBEN."
+      ]
+    },
+    {
+      "id": "2026-11-17c",
+      "version": "2026.11.17c",
+      "fecha": "17/11/2026",
+      "titulo": "Recordatorio de precios",
+      "cambios": [
+        "El primer día hábil de cada mes, el parte de la mañana le recuerda al Administrador actualizar los precios de la ropa en Datos Varios › Precios (al guardar, se actualiza solo el valor del stock)."
+      ]
+    },
+    {
+      "id": "2026-11-17b",
+      "version": "2026.11.17b",
+      "fecha": "17/11/2026",
+      "titulo": "Espacio de DELBEN Pro a la vista",
+      "cambios": [
+        "Arriba a la derecha (solo Administrador) hay una barra con cuánto ocupa la base de DELBEN Pro, de los 500 MB del plan gratis: verde, amarilla desde el 70 % y roja desde el 90 %.",
+        "En Datos Varios › Parte diario hay un ítem nuevo, \"Espacio de DELBEN Pro\", que por defecto le llega solo al Administrador."
+      ]
+    },
+    {
+      "id": "2026-11-17a",
+      "version": "2026.11.17a",
+      "fecha": "17/11/2026",
+      "titulo": "Bot: indumentaria pendiente",
+      "cambios": [
+        "Al bot de Telegram se le puede preguntar qué indumentaria retirada falta firmar (no informada) y qué ropa pedida falta entregar, con persona, servicio y prendas. Solo personal activo; el supervisor elige su zona o toda la empresa."
+      ]
+    },
+    {
+      "id": "2026-11-16j",
+      "version": "2026.11.16j",
+      "fecha": "16/11/2026",
+      "titulo": "Parte de la mañana: días por ítem y recordatorios de los lunes",
+      "cambios": [
+        "En Datos Varios › Parte diario, debajo de cada ítem se tildan los días de la semana en que sale (L a D).",
+        "Nuevos recordatorios para los supervisores: enviar las Novedades semanales y enviar la rendición de combustible (por defecto, los lunes).",
+        "Se sacó del parte la lista de semanas de Novedades sin enviar.",
+        "VTV y seguro (póliza): a cada supervisor le salen los móviles a su nombre y los de sus servicios, tal como figuran en el listado de flota."
+      ]
+    },
+    {
+      "id": "2026-11-16i",
+      "version": "2026.11.16i",
+      "fecha": "16/11/2026",
+      "titulo": "Parte de la mañana: ítems nuevos",
+      "cambios": [
+        "\"Ropa retirada sin firmar\" ahora se llama \"Indumentaria que falta firmar\" y se suma \"Indumentaria que falta entregar\" (pedidos sin retirar, solo personal activo).",
+        "Ítems nuevos para elegir por persona en Datos Varios › Parte diario: semanas de Novedades sin enviar, personal de vacaciones hoy, cumpleaños del día, altas y bajas de personal, VTV y pólizas vencidas o por vencer, tickets de combustible pendientes u observados y presentes fuera del radio de ayer.",
+        "A cada supervisor le sale solo lo de su zona."
+      ]
+    },
+    {
+      "id": "2026-11-16h",
+      "version": "2026.11.16h",
+      "fecha": "16/11/2026",
+      "titulo": "Parte de la mañana por Telegram",
+      "cambios": [
+        "Nueva pestaña Datos Varios › Parte diario (solo administrador): todos los días a las 9 el bot le manda a cada uno su parte.",
+        "Para cada persona se elige qué recibe: cómo viene el período, faltantes de presente, licencias que empiezan o terminan, móviles con novedades, ropa retirada sin firmar y avisos del bot sin aceptar.",
+        "El supervisor recibe solo lo de su zona. Con \"Mandar ahora\" se le manda el parte en el momento para probar.",
+        "En \"Ropa retirada sin firmar\" salen solo las personas activas (las dadas de baja no se informan)."
+      ]
+    },
+    {
+      "id": "2026-11-16g",
+      "version": "2026.11.16g",
+      "fecha": "16/11/2026",
+      "titulo": "Bot para vigiladores",
+      "cambios": [
+        "Nuevo perfil Vigilador en Datos Varios › Bot Telegram: solo pueden usarlo los vigiladores que da de alta el administrador.",
+        "El vigilador consulta solo sus propios datos: vacaciones, francos y horario, horas del período, ropa a cargo y licencias.",
+        "Si pregunta por otra persona o por la empresa, el bot le dice que lo consulte con su supervisor. No puede pedir ni cambiar nada."
+      ]
+    },
+    {
+      "id": "2026-11-16f",
+      "version": "2026.11.16f",
+      "fecha": "16/11/2026",
+      "titulo": "Bot: cargar novedades hablando",
+      "cambios": [
+        "Supervisores, Jefe de Operaciones y Administrador le dictan al bot (texto o audio) la novedad de un vigilador: \"Pérez franco el domingo 20 en San Francisco\".",
+        "El bot muestra qué va a cargar y lo que había ese día, y recién lo carga en la planilla de Novedades semanales cuando se confirma.",
+        "Si ese día ya tenía algo, pregunta si lo reemplaza; si la persona no está en la planilla del servicio, la agrega.",
+        "Al supervisor del servicio le sale el aviso de lo que se cargó cuando abre Novedades semanales."
+      ]
+    },
+    {
+      "id": "2026-11-16e",
+      "version": "2026.11.16e",
+      "fecha": "16/11/2026",
+      "titulo": "Perfil Raizen Supervisor",
+      "cambios": [
+        "Nuevo perfil Raizen Supervisor en Datos Varios › Perfiles, con acceso solo a sus apps."
+      ]
+    },
+    {
+      "id": "2026-11-16d",
+      "version": "2026.11.16d",
+      "fecha": "16/11/2026",
+      "titulo": "Bot: avisos para los servicios",
+      "cambios": [
+        "Supervisores, Jefe de Operaciones y Administrador pueden dictarle al bot (por texto o audio) novedades para un servicio: francos, vacaciones, cambios de turno, etc.",
+        "El aviso le sale al supervisor del servicio cuando abre la planilla de Novedades semanales de ese servicio.",
+        "Si el día de la semana no coincide con la fecha, el bot pregunta antes de guardarlo."
+      ]
+    },
+    {
+      "id": "2026-11-16c",
+      "version": "2026.11.16c",
+      "fecha": "16/11/2026",
+      "titulo": "Bot: consultas de los supervisores",
+      "cambios": [
+        "Los supervisores pueden consultar horas extras y días de vacaciones del total de la empresa o de una zona; si no dicen cuál, el bot les pregunta primero.",
+        "Los supervisores pueden consultar los datos personales y las vacaciones de cualquier vigilador.",
+        "El bot nombra los servicios por su nombre, ya no por el código (SSC07, SAC01...).",
+        "Corregido: el bot tomaba como período actual el que empieza el 26 de este mes (todavía sin datos) y decía que no había horas extras ni vacaciones."
+      ]
+    },
+    {
+      "id": "2026-11-16b",
+      "version": "2026.11.16.2",
+      "fecha": "16/11/2026",
+      "titulo": "SGI: cambios nuevos",
+      "cambios": [
+        "Registro de Salida: cuando se le asigna ropa a una persona, se carga sola en Indumentaria › Solicitudes registradas (si ya tenía pedida esa prenda, queda marcada como retirada). Queda lista para firmar en Cargos Precargados.",
+        "Preparación de Indumentaria: al imprimir etiquetas salen las dos por persona: la de datos y la del QR de la prenda.",
+        "Bot de Telegram: por el dominio de un auto dice en qué servicio está y sus desperfectos según el último control de móviles (y las novedades de los últimos 30 días). Si el dominio está mal escrito por una letra, busca el más parecido."
+      ]
+    },
+    {
+      "id": "2026-11-16a",
+      "version": "2026.11.16.1",
+      "fecha": "16/11/2026",
+      "titulo": "SGI: cambios nuevos",
+      "cambios": [
+        "Bot de Telegram: \"¿quiénes faltan dar el presente?\" (hoy, ayer o el día que digas). Compara lo que proyectó cada supervisor en la Planificación de Novedades con los presentes de Presentismo de Servicios y dice, por servicio, quién falta, quién informó licencia y qué servicios están completos. Lo pueden consultar el Administrador, el Jefe de Operaciones (Coordinador) y los supervisores, de todos los servicios.",
+        "Bot de Telegram (Administrador): también puede consultar cualquier dato de la planilla de Presentismo de Servicios.",
+        "Bot de Telegram: horas extras y días de vacaciones del período por zona (cada supervisor con sus servicios). Lo pueden consultar el Administrador y el Jefe de Operaciones.",
+        "Bot de Telegram: responde sobre los móviles: dónde está cada uno (servicio asignado y su dirección), estado, VTV y póliza, los partes del Control de Móviles (combustible, carros eléctricos y bicicletas) con sus novedades, y los kilómetros entre un control y el anterior."
+      ]
+    },
+    {
+      "id": "2026-11-13k",
+      "version": "2026.11.13.11",
+      "fecha": "13/11/2026",
+      "titulo": "SGI: cambios nuevos",
+      "cambios": [
+        "Bot de Telegram: entiende \"los servicios de [supervisor]\" y manda la proyección o las novedades de todos sus servicios juntos en un solo archivo (con la columna Servicio). Se puede pedir por el chat, por correo o por los dos a la vez.",
+        "Bot de Telegram: cualquiera puede pedir la proyección, las novedades semanales, los cargos o las licencias (de cualquier servicio o persona); la rendición de combustible, cada uno solo la suya. Siempre pregunta el formato (PDF o Excel) y si va por el chat o por correo (al correo registrado de quien lo pide).",
+        "Bot de Telegram (Administrador): informa los totales del período de toda la empresa y por empresa (horas a facturar, horas extras, días de vacaciones), lo mismo que el botón Informes.",
+        "Bot de Telegram (Administrador): totales de vacaciones de todo el personal activo (corresponden, tomados, remanente) y consulta de cualquier pestaña del SGI o de Novedades (stock, salidas, flota, compras, combustible, etc.).",
+        "Bot de Telegram: cada número consulta lo que su perfil tiene habilitado en Datos Varios › Autorizaciones (el Administrador, todo).",
+        "Bot de Telegram: puede mandar la proyección o las novedades de cualquier servicio, el cargo de indumentaria o las vacaciones de una persona, en Excel o PDF. Te pregunta si lo querés ahí en Telegram (para guardarlo o reenviarlo por WhatsApp) o por mail; por mail va solo al correo registrado de quien lo pide.",
+        "Cargos del Personal: el Administrador ve todo junto (lo histórico y lo de los últimos 2 años). Los demás siguen viendo solo lo entregado en los últimos 2 años.",
+        "Bot de Telegram: contesta más rápido, responde directo sin preámbulos y el audio llega como nota de voz para escucharlo ahí mismo.",
+        "Bot de Telegram: ahora puede consultar la indumentaria entregada a cada persona (por ejemplo, cuándo se le dio campera por última vez).",
+        "Bot de Telegram: ya contesta. Antes los mensajes quedaban trabados en la cola de Telegram; ahora el bot los saca, los contesta y sigue escuchando.",
+        "Bot de Telegram (solo Administrador): \"dejame anotado para el cierre…\" guarda la nota en las Novedades para el cierre de Novedades del Personal, del período actual o del que le digas. Aparece en Control de cierre.",
+        "Si el supervisor entrega en un cargo una prenda que no estaba pedida, se carga sola en Cargos del Personal (Solicitudes registradas) con los datos del cargo.",
+        "Los asuntos de los correos ya no dicen \"DELBEN SGI\".",
+        "Preparación de Indumentaria: columna \"Etiqueta / Cant.\" y botón \"Imprimir etiquetas\" (64 × 32 mm, impresora de etiquetas por USB desde la PC): apellido y nombre grande, legajo, empresa, servicio, supervisor, ítem y código.",
+        "Retiros pendientes y Solicitudes registradas: se pueden imprimir etiquetas de 64 × 32 mm de lo tildado.",
+        "Etiquetas de Retiros pendientes y Solicitudes registradas: salen 2 por persona: la de datos y otra con el QR del código de la prenda (el mismo del Escáner) con el nombre, el ítem y el código.",
+        "Listado de Personal: tres columnas de vacaciones: Corresponde (lo cargado en la ficha; si está vacío, por ley), Tomados y Remanente. Se descuenta todo lo que figura de vacaciones: Licencias del Personal, Proyección de Vac. y VAC en Novedades.",
+        "Clic en el nombre de la persona: ventana con lo que le corresponde, lo tomado, el remanente y el detalle de cada vacación (fechas, días y de dónde sale). El administrador tiene el botón \"Editar ficha\".",
+        "Nueva pestaña Datos Varios › Bot Telegram (solo administrador): configuración del bot de consultas, números autorizados con su perfil e historial de preguntas."
+      ]
+    },
+    {
+      "id": "2026-11-13j",
+      "version": "2026.11.13.10",
+      "fecha": "13/11/2026",
+      "titulo": "SGI: cambios nuevos",
+      "cambios": [
+        "Bot de Telegram: cualquiera puede pedir la proyección, las novedades semanales, los cargos o las licencias (de cualquier servicio o persona); la rendición de combustible, cada uno solo la suya. Siempre pregunta el formato (PDF o Excel) y si va por el chat o por correo (al correo registrado de quien lo pide).",
+        "Bot de Telegram (Administrador): informa los totales del período de toda la empresa y por empresa (horas a facturar, horas extras, días de vacaciones), lo mismo que el botón Informes.",
+        "Bot de Telegram (Administrador): totales de vacaciones de todo el personal activo (corresponden, tomados, remanente) y consulta de cualquier pestaña del SGI o de Novedades (stock, salidas, flota, compras, combustible, etc.).",
+        "Bot de Telegram: cada número consulta lo que su perfil tiene habilitado en Datos Varios › Autorizaciones (el Administrador, todo).",
+        "Bot de Telegram: puede mandar la proyección o las novedades de cualquier servicio, el cargo de indumentaria o las vacaciones de una persona, en Excel o PDF. Te pregunta si lo querés ahí en Telegram (para guardarlo o reenviarlo por WhatsApp) o por mail; por mail va solo al correo registrado de quien lo pide.",
+        "Cargos del Personal: el Administrador ve todo junto (lo histórico y lo de los últimos 2 años). Los demás siguen viendo solo lo entregado en los últimos 2 años.",
+        "Bot de Telegram: contesta más rápido, responde directo sin preámbulos y el audio llega como nota de voz para escucharlo ahí mismo.",
+        "Bot de Telegram: ahora puede consultar la indumentaria entregada a cada persona (por ejemplo, cuándo se le dio campera por última vez).",
+        "Bot de Telegram: ya contesta. Antes los mensajes quedaban trabados en la cola de Telegram; ahora el bot los saca, los contesta y sigue escuchando.",
+        "Bot de Telegram (solo Administrador): \"dejame anotado para el cierre…\" guarda la nota en las Novedades para el cierre de Novedades del Personal, del período actual o del que le digas. Aparece en Control de cierre.",
+        "Si el supervisor entrega en un cargo una prenda que no estaba pedida, se carga sola en Cargos del Personal (Solicitudes registradas) con los datos del cargo.",
+        "Los asuntos de los correos ya no dicen \"DELBEN SGI\".",
+        "Preparación de Indumentaria: columna \"Etiqueta / Cant.\" y botón \"Imprimir etiquetas\" (64 × 32 mm, impresora de etiquetas por USB desde la PC): apellido y nombre grande, legajo, empresa, servicio, supervisor, ítem y código.",
+        "Retiros pendientes y Solicitudes registradas: se pueden imprimir etiquetas de 64 × 32 mm de lo tildado.",
+        "Etiquetas de Retiros pendientes y Solicitudes registradas: salen 2 por persona: la de datos y otra con el QR del código de la prenda (el mismo del Escáner) con el nombre, el ítem y el código.",
+        "Listado de Personal: tres columnas de vacaciones: Corresponde (lo cargado en la ficha; si está vacío, por ley), Tomados y Remanente. Se descuenta todo lo que figura de vacaciones: Licencias del Personal, Proyección de Vac. y VAC en Novedades.",
+        "Clic en el nombre de la persona: ventana con lo que le corresponde, lo tomado, el remanente y el detalle de cada vacación (fechas, días y de dónde sale). El administrador tiene el botón \"Editar ficha\".",
+        "Nueva pestaña Datos Varios › Bot Telegram (solo administrador): configuración del bot de consultas, números autorizados con su perfil e historial de preguntas."
+      ]
+    },
+    {
+      "id": "2026-11-13i",
+      "version": "2026.11.13.9",
+      "fecha": "13/11/2026",
+      "titulo": "SGI: cambios nuevos",
+      "cambios": [
+        "Bot de Telegram (Administrador): informa los totales del período de toda la empresa y por empresa (horas a facturar, horas extras, días de vacaciones), lo mismo que el botón Informes.",
+        "Bot de Telegram (Administrador): totales de vacaciones de todo el personal activo (corresponden, tomados, remanente) y consulta de cualquier pestaña del SGI o de Novedades (stock, salidas, flota, compras, combustible, etc.).",
+        "Bot de Telegram: cada número consulta lo que su perfil tiene habilitado en Datos Varios › Autorizaciones (el Administrador, todo).",
+        "Bot de Telegram: puede mandar la proyección o las novedades de cualquier servicio, el cargo de indumentaria o las vacaciones de una persona, en Excel o PDF. Te pregunta si lo querés ahí en Telegram (para guardarlo o reenviarlo por WhatsApp) o por mail; por mail va solo al correo registrado de quien lo pide.",
+        "Cargos del Personal: el Administrador ve todo junto (lo histórico y lo de los últimos 2 años). Los demás siguen viendo solo lo entregado en los últimos 2 años.",
+        "Bot de Telegram: contesta más rápido, responde directo sin preámbulos y el audio llega como nota de voz para escucharlo ahí mismo.",
+        "Bot de Telegram: ahora puede consultar la indumentaria entregada a cada persona (por ejemplo, cuándo se le dio campera por última vez).",
+        "Bot de Telegram: ya contesta. Antes los mensajes quedaban trabados en la cola de Telegram; ahora el bot los saca, los contesta y sigue escuchando.",
+        "Bot de Telegram (solo Administrador): \"dejame anotado para el cierre…\" guarda la nota en las Novedades para el cierre de Novedades del Personal, del período actual o del que le digas. Aparece en Control de cierre.",
+        "Si el supervisor entrega en un cargo una prenda que no estaba pedida, se carga sola en Cargos del Personal (Solicitudes registradas) con los datos del cargo.",
+        "Los asuntos de los correos ya no dicen \"DELBEN SGI\".",
+        "Preparación de Indumentaria: columna \"Etiqueta / Cant.\" y botón \"Imprimir etiquetas\" (64 × 32 mm, impresora de etiquetas por USB desde la PC): apellido y nombre grande, legajo, empresa, servicio, supervisor, ítem y código.",
+        "Retiros pendientes y Solicitudes registradas: se pueden imprimir etiquetas de 64 × 32 mm de lo tildado.",
+        "Etiquetas de Retiros pendientes y Solicitudes registradas: salen 2 por persona: la de datos y otra con el QR del código de la prenda (el mismo del Escáner) con el nombre, el ítem y el código.",
+        "Listado de Personal: tres columnas de vacaciones: Corresponde (lo cargado en la ficha; si está vacío, por ley), Tomados y Remanente. Se descuenta todo lo que figura de vacaciones: Licencias del Personal, Proyección de Vac. y VAC en Novedades.",
+        "Clic en el nombre de la persona: ventana con lo que le corresponde, lo tomado, el remanente y el detalle de cada vacación (fechas, días y de dónde sale). El administrador tiene el botón \"Editar ficha\".",
+        "Nueva pestaña Datos Varios › Bot Telegram (solo administrador): configuración del bot de consultas, números autorizados con su perfil e historial de preguntas."
+      ]
+    },
+    {
+      "id": "2026-11-13h",
+      "version": "2026.11.13.8",
+      "fecha": "13/11/2026",
+      "titulo": "SGI: cambios nuevos",
+      "cambios": [
+        "Bot de Telegram: cada número consulta lo que su perfil tiene habilitado en Datos Varios › Autorizaciones (el Administrador, todo).",
+        "Bot de Telegram: puede mandar la proyección o las novedades de cualquier servicio, el cargo de indumentaria o las vacaciones de una persona, en Excel o PDF. Te pregunta si lo querés ahí en Telegram (para guardarlo o reenviarlo por WhatsApp) o por mail; por mail va solo al correo registrado de quien lo pide.",
+        "Cargos del Personal: el Administrador ve todo junto (lo histórico y lo de los últimos 2 años). Los demás siguen viendo solo lo entregado en los últimos 2 años.",
+        "Bot de Telegram: contesta más rápido, responde directo sin preámbulos y el audio llega como nota de voz para escucharlo ahí mismo.",
+        "Bot de Telegram: ahora puede consultar la indumentaria entregada a cada persona (por ejemplo, cuándo se le dio campera por última vez).",
+        "Bot de Telegram: ya contesta. Antes los mensajes quedaban trabados en la cola de Telegram; ahora el bot los saca, los contesta y sigue escuchando.",
+        "Bot de Telegram (solo Administrador): \"dejame anotado para el cierre…\" guarda la nota en las Novedades para el cierre de Novedades del Personal, del período actual o del que le digas. Aparece en Control de cierre.",
+        "Si el supervisor entrega en un cargo una prenda que no estaba pedida, se carga sola en Cargos del Personal (Solicitudes registradas) con los datos del cargo.",
+        "Los asuntos de los correos ya no dicen \"DELBEN SGI\".",
+        "Preparación de Indumentaria: columna \"Etiqueta / Cant.\" y botón \"Imprimir etiquetas\" (64 × 32 mm, impresora de etiquetas por USB desde la PC): apellido y nombre grande, legajo, empresa, servicio, supervisor, ítem y código.",
+        "Retiros pendientes y Solicitudes registradas: se pueden imprimir etiquetas de 64 × 32 mm de lo tildado.",
+        "Etiquetas de Retiros pendientes y Solicitudes registradas: salen 2 por persona: la de datos y otra con el QR del código de la prenda (el mismo del Escáner) con el nombre, el ítem y el código.",
+        "Listado de Personal: tres columnas de vacaciones: Corresponde (lo cargado en la ficha; si está vacío, por ley), Tomados y Remanente. Se descuenta todo lo que figura de vacaciones: Licencias del Personal, Proyección de Vac. y VAC en Novedades.",
+        "Clic en el nombre de la persona: ventana con lo que le corresponde, lo tomado, el remanente y el detalle de cada vacación (fechas, días y de dónde sale). El administrador tiene el botón \"Editar ficha\".",
+        "Nueva pestaña Datos Varios › Bot Telegram (solo administrador): configuración del bot de consultas, números autorizados con su perfil e historial de preguntas."
+      ]
+    },
+    {
+      "id": "2026-11-13g",
+      "version": "2026.11.13.7",
+      "fecha": "13/11/2026",
+      "titulo": "SGI: cambios nuevos",
+      "cambios": [
+        "Cargos del Personal: el Administrador ve todo junto (lo histórico y lo de los últimos 2 años). Los demás siguen viendo solo lo entregado en los últimos 2 años.",
+        "Bot de Telegram: contesta más rápido, responde directo sin preámbulos y el audio llega como nota de voz para escucharlo ahí mismo.",
+        "Bot de Telegram: ahora puede consultar la indumentaria entregada a cada persona (por ejemplo, cuándo se le dio campera por última vez).",
+        "Bot de Telegram: ya contesta. Antes los mensajes quedaban trabados en la cola de Telegram; ahora el bot los saca, los contesta y sigue escuchando.",
+        "Bot de Telegram (solo Administrador): \"dejame anotado para el cierre…\" guarda la nota en las Novedades para el cierre de Novedades del Personal, del período actual o del que le digas. Aparece en Control de cierre.",
+        "Si el supervisor entrega en un cargo una prenda que no estaba pedida, se carga sola en Cargos del Personal (Solicitudes registradas) con los datos del cargo.",
+        "Los asuntos de los correos ya no dicen \"DELBEN SGI\".",
+        "Preparación de Indumentaria: columna \"Etiqueta / Cant.\" y botón \"Imprimir etiquetas\" (64 × 32 mm, impresora de etiquetas por USB desde la PC): apellido y nombre grande, legajo, empresa, servicio, supervisor, ítem y código.",
+        "Retiros pendientes y Solicitudes registradas: se pueden imprimir etiquetas de 64 × 32 mm de lo tildado.",
+        "Etiquetas de Retiros pendientes y Solicitudes registradas: salen 2 por persona: la de datos y otra con el QR del código de la prenda (el mismo del Escáner) con el nombre, el ítem y el código.",
+        "Listado de Personal: tres columnas de vacaciones: Corresponde (lo cargado en la ficha; si está vacío, por ley), Tomados y Remanente. Se descuenta todo lo que figura de vacaciones: Licencias del Personal, Proyección de Vac. y VAC en Novedades.",
+        "Clic en el nombre de la persona: ventana con lo que le corresponde, lo tomado, el remanente y el detalle de cada vacación (fechas, días y de dónde sale). El administrador tiene el botón \"Editar ficha\".",
+        "Nueva pestaña Datos Varios › Bot Telegram (solo administrador): configuración del bot de consultas, números autorizados con su perfil e historial de preguntas."
+      ]
+    },
+    {
+      "id": "2026-11-13f",
+      "version": "2026.11.13.6",
+      "fecha": "13/11/2026",
+      "titulo": "SGI: cambios nuevos",
+      "cambios": [
+        "Bot de Telegram: ya contesta. Antes los mensajes quedaban trabados en la cola de Telegram; ahora el bot los saca, los contesta y sigue escuchando.",
+        "Bot de Telegram (solo Administrador): \"dejame anotado para el cierre…\" guarda la nota en las Novedades para el cierre de Novedades del Personal, del período actual o del que le digas. Aparece en Control de cierre.",
+        "Si el supervisor entrega en un cargo una prenda que no estaba pedida, se carga sola en Cargos del Personal (Solicitudes registradas) con los datos del cargo.",
+        "Los asuntos de los correos ya no dicen \"DELBEN SGI\".",
+        "Preparación de Indumentaria: columna \"Etiqueta / Cant.\" y botón \"Imprimir etiquetas\" (64 × 32 mm, impresora de etiquetas por USB desde la PC): apellido y nombre grande, legajo, empresa, servicio, supervisor, ítem y código.",
+        "Retiros pendientes y Solicitudes registradas: se pueden imprimir etiquetas de 64 × 32 mm de lo tildado.",
+        "Etiquetas de Retiros pendientes y Solicitudes registradas: salen 2 por persona: la de datos y otra con el QR del código de la prenda (el mismo del Escáner) con el nombre, el ítem y el código.",
+        "Listado de Personal: tres columnas de vacaciones: Corresponde (lo cargado en la ficha; si está vacío, por ley), Tomados y Remanente. Se descuenta todo lo que figura de vacaciones: Licencias del Personal, Proyección de Vac. y VAC en Novedades.",
+        "Clic en el nombre de la persona: ventana con lo que le corresponde, lo tomado, el remanente y el detalle de cada vacación (fechas, días y de dónde sale). El administrador tiene el botón \"Editar ficha\".",
+        "Nueva pestaña Datos Varios › Bot Telegram (solo administrador): configuración del bot de consultas, números autorizados con su perfil e historial de preguntas."
+      ]
+    },
+    {
+      "id": "2026-11-13e",
+      "version": "2026.11.13.5",
+      "fecha": "13/11/2026",
+      "titulo": "SGI: cambios nuevos",
+      "cambios": [
+        "Si el supervisor entrega en un cargo una prenda que no estaba pedida, se carga sola en Cargos del Personal (Solicitudes registradas) con los datos del cargo.",
+        "Los asuntos de los correos ya no dicen \"DELBEN SGI\".",
+        "Preparación de Indumentaria: columna \"Etiqueta / Cant.\" y botón \"Imprimir etiquetas\" (64 × 32 mm, impresora de etiquetas por USB desde la PC): apellido y nombre grande, legajo, empresa, servicio, supervisor, ítem y código.",
+        "Retiros pendientes y Solicitudes registradas: se pueden imprimir etiquetas de 64 × 32 mm de lo tildado.",
+        "Etiquetas de Retiros pendientes y Solicitudes registradas: salen 2 por persona: la de datos y otra con el QR del código de la prenda (el mismo del Escáner) con el nombre, el ítem y el código.",
+        "Listado de Personal: tres columnas de vacaciones: Corresponde (lo cargado en la ficha; si está vacío, por ley), Tomados y Remanente. Se descuenta todo lo que figura de vacaciones: Licencias del Personal, Proyección de Vac. y VAC en Novedades.",
+        "Clic en el nombre de la persona: ventana con lo que le corresponde, lo tomado, el remanente y el detalle de cada vacación (fechas, días y de dónde sale). El administrador tiene el botón \"Editar ficha\".",
+        "Nueva pestaña Datos Varios › Bot Telegram (solo administrador): configuración del bot de consultas, números autorizados con su perfil e historial de preguntas."
+      ]
+    },
+    {
+      "id": "2026-11-09",
+      "version": "2026.11.09",
+      "fecha": "09/11/2026",
+      "titulo": "SGI: cambios nuevos",
+      "cambios": [
+        "Cada cargo firmado pasa una sola vez a Cargos del Personal (no pisa lo corregido a mano).",
+        "Correo \"Indumentaria en Preparación\".",
+        "Perfiles: rol COM (solo Control de Presentismo) y filas de Pedido de descargo."
+      ]
+    },
+    {
+      "id": "2026-10-30",
+      "fecha": "30/10/2026",
+      "titulo": "SGI: cambios nuevos",
+      "cambios": [
+        "Gestión de Personal: nueva pestaña Cargos Históricos (personal de baja y cargos de más de 2 años), con buscador, colores y PDF.",
+        "Los cargos firmados se descuentan en Cargos del Personal.",
+        "Vacacioneros: informe en PDF y Excel por empresa, zona y servicio (servicio donde estuvo más de 10 días); grupos de Zárate y Fincas de Iraola 2 aparte.",
+        "Proyección de Vacaciones: se completan las vacaciones informadas por los supervisores.",
+        "Flota: informe completo del vehículo en PDF; Mantenimiento con facturas y presupuestos (foto, PDF o cámara).",
+        "Indumentaria: botón para agregar filas en todas las cargas masivas; Próxima Entrega en meses; Curvas sin tintorería.",
+        "Datos Varios: servicios con la palabra baja en negro (solo los ve el administrador), también en Líneas Tel.; precios sincronizados con el inventario; Perfiles en orden alfabético con buscador.",
+        "Gestión de Personal: nuevas pestañas Diagrama Automático (vacaciones del año en bloques de 7 o 14 días con el vacacionero, por servicio, zona, empresa o grupo) y Cobertura de Servicios (cuántos vigiladores necesita cada servicio, con franqueros optimizados).",
+        "Preparación de Indumentaria: lo escaneado con el celular (app Escáner) aparece solo en las filas; después tocás Guardar Preparación."
+      ]
+    }
+  ],
+  "minuta": [
+    {
+      "id": "2026-11-20s",
+      "version": "2026.11.20s",
+      "fecha": "20/11/2026",
+      "titulo": "Raizen ahora es SIGNAR ENERGY",
+      "cambios": [
+        "Raizen ahora se llama SIGNAR ENERGY: los servicios y sus registros (ausencias, salidas, ropa, inventarios, cargos, presentes, minutas) ya figuran con el nombre nuevo.",
+        "Si alguien escribe «raizen», se cambia solo por SIGNAR ENERGY, y buscar «raizen» o «signar» encuentra lo mismo."
+      ]
+    },
+    {
+      "id": "2026-11-20",
+      "version": "2026.11.20",
+      "fecha": "20/11/2026",
+      "titulo": "Correos como sgi@delbensgi.com.ar",
+      "cambios": [
+        "Los correos que manda esta app ahora salen como sgi@delbensgi.com.ar (ya no desde la cuenta de Gmail). Si un día se termina el cupo, salen por las otras cuentas DELBEN.",
+        "El perfil de supervisor de SIGNAR ENERGY usa la Minuta como el usuario de su servicio: ve solo su servicio y sus minutas."
+      ]
+    },
+    {
+      "id": "2026-11-13",
+      "version": "2026.11.13",
+      "fecha": "13/11/2026",
+      "titulo": "Minuta Operativa: cambios nuevos",
+      "cambios": [
+        "El asunto del correo es: Minuta Operativa – Servicio – Turno – Fecha.",
+        "Los presentes traídos de Presentismo vienen con el horario del turno, sin horas fraccionadas; si alguien llegó tarde, el encargado lo cambia a mano."
+      ]
+    },
+    {
+      "id": "2026-11-09",
+      "version": "2026.11.09",
+      "fecha": "09/11/2026",
+      "titulo": "Minuta Operativa: cambios nuevos",
+      "cambios": [
+        "Raizen ahora es Signar Energy, con su logo; Fincas de Iraola Dos.",
+        "El personal que dio el presente en Presentismo ya viene cargado al abrir la minuta (y botón Traer los presentes del día).",
+        "Horas redondeadas a la media hora; la misma minuta no se guarda ni se envía dos veces.",
+        "Nombres de archivo nuevos (también Barrio Laguna Grande)."
+      ]
+    },
+    {
+      "id": "2026-10-31",
+      "fecha": "31/10/2026",
+      "titulo": "Minuta: nombre del PDF y fotos en ventana",
+      "cambios": [
+        "El PDF se llama con el servicio, la fecha y el turno (ej.: SAN FRANCISCO 31-10-2026 Diurno). Ya no lleva la guardia.",
+        "En el PDF, la columna Foto de los rondines y el botón Ver foto de las anomalías abren la foto en una ventana dentro del mismo PDF, con su título y una (X) para cerrarla. Se pueden abrir varias."
+      ]
+    },
+    {
+      "id": "2026-10-30",
+      "fecha": "30/10/2026",
+      "titulo": "Minuta Operativa: cambios nuevos",
+      "cambios": [
+        "PDF con colores más sobrios (rojo como color principal, gris oscuro y gris).",
+        "Recorridas / rondines: nueva columna Foto. Tocando \"Ver\" (o cualquier foto) se abre la foto grande con su título; \"Cerrar\" vuelve al informe.",
+        "Novedades relevantes / anomalías: botón \"Ver foto\" cuando hay una foto de esa novedad.",
+        "El PDF se guarda como \"Servicio DD-MM-AAAA Día\" o \"Noche\" (sin la palabra Delben).",
+        "Las personas cargadas en Correos CC (Escritorio) para el servicio salen con copia por defecto."
+      ]
+    }
+  ],
+  "escritorio": [
+    {
+      "id": "2026-11-27v",
+      "version": "2026.11.27v",
+      "fecha": "27/11/2026",
+      "titulo": "Visitas de la página web",
+      "cambios": [
+        "Al lado de la barra de espacio de Pro, solo para el Administrador: visitas de la página web de hoy, de los últimos 30 días y en total."
+      ]
+    },
+    {
+      "id": "2026-11-22d",
+      "version": "2026.11.22d",
+      "fecha": "22/11/2026",
+      "titulo": "Apps según SGI › Perfiles",
+      "cambios": [
+        "Las apps que ve cada usuario en el Escritorio salen de lo que marques en SGI › Datos Varios › Perfiles (ventana «Portal y Escritorio»)."
+      ]
+    },
+    {
+      "id": "2026-11-22c",
+      "version": "2026.11.22c",
+      "fecha": "22/11/2026",
+      "titulo": "La sesión ya no vence sin avisar",
+      "cambios": [
+        "Mientras el Escritorio está abierto, la sesión se mantiene activa sola (antes vencía a las 6 horas sin avisar y las apps que abrías después decían «La sesión venció»).",
+        "Si igual vence, aparece una ventana para poner la clave de nuevo, sin cerrar las ventanas que tenés abiertas, y las que lo necesiten se vuelven a cargar solas.",
+        "Facturas Proforma y las pantallas del Pro toman la sesión del Escritorio."
+      ]
+    },
+    {
+      "id": "2026-11-20",
+      "version": "2026.11.20",
+      "fecha": "20/11/2026",
+      "titulo": "Carpetas Otros y Otras empresas",
+      "cambios": [
+        "En el grupo Otros hay dos botones nuevos: «Otros», que guarda los dos juegos y DelBen Domótica (ya no se ven sueltos al abrir el Escritorio), y «Otras empresas», que por ahora está vacío.",
+        "Tocando cada botón se abre una ventana con lo que tiene adentro."
+      ]
+    },
+    {
+      "id": "2026-11-17d",
+      "version": "2026.11.17d",
+      "fecha": "17/11/2026",
+      "titulo": "Facturas Proforma: editar y pie",
+      "cambios": [
+        "Las proformas ya generadas se pueden editar (botón Editar): se cambian los datos del cliente, el período o los ítems y se guarda con el mismo número.",
+        "El PDF lleva abajo tus datos de contacto: teléfono, info@delbensgi.com.ar, fjacyno@gmail.com y www.delbensgi.com.ar."
+      ]
+    },
+    {
+      "id": "2026-11-17c",
+      "version": "2026.11.17c",
+      "fecha": "17/11/2026",
+      "titulo": "Facturas Proforma",
+      "cambios": [
+        "Botón nuevo \"Facturas Proforma\" en Otros (solo Administración): cargás los datos, el número sigue solo (01-000109, 01-000110…) y se descarga el PDF igual a la proforma de siempre, con el encabezado F.M.J.",
+        "Al elegir un cliente que ya tuvo una proforma se completan solos su CUIT, condición de IVA, domicilio y los ítems de la última."
+      ]
+    },
+    {
+      "id": "2026-11-17b",
+      "version": "2026.11.17b",
+      "fecha": "17/11/2026",
+      "titulo": "DELBEN Pro desde el Escritorio",
+      "cambios": [
+        "Arriba hay un botón nuevo \"Pro\" (solo Administración). Con el Pro prendido, el Escritorio pasa a llamarse DELBEN PRO.",
+        "Con el Pro prendido, Control de Presentismo se abre con los datos de la base nueva y aparecen Servicios y Personal del Pro (marcados con \"Pro\"). Las demás apps se abren igual que siempre.",
+        "Para volver a todo como antes, tocá el botón y queda \"Pro apagado\"."
+      ]
+    },
+    {
+      "id": "2026-11-17a",
+      "version": "2026.11.17a",
+      "fecha": "17/11/2026",
+      "titulo": "Espacio de DELBEN Pro a la vista",
+      "cambios": [
+        "En la barra de arriba (solo Administración) se ve cuánto ocupa la base de DELBEN Pro, de los 500 MB del plan gratis: verde, amarilla desde el 70 % y roja desde el 90 %. Pasando el mouse dice cuántos MB quedan."
+      ]
+    },
+    {
+      "id": "2026-11-16a",
+      "version": "2026.11.16a",
+      "fecha": "16/11/2026",
+      "titulo": "Perfil Raizen Supervisor",
+      "cambios": [
+        "El usuario RAIZEN DOCK SUD SUPERVISORES (perfil Raizen Supervisor) ve solo Control de Móviles, Presentismo, Minuta Operativa, Combustible y Cargos del Personal: sin SGI, Novedades ni Rondín.",
+        "En el SGI sigue con su perfil de servicio, así la Minuta y el Presentismo funcionan igual que antes."
+      ]
+    },
+    {
+      "id": "2026-11-09",
+      "version": "2026.11.09",
+      "fecha": "09/11/2026",
+      "titulo": "Escritorio DELBEN: apps nuevas",
+      "cambios": [
+        "Nuevas apps: Control de Presentismo, Pedido de descargo y Horarios de cobertura (solo administración).",
+        "Licencias abre sin volver a poner la clave.",
+        "Las apps se abren siempre con la última versión (sin la copia vieja del navegador)."
+      ]
+    },
+    {
+      "id": "2026-10-30",
+      "fecha": "30/10/2026",
+      "titulo": "Escritorio DELBEN: cambios nuevos",
+      "cambios": [
+        "Nuevo botón Correos CC: por servicio, nombre y apellido, cargo, correo y qué se le comparte. Esas personas reciben copia de la Minuta Operativa por defecto. Se pueden modificar y eliminar.",
+        "Aviso de actualizaciones en todas las apps (este mensaje)."
+      ]
+    }
+  ],
+  "presentismo": [
+    {
+      "id": "2026-11-24",
+      "version": "2026.11.24",
+      "fecha": "24/11/2026",
+      "titulo": "Menos cortes al dar el presente",
+      "cambios": [
+        "Si se corta un momento la conexión con el servidor (poca señal o mucha gente dando el presente al cambio de turno), la app vuelve a intentar sola antes de avisar. Antes aparecía el cartel «Failed to fetch».",
+        "Si igual no hay conexión, el cartel ahora lo dice en castellano: revisá la señal o el wifi y probá de nuevo."
+      ]
+    },
+    {
+      "id": "2026-11-20s",
+      "version": "2026.11.20s",
+      "fecha": "20/11/2026",
+      "titulo": "Raizen ahora es SIGNAR ENERGY",
+      "cambios": [
+        "Raizen ahora se llama SIGNAR ENERGY: los servicios y sus registros (ausencias, salidas, ropa, inventarios, cargos, presentes, minutas) ya figuran con el nombre nuevo.",
+        "Si alguien escribe «raizen», se cambia solo por SIGNAR ENERGY, y buscar «raizen» o «signar» encuentra lo mismo."
+      ]
+    },
+    {
+      "id": "2026-11-20",
+      "version": "2026.11.20",
+      "fecha": "20/11/2026",
+      "titulo": "Correos como sgi@delbensgi.com.ar",
+      "cambios": [
+        "Los correos que manda esta app ahora salen como sgi@delbensgi.com.ar (ya no desde la cuenta de Gmail). Si un día se termina el cupo, salen por las otras cuentas DELBEN."
+      ]
+    },
+    {
+      "id": "2026-11-16",
+      "version": "2026.11.16",
+      "fecha": "16/11/2026",
+      "titulo": "Presentismo: cambios nuevos",
+      "cambios": [
+        "San Francisco, Fincas de Iraola, CMF, Arauco Zárate, Laguna, Raízen, Jardines (Manzanas 1, 2 y 3) y Radio Victoria dan el presente desde la computadora: ya no se manda el correo de \"fuera del radio\". Si pasa, queda igual en Anomalías de ubicación."
+      ]
+    },
+    {
+      "id": "2026-11-13",
+      "version": "2026.11.13",
+      "fecha": "13/11/2026",
+      "titulo": "Presentismo: cambios nuevos",
+      "cambios": [
+        "Desde la computadora del servicio ya no se controla la ubicación (la PC no tiene GPS y daba \"fuera de rango\"). Con el QR desde el celular se controla igual que antes.",
+        "El asunto del correo de presentes es: Presentismo Servicio (nombre) – fecha."
+      ]
+    },
+    {
+      "id": "2026-11-09",
+      "version": "2026.11.09",
+      "fecha": "09/11/2026",
+      "titulo": "Presentismo: cambios nuevos",
+      "cambios": [
+        "Presente con QR: se controla la ubicación dentro de los 20 metros del puesto; si está fuera, aviso al supervisor y a administración.",
+        "Las llegadas tarde (más de 15 minutos) se marcan en rojo.",
+        "Se ve bien en celular, tablet y PC.",
+        "El Coordinador ve lo mismo que un supervisor."
+      ]
+    },
+    {
+      "id": "2026-10-31",
+      "fecha": "31/10/2026",
+      "titulo": "Presentismo: QR por puesto con ubicación",
+      "cambios": [
+        "Cada puesto puede tener su propio QR (ej.: Manzana 1 y 2: Cabina 1 a 4; Manzana 3: Cabina 1, Cabina 4 y Rondín).",
+        "Al dar el presente con el QR se toma la ubicación del celular: el primer presente guarda dónde está el QR y, si después alguien lo da lejos (más de 5 a 30 metros), queda como anomalía.",
+        "En los servicios con encargado (Fincas, Laguna, Arauco, CMF…) el QR abre directamente el ingreso del encargado.",
+        "Nueva pestaña Anomalías de ubicación para supervisores, con mapa."
+      ]
+    },
+    {
+      "id": "2026-10-30",
+      "fecha": "30/10/2026",
+      "titulo": "Presentismo: cambios nuevos",
+      "cambios": [
+        "Códigos QR: 6 por hoja, siempre iguales, y se elige cuáles imprimir.",
+        "Los servicios con la palabra baja ya no aparecen.",
+        "Los permisos se dan desde SGI > Datos Varios > Perfiles."
+      ]
+    }
+  ],
+  "combustible": [
+    {
+      "id": "2026-11-22z",
+      "version": "2026.11.22z",
+      "fecha": "22/11/2026",
+      "titulo": "Asuntos sin DELBEN",
+      "cambios": [
+        "Los correos de rendición de combustible, caja chica, pedido de fondos y recordatorio de rendición ya no llevan la palabra DELBEN en el asunto."
+      ]
+    },
+    {
+      "id": "2026-11-20",
+      "version": "2026.11.20",
+      "fecha": "20/11/2026",
+      "titulo": "SIGNAR ENERGY y supervisores autorizados",
+      "cambios": [
+        "Raizen ahora se llama SIGNAR ENERGY: en las listas se ve el nombre nuevo, y buscar «raizen» o «signar» da lo mismo. Si alguien escribe «raizen», se cambia solo.",
+        "En Cargar ticket por un supervisor, Asignaciones, Saldos y Revisión también aparecen los usuarios que en SGI › Perfiles tienen «Entrar a la app» con Ver y editar (por ejemplo SIGNAR ENERGY DOCK SUD SUPERVISOR): se les puede asignar combustible y cargarles tickets.",
+        "Juan Palacio ya no figura en las listas de supervisores de Combustible."
+      ]
+    },
+    {
+      "id": "2026-11-17",
+      "version": "2026.11.17",
+      "fecha": "17/11/2026",
+      "titulo": "Correos desde DELBEN",
+      "cambios": [
+        "Los correos que manda esta app ahora salen de la cuenta DELBEN (delbensgi@gmail.com), ya no de fjacyno@gmail.com. Si un día se termina el cupo de esa cuenta, salen por las otras cuentas DELBEN."
+      ]
+    },
+    {
+      "id": "2026-11-16",
+      "version": "2026.11.16",
+      "fecha": "16/11/2026",
+      "titulo": "Raizen Supervisor",
+      "cambios": [
+        "El usuario de Raizen Supervisor entra y rinde combustible como un supervisor."
+      ]
+    },
+    {
+      "id": "2026-11-13",
+      "version": "2026.11.13",
+      "fecha": "13/11/2026",
+      "titulo": "Combustible: IVA e IIBB y saldos",
+      "cambios": [
+        "La lectura automática del ticket volvió a funcionar (el modelo anterior de Google dejó de existir): toma Subtotal, IVA, IIBB, impuestos internos y total impuestos.",
+        "Al enviar o rehacer una rendición, los tickets sin esos datos se leen de nuevo de la foto, así el PDF sale completo.",
+        "Saldos por supervisor: el administrador puede quitar personas de la lista y agregar otras."
+      ]
+    },
+    {
+      "id": "2026-11-09",
+      "version": "2026.11.09",
+      "fecha": "09/11/2026",
+      "titulo": "Combustible: rendición completa",
+      "cambios": [
+        "La rendición tiene Fecha, Usuario, Concepto, Proveedor, Comprobante, Subtotal, IVA, IIBB, Impuestos internos, Total impuestos y Total ticket, leídos del ticket.",
+        "El Coordinador ve lo mismo que un supervisor."
+      ]
+    },
+    {
+      "id": "2026-10-30",
+      "fecha": "30/10/2026",
+      "titulo": "Control de Combustible: cambios nuevos",
+      "cambios": [
+        "El Jefe de Operaciones entra con el perfil de supervisor.",
+        "Los servicios con la palabra baja ya no aparecen.",
+        "Los permisos se dan desde SGI > Datos Varios > Perfiles."
+      ]
+    }
+  ],
+  "licencias": [
+    {
+      "id": "2026-11-20s",
+      "version": "2026.11.20s",
+      "fecha": "20/11/2026",
+      "titulo": "Raizen ahora es SIGNAR ENERGY",
+      "cambios": [
+        "Raizen ahora se llama SIGNAR ENERGY: los servicios y sus registros (ausencias, salidas, ropa, inventarios, cargos, presentes, minutas) ya figuran con el nombre nuevo.",
+        "Si alguien escribe «raizen», se cambia solo por SIGNAR ENERGY, y buscar «raizen» o «signar» encuentra lo mismo."
+      ]
+    },
+    {
+      "id": "2026-11-20",
+      "version": "2026.11.20",
+      "fecha": "20/11/2026",
+      "titulo": "Correos como sgi@delbensgi.com.ar",
+      "cambios": [
+        "Los correos que manda esta app ahora salen como sgi@delbensgi.com.ar (ya no desde la cuenta de Gmail). Si un día se termina el cupo, salen por las otras cuentas DELBEN."
+      ]
+    },
+    {
+      "id": "2026-11-17a",
+      "version": "2026.11.17a",
+      "fecha": "17/11/2026",
+      "titulo": "Licencias: no se cargan dos veces",
+      "cambios": [
+        "Al tocar Guardar y enviar, la licencia queda guardada en el teléfono o la PC. Si tarda o no hay internet, la app la manda sola en segundo plano y avisa abajo que se está enviando: no hace falta volver a cargarla.",
+        "Si igual se carga de nuevo la misma licencia (misma persona, tipo y fechas) dentro de las 24 horas, no se vuelve a cargar ni a enviar: avisa que ya estaba cargada con su número."
+      ]
+    },
+    {
+      "id": "2026-11-13",
+      "version": "2026.11.13",
+      "fecha": "13/11/2026",
+      "titulo": "Licencias: avisos por correo",
+      "cambios": [
+        "Pedido de descargo: apenas se carga llega un correo de aviso (pendiente); cuando el vigilador responde llega el PDF firmado.",
+        "Los asuntos de los correos ya no dicen \"Delben\": Licencia por (tipo) – Apellido y nombre – Legajo – Empresa."
+      ]
+    },
+    {
+      "id": "2026-11-09",
+      "version": "2026.11.09",
+      "fecha": "09/11/2026",
+      "titulo": "Licencias: Pedido de descargo",
+      "cambios": [
+        "Nuevo tipo de licencia \"Pedido de descargo\": elegís vigilador, objetivo, origen del desvío y días; los textos se arman solos y se pueden cambiar.",
+        "Podés dictar con el micrófono el origen del desvío y el incumplimiento (se pasa a texto).",
+        "Con copia a quien quieras; el correo siempre llega a Fernando, al Jefe de Operaciones y al supervisor.",
+        "Botón \"Pedidos de descargo\" en la pantalla principal: ves todos los pedidos, arriba quién falta responder o si están todos respondidos, VER PDF y REENVIAR.",
+        "El PDF y el nombre del archivo llevan vigilador, legajo y empresa (se puede buscar por empresa).",
+        "Desde el Portal y el Escritorio entrás sin volver a poner la clave.",
+        "Nuevo tipo \"Eliminar licencia\"."
+      ]
+    },
+    {
+      "id": "2026-10-30",
+      "fecha": "30/10/2026",
+      "titulo": "Licencias del Personal: cambios nuevos",
+      "cambios": [
+        "Nuevo tipo de licencia: Alta de licencia, con adjunto por foto, cámara o archivo.",
+        "Los servicios con la palabra baja ya no aparecen.",
+        "Los permisos se dan desde SGI > Datos Varios > Perfiles."
+      ]
+    }
+  ],
+  "escaner": [
+    {
+      "id": "2026-11-13",
+      "version": "2026.11.13",
+      "fecha": "13/11/2026",
+      "titulo": "Escáner: etiquetas de QR",
+      "cambios": [
+        "Los QR se imprimen en etiqueta de 64 × 32 mm (una por etiqueta, con la cantidad que elijas) para la impresora de etiquetas por USB."
+      ]
+    },
+    {
+      "id": "2026-11-09",
+      "version": "2026.11.09",
+      "fecha": "09/11/2026",
+      "titulo": "Escáner: cambios nuevos",
+      "cambios": [
+        "Listados desplegables con buscador.",
+        "Los datos quedan vacíos después de cargar; el inventario muestra la existencia actual.",
+        "Las confirmaciones usan el diseño de la app."
+      ]
+    },
+    {
+      "id": "2026-10-30",
+      "fecha": "30/10/2026",
+      "titulo": "Escáner de Indumentaria (nuevo)",
+      "cambios": [
+        "Preparación: escaneás el código o QR, elegís quién retira, objetivo y a quién se asigna (legajo, empresa y DNI se completan solos) y aparece en la PC en SGI › Preparación de Indumentaria.",
+        "Inventario: escaneás, cargás la cantidad que hay y Aceptar: el inventario se actualiza solo.",
+        "Imprimir QR: elegís los ítems y salen los QR de 2,5 × 2,5 cm con el nombre al lado (la selección queda en la hoja QR Indumentaria de Drive).",
+        "Solo para el administrador."
+      ]
+    }
+  ],
+  "descargos": [
+    {
+      "id": "2026-11-20",
+      "version": "2026.11.20",
+      "fecha": "20/11/2026",
+      "titulo": "Correos como sgi@delbensgi.com.ar",
+      "cambios": [
+        "Los correos que manda esta app ahora salen como sgi@delbensgi.com.ar (ya no desde la cuenta de Gmail). Si un día se termina el cupo, salen por las otras cuentas DELBEN."
+      ]
+    },
+    {
+      "id": "2026-11-09",
+      "version": "2026.11.09",
+      "fecha": "09/11/2026",
+      "titulo": "Pedido de descargo (app nueva)",
+      "cambios": [
+        "El vigilador entra solo con su DNI y ve únicamente sus pedidos pendientes.",
+        "Puede contar lo que pasó hablando (se pasa a texto) o escribiendo, firma con el dedo y lo envía.",
+        "Una vez enviado, el pedido desaparece de su lista; el PDF firmado llega por correo a todos los del pedido.",
+        "Se instala en el celular desde el Portal o el instructivo (Descargar app)."
+      ]
+    }
+  ],
+  "control": [
+    {
+      "id": "2026-11-13",
+      "version": "2026.11.13",
+      "fecha": "13/11/2026",
+      "titulo": "Control de Presentismo: cambios nuevos",
+      "cambios": [
+        "Cada recuadro de arriba muestra su detalle al tocarlo: Servicios, Presentes hoy, Fichadas tarde hoy y Todavía sin la app.",
+        "La ventana de servicios sin presente vuelve a salir en cada actualización (cada 2 minutos) hasta que den el presente.",
+        "Aparecen los servicios que carga administración sin objetivo propio, como RAZ - TRELLES, RAZ - MONTENEGRO y RAZ - BARRACAS.",
+        "La tecla Escape cierra las ventanas."
+      ]
+    },
+    {
+      "id": "2026-11-09",
+      "version": "2026.11.09",
+      "fecha": "09/11/2026",
+      "titulo": "Control de Presentismo: cambios nuevos",
+      "cambios": [
+        "Los avisos salen de la proyección del supervisor en Novedades y de los Horarios de cobertura: no avisa los días que el servicio no trabaja.",
+        "Avisa por cantidad de puestos y dice qué cabina falta; también controla los turnos de la noche anterior.",
+        "Los servicios que todavía no dan el presente con la app van en naranja, aparte.",
+        "Siempre se ve la hora en que se fichó.",
+        "Al tocar un servicio: quiénes dieron el presente del turno en curso, los proyectados que no lo dieron y el relevo, con legajo y empresa.",
+        "Al tocar el recuadro rojo \"Turnos sin presente\" se abre la lista de los servicios que no dieron el presente.",
+        "Ahora todos los servicios muestran su supervisor y cada manzana muestra solo sus teléfonos."
+      ]
+    }
+  ],
+  "coberturas": [
+    {
+      "id": "2026-11-09",
+      "version": "2026.11.09",
+      "fecha": "09/11/2026",
+      "titulo": "Horarios de cobertura (nuevo)",
+      "cambios": [
+        "Cargá los horarios de cada servicio por puesto, día de la semana y feriado, con desde, hasta y cantidad de personas.",
+        "Botones \"Agregar puesto\" y \"Agregar 24 h\"; la tabla \"Horas por día\" compara lo cargado con lo contratado.",
+        "Los nombres de los servicios son los de los clientes en Stock Manager, en mayúsculas (como en la Minuta: Signar Energy, Fincas de Iraola Dos).",
+        "De acá salen los avisos del Control de Presentismo."
+      ]
+    }
+  ],
+  "cargos": [
+    {
+      "id": "2026-11-20s",
+      "version": "2026.11.20s",
+      "fecha": "20/11/2026",
+      "titulo": "Raizen ahora es SIGNAR ENERGY",
+      "cambios": [
+        "Raizen ahora se llama SIGNAR ENERGY: los servicios y sus registros (ausencias, salidas, ropa, inventarios, cargos, presentes, minutas) ya figuran con el nombre nuevo.",
+        "Si alguien escribe «raizen», se cambia solo por SIGNAR ENERGY, y buscar «raizen» o «signar» encuentra lo mismo."
+      ]
+    },
+    {
+      "id": "2026-11-20b",
+      "version": "2026.11.20b",
+      "fecha": "20/11/2026",
+      "titulo": "Correos como sgi@ y sin DELBEN en el asunto",
+      "cambios": [
+        "Los correos de esta app ahora salen como sgi@delbensgi.com.ar y el asunto ya no lleva la palabra DELBEN."
+      ]
+    },
+    {
+      "id": "2026-11-17",
+      "version": "2026.11.17",
+      "fecha": "17/11/2026",
+      "titulo": "Correos de las apps DELBEN",
+      "cambios": [
+        "Esta app ahora también envía los correos de SGI, Novedades, Combustible y Control de Móviles, para que todos salgan de la cuenta DELBEN."
+      ]
+    },
+    {
+      "id": "2026-11-16b",
+      "version": "2026.11.16b",
+      "fecha": "16/11/2026",
+      "titulo": "Cargos para firmar con DNI",
+      "cambios": [
+        "Botón \"Cargos Precargados\" con DNI: el vigilador pone su DNI, ve lo que tiene para firmar y firma, sin poder cambiar nada del cargo.",
+        "Los botones del inicio (Cargos Nuevos, Devolución, Cargos Firmados y Cargos) se habilitan por perfil en SGI › Perfiles.",
+        "Perfil Raizen Supervisor: solo Cargos y Devolución; no ve los cargos de otros. Los cargos le llegan también a Juan Palacio."
+      ]
+    },
+    {
+      "id": "2026-11-16",
+      "version": "2026.11.16",
+      "fecha": "16/11/2026",
+      "titulo": "Cargos Precargados",
+      "cambios": [
+        "Nuevo botón en el inicio: Cargos Precargados (se habilita por perfil en Autorizaciones).",
+        "El supervisor escribe apellido y nombre, aparece el DNI y al tocar OK se listan las prendas que la persona ya retiró y falta firmar.",
+        "Con Firmar cargo se arma el acta con esos ítems: se elige el servicio y firma el vigilador.",
+        "La ropa asignada en el Registro de Salida del SGI se carga sola en Solicitudes registradas y aparece acá."
+      ]
+    },
+    {
+      "id": "2026-11-09",
+      "version": "2026.11.09",
+      "fecha": "09/11/2026",
+      "titulo": "Cargos del Personal: cambios nuevos",
+      "cambios": [
+        "Se pueden escanear los QR de los ítems.",
+        "Botón \"Cargo Automático\": trae lo retirado en el Registro de Salida que falta firmar."
+      ]
+    }
+  ],
+  "datos": [
+    {
+      "id": "2026-11-27d",
+      "version": "2026.11.27d",
+      "fecha": "27/11/2026",
+      "titulo": "Foto del DNI",
+      "cambios": [
+        "La foto del DNI sale horizontal y recortada justo al recuadro verde (solo el documento, sin el fondo)."
+      ]
+    },
+    {
+      "id": "2026-11-20c",
+      "version": "2026.11.20c",
+      "fecha": "20/11/2026",
+      "titulo": "Foto para la credencial mejorada",
+      "cambios": [
+        "El fondo queda blanco en todas las fotos.",
+        "La foto se encuadra sola tipo carnet: cabeza centrada y hombros.",
+        "Más nítida."
+      ]
+    },
+    {
+      "id": "2026-11-20b",
+      "version": "2026.11.20b",
+      "fecha": "20/11/2026",
+      "titulo": "Ficha de Datos: foto para la credencial",
+      "cambios": [
+        "Nueva pantalla 8: foto de frente (selfie) con guía para la cara y los hombros.",
+        "El fondo se borra solo y queda blanco; la foto queda nítida, lista para la credencial.",
+        "Si no anda la cámara, se puede elegir la foto de la galería.",
+        "Cada persona tiene una sola ficha: la nueva reemplaza a la anterior (si sacás fotos nuevas del DNI, reemplazan a las viejas)."
+      ]
+    },
+    {
+      "id": "2026-11-20",
+      "version": "2026.11.20",
+      "fecha": "20/11/2026",
+      "titulo": "Ficha de Datos: arreglos para enviar y para la foto del DNI",
+      "cambios": [
+        "ENVIAR DATOS ya no se queda quieto: si falta algo o está mal escrito, te lleva a esa pantalla y te dice qué corregir.",
+        "El DNI se puede escribir con o sin puntos.",
+        "El botón CAPTURAR FOTO se habilita siempre que la cámara está abierta.",
+        "Si la cámara no anda, aparece ELEGIR FOTO DE LA GALERÍA."
+      ]
+    },
+    {
+      "id": "2026-11-09",
+      "version": "2026.11.09",
+      "fecha": "09/11/2026",
+      "titulo": "Ficha de Datos: cambios nuevos",
+      "cambios": [
+        "Busca por nombre o DNI.",
+        "Actualiza domicilio, teléfono y correo en el listado del personal.",
+        "Se guarda de a una ficha por vez y vuelve a cargar el listado si no llegó."
+      ]
+    }
+  ],
+  "pro": [
+    {
+      "id": "2026-11-27",
+      "version": "2026.11.27",
+      "fecha": "27/11/2026",
+      "titulo": "Credenciales",
+      "cambios": [
+        "Nueva pestaña Credenciales: abre Gestión de Personal › Credenciales del SGI, con el mismo modelo de credencial (frente, dorso con la ART, habilitación y QR con el logo de KTL)."
+      ]
+    },
+    {
+      "id": "2026-11-22c",
+      "version": "2026.11.22c",
+      "fecha": "22/11/2026",
+      "titulo": "Entrada desde el Escritorio (arreglo definitivo)",
+      "cambios": [
+        "Las pantallas del Pro le piden la sesión directamente al Escritorio que tenés abierto. Antes leían una sesión vieja guardada en la otra dirección (delbensgi.com.ar) y decían «La sesión venció» aunque el Escritorio estuviera abierto.",
+        "Si la sesión de verdad venció, el Escritorio te pide la clave en su ventana y la pantalla del Pro se vuelve a abrir sola."
+      ]
+    },
+    {
+      "id": "2026-11-22b",
+      "version": "2026.11.22b",
+      "fecha": "22/11/2026",
+      "titulo": "Entrada desde el Escritorio",
+      "cambios": [
+        "Las pantallas del Pro (Facturas Proforma y las demás) ahora usan la sesión del Escritorio que tenés abierta. Antes probaban primero una sesión vieja del Portal y decían «La sesión venció»."
+      ]
+    },
+    {
+      "id": "2026-11-22a",
+      "version": "2026.11.22a",
+      "fecha": "22/11/2026",
+      "titulo": "Facturas Proforma con pestañas",
+      "cambios": [
+        "Pestañas Nueva proforma, Clientes, Productos e Historial.",
+        "Clientes y Productos: cargás, editás y borrás los tuyos; al armar la proforma los elegís de la lista y se completan solos los datos y el precio.",
+        "Historial: todas las proformas con buscador por cliente o número, filtro de fechas y total del período; desde ahí se edita o se baja el PDF."
+      ]
+    },
+    {
+      "id": "2026-11-17c",
+      "version": "2026.11.17c",
+      "fecha": "17/11/2026",
+      "titulo": "Facturas Proforma",
+      "cambios": [
+        "Pantalla de Facturas Proforma con número automático, listado de las generadas y PDF."
+      ]
+    },
+    {
+      "id": "2026-11-17b",
+      "version": "2026.11.17b",
+      "fecha": "17/11/2026",
+      "titulo": "El Pro se usa desde el Escritorio",
+      "cambios": [
+        "Las pantallas del Pro se abren en ventanas del Escritorio (botón \"Pro prendido\"). La dirección del Pro sola lleva al Escritorio con el Pro prendido."
+      ]
+    },
+    {
+      "id": "2026-11-17a",
+      "version": "2026.11.17a",
+      "fecha": "17/11/2026",
+      "titulo": "Datos al día y espacio a la vista",
+      "cambios": [
+        "Arriba se ve cuánto ocupa la base, de los 500 MB del plan gratis (verde, amarilla desde el 70 %, roja desde el 90 %).",
+        "Se cargaron la proyección del período anterior, las licencias y los pedidos de descargo; la proyección, los feriados, las licencias y los descargos se actualizan solos cada 5 minutos.",
+        "El historial anota solo los cambios reales: la base bajó de 268 MB a menos de 40 MB."
+      ]
+    },
+    {
+      "id": "2026-11-09d",
+      "version": "2026.11.09d",
+      "fecha": "09/11/2026",
+      "titulo": "DELBEN Pro: Control de Presentismo",
+      "cambios": [
+        "Nuevo botón Control: los presentes de hoy de todos los servicios, contra los horarios de cobertura.",
+        "Cada servicio muestra sus turnos de hoy con cuántos dieron el presente (ej. 07:00 · 2/3); en rojo si pasaron 15 minutos y falta alguien.",
+        "Los servicios que todavía no dan el presente con la app van en naranja, aparte, y no cuentan como turnos sin presente.",
+        "Al tocar el recuadro rojo \"Turnos sin presente\" se abre la lista de servicios; al tocar un servicio, quiénes dieron el presente del turno en curso, el relevo y todos los presentes del día.",
+        "Los presentes llegan solos desde la app de Presentismo cada 5 minutos."
+      ]
+    },
+    {
+      "id": "2026-11-09b",
+      "version": "2026.11.09b",
+      "fecha": "09/11/2026",
+      "titulo": "DELBEN Pro: supervisor con nombre y apellido",
+      "cambios": [
+        "En Servicios, el supervisor se muestra con su nombre y apellido (no con el usuario), en la lista y en el detalle.",
+        "También se puede buscar un servicio por el nombre del supervisor."
+      ]
+    },
+    {
+      "id": "2026-11-09",
+      "version": "2026.11.09",
+      "fecha": "09/11/2026",
+      "titulo": "DELBEN Pro: primera versión en prueba",
+      "cambios": [
+        "Entrás con la misma sesión del Portal o del Escritorio, sin volver a poner la clave.",
+        "Servicios: los 40 servicios activos con su código único, nombres anteriores, horarios de cobertura, horas contratadas y líneas de teléfono.",
+        "Personal: el listado completo con DNI, legajo, empresa y estado, con buscador.",
+        "Control de Presentismo: en preparación."
+      ]
+    }
+  ],
+  "notas": [
+    {
+      "id": "2026-11-13b",
+      "version": "2026.11.13.2",
+      "fecha": "13/11/2026",
+      "titulo": "Novedades para el cierre (nuevo)",
+      "cambios": [
+        "Botón turquesa \"Novedades\" en el Escritorio, solo para administración.",
+        "Durante el período anotás lo que hay que tener en cuenta para el cierre de horas.",
+        "Al hacer el Control de cierre en Novedades del Personal, antes de pasar a RRHH, sale una ventana con todas las novedades del período.",
+        "Dictado por voz: tocá el micrófono y hablá; se escribe solo.",
+        "El botón está al lado de DELBEN SGI en el Escritorio."
+      ]
+    }
+  ],
+  "informes": [
+    {
+      "id": "2026-11-13b",
+      "version": "2026.11.13.2",
+      "fecha": "13/11/2026",
+      "titulo": "Informes (nuevo)",
+      "cambios": [
+        "Horas a facturar por empresa del servicio y total: contratadas y realizadas + proyectadas, a la fecha y estimado al cierre del período (tocá la empresa para ver sus servicios).",
+        "Horas extras unificadas por persona (todas sus horas de todos los servicios), por empresa y total, estimadas al cierre.",
+        "Vacaciones por empresa y total: días a la fecha, los que faltan y los que tienen plus.",
+        "Horas extras y vacaciones: ahora van a la empresa del vigilador (las extras son de la persona, no del servicio)."
+      ]
+    }
+  ],
+  "informe": [
+    {
+      "id": "2026-11-21a",
+      "version": "2026.11.21a",
+      "fecha": "21/11/2026",
+      "titulo": "Informe de Novedades con diseño nuevo",
+      "cambios": [
+        "El PDF del informe sale con el diseño nuevo de KTL: sin renglones, datos en un cuadro y el texto corrido.",
+        "Si el servicio es de SIGNAR ENERGY (Raizen), el informe sale con su formato: fecha, hora y lugar del hecho, tipo de hecho y cronología.",
+        "Tipo de hecho: si elegís «Otro», aparece un campo para escribir qué pasó y sale así en el PDF (por ejemplo «Otro: Corte de energía»).",
+        "Cada foto puede llevar un epígrafe (una línea abajo de la foto)."
+      ]
+    }
+  ],
+  "documentacion": [
+    {
+      "id": "2026-11-27",
+      "version": "2026.11.27",
+      "fecha": "27/11/2026",
+      "titulo": "Documentación por persona",
+      "cambios": [
+        "ART y Seguro de vida: al elegir una persona aparece el botón «Subir documento de esta persona» (PDF o foto).",
+        "El documento se guarda en la carpeta de su empresa, dentro de Personal / DNI - Apellido y nombre.",
+        "Con la persona elegida se ven primero sus documentos; los de otras personas no aparecen."
+      ]
+    }
+  ]
+}
